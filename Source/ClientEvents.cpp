@@ -134,7 +134,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 	if (!m_pClient->HasCharacter(char_weenie_id))
 	{
 		LoginError(13); // update error codes
-		SERVER_WARN << szAccount << "Logging in with a character that doesn't belong to this account!\n";
+		SERVER_WARN << szAccount << "attempting to log in with a character that doesn't belong to this account";
 		return;
 	}
 
@@ -142,25 +142,25 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 	{
 		// LOG(Temp, Normal, "Character already logged in!\n");
 		LoginError(13); // update error codes
-		SERVER_WARN << szAccount << "Login request, but character already logged in!\n";
+		SERVER_WARN << szAccount << "Login request, but character already logged in!";
 		return;
 	}
 
 	/*
 	if (_stricmp(szAccount, m_pClient->GetAccountInfo().username))
 	{
-		LoginError(15);
-		LOG(Client, Warning, "Bad account for login: \"%s\" \"%s\"\n", szAccount, m_pClient->GetAccountInfo().username);
-		return;
+	LoginError(15);
+	LOG(Client, Warning, "Bad account for login: \"%s\" \"%s\"\n", szAccount, m_pClient->GetAccountInfo().username);
+	return;
 	}
 	*/
-	
+
 	m_pPlayer = new CPlayerWeenie(m_pClient, char_weenie_id, m_pClient->IncCharacterInstanceTS(char_weenie_id));
-	
+
 	if (!m_pPlayer->Load())
 	{
 		LoginError(13); // update error codes
-		SERVER_WARN << szAccount << "Login request, but character failed to load!\n";
+		SERVER_WARN << szAccount << "Login request, but character failed to load!";
 
 		delete m_pPlayer;
 
@@ -2909,7 +2909,7 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 	if (pReader->GetLastError()) return;
 
 #ifdef _DEBUG
-	LOG(Client, Verbose, "Processing event: 0x%X\n", dwEvent);
+	DEBUG_DATA << "Processing event:" << dwEvent;
 #endif
 
 	switch (dwEvent)
@@ -4176,11 +4176,11 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 		{
 			//Unknown Event
 #ifdef _DEBUG
-			LOG(Temp, Normal, "Unhandled client event 0x%X:\n", dwEvent);
+			SERVER_WARN << "Unhandled client event" << dwEvent;
 #endif
 			// LOG_BYTES(Temp, Verbose, in->GetDataPtr(), in->GetDataEnd() - in->GetDataPtr() );
 		}
-	}
+		}
 }
 
 

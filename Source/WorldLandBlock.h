@@ -7,7 +7,7 @@
 #include "Player.h"
 
 #ifdef _DEBUG
-#define DELETE_ENTITY(x) LOG(Temp, Normal, csprintf("Delete Entity %u @ %s\r\n", pEntity->id, __FUNCTION__)); delete pEntity
+#define DELETE_ENTITY(x) DEBUG_DATA << "Delete Entity" << pEntity->id << "@" << __FUNCTION__; delete pEntity
 #else
 #define DELETE_ENTITY(x) delete pEntity
 #endif
