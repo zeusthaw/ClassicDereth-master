@@ -169,6 +169,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 
 	m_pPlayer->SetLoginPlayerQualities(); // overrides
 	m_pPlayer->RecalculateEncumbrance();
+	m_pPlayer->RecalculateCoinAmount(W_COINSTACK_CLASS);
 	m_pPlayer->LoginCharacter();
 	
 	last_age_update = chrono::system_clock::to_time_t(chrono::system_clock::now());
