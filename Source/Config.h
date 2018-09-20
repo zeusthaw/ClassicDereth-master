@@ -74,6 +74,7 @@ public:
 
 	virtual bool ShowLogins() { return m_bShowLogins; }
 	virtual bool SpeedHackKicking() { return m_bSpeedHackKicking; }
+	virtual double SpeedHackKickThreshold() { return m_fSpeedHackKickThreshold; }
 	virtual bool ShowDeathMessagesGlobally() { return m_bShowDeathMessagesGlobally; }
 	virtual bool ShowPlayerDeathMessagesGlobally() { return m_bShowPlayerDeathMessagesGlobally; }
 
