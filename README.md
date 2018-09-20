@@ -45,7 +45,11 @@ Maintained by the GDLE Development Team. Contact us at https://discord.gg/WzGX34
 
 
 # Additional support: 
-gmriggs, The golems, Kloud,
+* gmriggs
+* The Golems
+* Kloud
+* Optimshi
+* parad0x
 
 Good luck, have fun.
 
