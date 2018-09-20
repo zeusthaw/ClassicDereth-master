@@ -154,6 +154,7 @@ protected:
 
 	bool m_bShowLogins = true;
 	bool m_bSpeedHackKicking = true;
+	double m_fSpeedHackKickThreshold = 1.2;
 
 	bool m_bShowDeathMessagesGlobally = false;
 	bool m_bShowPlayerDeathMessagesGlobally = false;
