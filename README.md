@@ -18,7 +18,30 @@ License: https://raw.githubusercontent.com/bDekaru/ClassicDereth/master/LICENSE
 Maintained by the GDLE Development Team. Contact us at https://discord.gg/WzGX348 
 
 # Development: 
-*Scribble, Chosen One, LikeableLime, Morosity, fourk, scruples, drunkferret, mwnciau, fdsfsd, Auning Content, shark, Targin, Zarto, SeraphinX, Crimson Mage, Lord Traithia, Mentel, Zykot, Zeus, Shadow King, Recks, birbistheworb, Hellswrath, and Driss
+* Scribble
+* Chosen One
+* LikeableLime 
+* Morosity 
+* fourk 
+* scruples 
+* drunkferret 
+* mwnciau 
+* fdsfsd 
+* Auning Content 
+* shark 
+* Targin 
+* Zarto 
+* SeraphinX 
+* Crimson Mage 
+* Lord Traithia 
+* Mentel 
+* Zykot 
+* Zeus 
+* Shadow King 
+* Recks 
+* birbistheworb 
+* Hellswrath 
+* Driss
 
 
 # Additional support: 
@@ -28,7 +51,7 @@ Good luck, have fun.
 
 # Discords:
 
-GDL: https://discord.gg/J9jGPFK
-GDLE: https://discord.gg/yZqvAsF
-Lifestoned: https://discord.gg/zNwpvNh
-FizzleClassic: https://discord.gg/Wma8wjd
+* GDL: https://discord.gg/J9jGPFK
+* GDLE: https://discord.gg/yZqvAsF
+* Lifestoned: https://discord.gg/zNwpvNh
+* FizzleClassic: https://discord.gg/Wma8wjd
