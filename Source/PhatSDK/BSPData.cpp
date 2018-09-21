@@ -372,7 +372,7 @@ TransitionState CSphere::slide_sphere(OBJECTINFO *object, SPHEREPATH *path, COLL
 	if (collision_normal.normalize_check_small())
 		return TransitionState::COLLIDED_TS;
 
-	return slide_sphere(path, collisions, &collision_normal, &path->global_curr_center[sphere_number]);
+	return check_pos->slide_sphere(path, collisions, &collision_normal, &path->global_curr_center[sphere_number]);
 }
 
 TransitionState CSphere::slide_sphere(SPHEREPATH *path, COLLISIONINFO *collisions, Vector *collision_normal, Vector *curr_pos)
@@ -495,8 +495,8 @@ TransitionState CSphere::slide_sphere(OBJECTINFO *object, SPHEREPATH *path, COLL
 			return TransitionState::COLLIDED_TS;
 
 		direction.x = collision_normal.x - someVec.x;
-		direction.y = direction.y - someVec.x;
-		direction.z = direction.z - someVec.x;
+		direction.y = direction.y - someVec.y;
+		direction.z = direction.z - someVec.z;
 
 		path->add_offset_to_check_pos(&direction, path->global_sphere[sphere_num].radius);
 		return TransitionState::SLID_TS;
@@ -1183,11 +1183,6 @@ BSPNODE::BSPNODE()
 }
 
 BSPNODE::~BSPNODE()
-{
-	Destroy();
-}
-
-void BSPNODE::Destroy()
 {
 	if (pos_node)
 	{
@@ -2222,11 +2217,6 @@ BSPPORTAL::BSPPORTAL()
 
 BSPPORTAL::~BSPPORTAL()
 {
-	Destroy();
-}
-
-void BSPPORTAL::Destroy()
-{
 	if (in_portals)
 	{
 		for (DWORD i = 0; i < num_portals; i++)
@@ -2240,8 +2230,6 @@ void BSPPORTAL::Destroy()
 	}
 
 	num_portals = 0;
-
-	BSPNODE::Destroy();
 }
 
 BOOL BSPPORTAL::UnPackPortal(BYTE** ppData, ULONG iSize)
@@ -2805,15 +2793,15 @@ int BSPTREE::box_intersects_cell_bsp(BBox *box)
 	return root_node->box_intersects_cell_bsp(box);
 }
 
-void BSPNODE::DetachPortalsAndPurgeNodes(SmartArray<BSPNODE *> *io_PortalsToKeep)
+void BSPNODE::DetachPortalsAndPurgeNodes(std::vector<BSPNODE*> &keep)//SmartArray<BSPNODE *> *io_PortalsToKeep)
 {
 	if (pos_node)
 	{
-		pos_node->DetachPortalsAndPurgeNodes(io_PortalsToKeep);
+		pos_node->DetachPortalsAndPurgeNodes(keep);
 
 		if (pos_node->type == 'PORT')
 		{
-			io_PortalsToKeep->add(&pos_node); // AddToEnd
+			keep.push_back(pos_node); // AddToEnd
 		}
 		else
 		{
@@ -2825,11 +2813,11 @@ void BSPNODE::DetachPortalsAndPurgeNodes(SmartArray<BSPNODE *> *io_PortalsToKeep
 
 	if (neg_node)
 	{
-		neg_node->DetachPortalsAndPurgeNodes(io_PortalsToKeep);
+		neg_node->DetachPortalsAndPurgeNodes(keep);
 
 		if (neg_node->type == 'PORT')
 		{
-			io_PortalsToKeep->add(&neg_node); // AddToEnd
+			keep.push_back(neg_node); // AddToEnd
 		}
 		else
 		{
@@ -2840,22 +2828,27 @@ void BSPNODE::DetachPortalsAndPurgeNodes(SmartArray<BSPNODE *> *io_PortalsToKeep
 	}
 }
 
-void BSPNODE::LinkPortalNodeChain(SmartArray<BSPNODE *> *_Portals)
+void BSPNODE::LinkPortalNodeChain(std::vector<BSPNODE*> &portals)//SmartArray<BSPNODE *> *_Portals)
 {
-	for (int i = _Portals->num_used - 1; i >= 0; i--)
+	BSPNODE **tmp = &pos_node;
+	for (int i = portals.size() - 1; i >= 0; i--)
 	{
-		pos_node = _Portals->array_data[i];
+		*tmp = portals[i];
+		tmp = &(*tmp)->pos_node;
 
-		if (i > 0)
-		{
-			pos_node->pos_node = _Portals->array_data[i - 1];
-		}
+		//if (i > 0)
+		//{
+		//	pos_node->pos_node = portals[i - 1];
+		//}
 	}
 }
 
 void BSPTREE::RemoveNonPortalNodes()
 {
-	SmartArray<BSPNODE *> PortalsToKeep;
-	root_node->DetachPortalsAndPurgeNodes(&PortalsToKeep);
-	root_node->LinkPortalNodeChain(&PortalsToKeep);
+	//SmartArray<BSPNODE *> PortalsToKeep;
+	std::vector<BSPNODE*> portals;
+	root_node->DetachPortalsAndPurgeNodes(portals);
+	root_node->LinkPortalNodeChain(portals);
+	//root_node->DetachPortalsAndPurgeNodes(&PortalsToKeep);
+	//root_node->LinkPortalNodeChain(&PortalsToKeep);
 }

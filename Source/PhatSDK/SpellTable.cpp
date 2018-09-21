@@ -391,7 +391,7 @@ int CSpellBase::InqTargetType() const
 	return 0;
 }
 
-/*
+
 DEFINE_PACK(SpellSetTierList)
 {
 	UNFINISHED();
@@ -399,6 +399,8 @@ DEFINE_PACK(SpellSetTierList)
 
 DEFINE_UNPACK(SpellSetTierList)
 {
+	m_tierSpellList.UnPack(pReader);
+	return true;
 }
 
 DEFINE_PACK(SpellSet)
@@ -408,8 +410,10 @@ DEFINE_PACK(SpellSet)
 
 DEFINE_UNPACK(SpellSet)
 {
+	m_spellSetTiers.UnPack(pReader);
+	return true;
 }
-*/
+
 
 CSpellTable::CSpellTable()
 {
@@ -442,7 +446,24 @@ DEFINE_UNPACK(CSpellTable) // type 0x0E00000E
 {
 	DWORD data_id = pReader->Read<DWORD>(); // id
 	_spellBaseHash.UnPack(pReader);
-	// m_SpellSetHash....
+	_spellSetHash.UnPack(pReader);
+
+#if 0
+	for (auto it : _spellSetHash)
+	{
+		SERVER_INFO << "Set ID: " << it.first;
+		for (auto it2 : it.second.m_spellSetTiers)
+		{
+			SERVER_INFO << "Level/Pieces: " << it2.first;
+			for (auto it3 : it2.second.m_tierSpellList)
+			{
+				SERVER_INFO << "Set spells: " << it3;
+			}
+		}
+
+	}
+#endif
+
 
 #if PHATSDK_IS_SERVER
 	_categoryToResearchableSpellsMap.clear();
@@ -524,4 +545,9 @@ DWORD CSpellTable::ChangeSpellToDifferentLevel(DWORD spell_id, DWORD spell_level
 const CSpellBase *CSpellTable::GetSpellBase(DWORD spell_id)
 {
 	return _spellBaseHash.lookup(spell_id);
+}
+
+const SpellSet *CSpellTable::GetSpellSet(DWORD set_id)
+{
+	return _spellSetHash.lookup(set_id);
 }

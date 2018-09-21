@@ -54,6 +54,15 @@ void CPortal::CheckedTeleport(CWeenieObject *pOther)
 {
 	if (pOther && !(pOther->m_PhysicsState & PhysicsState::HIDDEN_PS))
 	{
+		if (CPlayerWeenie *player = pOther->AsPlayer())
+		{
+			if (player->CheckPKActivity())
+			{
+				pOther->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+				return;
+			}
+		}
+
 		ChanceExecuteEmoteSet(pOther->GetID(), Use_EmoteCategory);
 
 		std::string restriction;

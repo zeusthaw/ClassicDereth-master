@@ -251,9 +251,9 @@ void Frame::set_heading(float DegreeHeading)
 Vector Frame::get_vector_heading()
 {
 	Vector heading;
-	heading.x = m00 * 0.0 + m10 + m20;
-	heading.y = m01 * 0.0 + m11 + m21;
-	heading.z = m02 * 0.0 + m12 + m22;
+	heading.x = m10;
+	heading.y = m11;
+	heading.z = m12;
 	return heading;
 }
 
@@ -507,7 +507,7 @@ float Frame::get_heading(void) const
 	Heading.x = ((m00 + m20) * 0.0f) + m10;
 	Heading.y = ((m01 + m21) * 0.0f) + m11;
 
-	return (float)fmod(450 - RAD2DEG(atan2(Heading.y, Heading.x)), 360);
+	return (float) fmod(450 - RAD2DEG(atan2(Heading.y, Heading.x)), 360);
 }
 
 void Frame::interpolate_rotation(const Frame &from, const Frame &to, float t)
@@ -549,7 +549,7 @@ void Frame::interpolate_rotation(const Frame &from, const Frame &to, float t)
 	}
 
 	Quaternion new_q;
-	new_q = q * v12 + from.m_angles*v11;
+	new_q = q*v12 + from.m_angles*v11;
 	set_rotate(new_q);
 }
 
@@ -557,7 +557,7 @@ void Frame::subtract2(Frame *_f1, Frame *_f2)
 {
 	float new_qz;
 	float new_qy;
-	float new_qx;
+	float new_qx; 
 	float new_qw;
 
 	m_origin = _f2->globaltolocal(_f1->m_origin);
@@ -755,7 +755,7 @@ float Position::cylinder_distance(float r1, float h1, const Position &p1, float 
 {
 	Vector offset = p1.get_offset(p2);
 	float magReach = offset.magnitude() - (r1 + r2);
-
+	
 	float v8;
 	float v10;
 
@@ -776,7 +776,7 @@ float Position::cylinder_distance(float r1, float h1, const Position &p1, float 
 	if (v11 > 0)
 	{
 		if (magReach > 0)
-			return sqrt((v11*v11) + (magReach*magReach));
+			return sqrt((v11*v11)+(magReach*magReach));
 
 		return v11;
 	}
@@ -803,7 +803,7 @@ float Position::heading(const Position &p)
 	if (direction.normalize_check_small())
 		return 0.0f;
 
-	return (float)fmod(450.0 - RAD2DEG(atan2(direction.y, direction.x)), 360.0);
+	return (float) fmod(450.0 - RAD2DEG(atan2(direction.y, direction.x)), 360.0);
 }
 
 float Position::heading_diff(const Position &p)
@@ -814,7 +814,7 @@ float Position::heading_diff(const Position &p)
 DWORD Position::determine_quadrant(float height, Position *p) const
 {
 	Vector hitpoint = localtolocal(*p, Vector(0, 0, 0));
-
+	
 	DWORD quadrant;
 
 	if (hitpoint.x < 0.0)
@@ -905,7 +905,7 @@ void PositionPack::Pack(BinaryWriter *pWriter)
 bool PositionPack::UnPack(BinaryReader *pReader)
 {
 	DWORD flags = pReader->Read<DWORD>();
-	position.UnPackOrigin(pReader);
+	position.UnPackOrigin(pReader);	
 
 	if (flags & 8)
 		position.frame.m_angles.w = 0;

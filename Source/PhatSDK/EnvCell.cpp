@@ -366,7 +366,7 @@ BOOL CCellPortal::UnPack(DWORD LandBlock, WORD *PolyIndex, BYTE **ppData, ULONG 
 
 CEnvCell *CCellPortal::GetOtherCell(BOOL do_not_load)
 {
-	return CEnvCell::GetVisible(other_cell_id);
+	return CEnvCell::GetVisible(other_cell_id, !do_not_load);
 }
 
 BOOL CEnvCell::point_in_cell(const Vector& point)
@@ -414,10 +414,10 @@ TransitionState CEnvCell::find_env_collisions(CTransition *transition)
 	return ts;
 }
 
-CEnvCell *CEnvCell::GetVisible(DWORD cell_id)
+CEnvCell *CEnvCell::GetVisible(DWORD cell_id, bool bDoPostLoad)
 {
 	// Should get any requested cell on a server, or visible cells on a client?
-	return g_pPhatSDK->EnvCell_GetVisible(cell_id);
+	return g_pPhatSDK->EnvCell_GetVisible(cell_id, bDoPostLoad);
 }
 
 CEnvCell *CEnvCell::find_visible_child_cell(Vector *origin, const int bSearchCells)

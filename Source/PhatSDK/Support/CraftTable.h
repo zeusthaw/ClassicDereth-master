@@ -6,7 +6,7 @@ class TYPEMod : public PackObj, public PackableJson
 {
 public:
 
-	virtual void Pack(class BinaryWriter *pWriter) override;
+	virtual void Pack(class BinaryWriter *pWriter) override; 
 	virtual bool UnPack(class BinaryReader *pReader) override;
 	virtual void PackJson(json& writer) override;
 	virtual bool UnPackJson(const json& reader) override;
@@ -18,7 +18,7 @@ public:
 };
 
 template<typename TStatType, typename TDataType>
-class TYPERequirement : public PackObj, public PackableJson
+class TYPERequirement : public PackObj, public PackableJson	
 {
 public:
 
@@ -64,15 +64,15 @@ public:
 	PackableListWithJson<TYPEMod<STypeString, std::string>> _stringMod;
 	PackableListWithJson<TYPEMod<STypeBool, BOOL>> _boolMod;
 
-	int _ModifyHealth = 0;
-	int _ModifyStamina = 0;
-	int _ModifyMana = 0;
-	int _RequiresHealth = 0;
-	int _RequiresStamina = 0;
-	int _RequiresMana = 0;
+	int _ModifyHealth=0;
+	int _ModifyStamina=0;
+	int _ModifyMana=0;
+	int _RequiresHealth=0;
+	int _RequiresStamina=0;
+	int _RequiresMana=0;
 
 	bool _unknown7 = false;
-	DWORD _modificationScriptId = 0;
+	DWORD _modificationScriptId = 0 ;
 
 	int _unknown9 = 0;
 	DWORD _unknown10 = 0;
@@ -125,7 +125,7 @@ public:
 
 	DECLARE_PACKABLE()
 	DECLARE_PACKABLE_JSON();
-
+	
 
 	PackableHashTable<DWORD, CCraftOperation> _operations;
 	PackableHashTable<DWORD64, DWORD, DWORD64> _precursorMap;

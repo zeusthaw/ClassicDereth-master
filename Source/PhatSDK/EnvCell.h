@@ -77,7 +77,7 @@ public:
 	virtual TransitionState find_collisions(class CTransition *) override;
 	virtual TransitionState find_env_collisions(CTransition *transition) override;
 
-	static CEnvCell *GetVisible(DWORD cell_id);
+	static CEnvCell *GetVisible(DWORD cell_id, bool bDoPostLoad = true);
 	CEnvCell *find_visible_child_cell(Vector *origin, const int bSearchCells);
 
 	virtual void find_transit_cells(Position *p, const unsigned int num_sphere, CSphere *sphere, CELLARRAY *cell_array, SPHEREPATH *path) override;

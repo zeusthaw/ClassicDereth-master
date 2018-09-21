@@ -1,5 +1,10 @@
 #pragma once
 
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
+
 #define MYSQL_CONNECT_TIMEOUT 3
 
 typedef char** SQLResultRow_t;
@@ -99,10 +104,18 @@ protected:
 	virtual DWORD InternalThreadProc();
 	virtual void ProcessAsyncQueries() { }
 
+	inline void Signal()
+	{
+		//std::unique_lock lock(m_signalLock);
+		m_signal.notify_all();
+	}
+
 	bool m_bQuit = false;
-	HANDLE m_hMakeTick = NULL;
-	HANDLE m_hAsyncThread = NULL;
 	CSQLConnection *m_pAsyncConnection = NULL;
+
+	std::mutex m_signalLock;
+	std::condition_variable m_signal;
+	std::thread m_queryThread;
 };
 
 class CMYSQLQuery
@@ -171,7 +184,8 @@ private:
 	double m_fLastAsyncRefresh;
 	bool m_bDisabled;
 
-	CLockable _asyncQueueLock;
+	//CLockable _asyncQueueLock;
+	std::mutex m_lock;
 	std::list<CMYSQLQuery *> _asyncQueries;
 };
 

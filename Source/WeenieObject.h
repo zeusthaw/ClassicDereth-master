@@ -92,7 +92,7 @@ struct DamageEventData
 
 	DAMAGE_FORM damage_form = DF_UNDEF;
 	DAMAGE_TYPE damage_type = UNDEF_DAMAGE_TYPE;
-
+	
 	int preVarianceDamage = 0;
 	double baseDamage = 0;
 	double damageBeforeMitigation = 0;
@@ -213,11 +213,14 @@ public:
 	virtual class CTownCrier *AsTownCrier() { return NULL; }
 	virtual class CVendor *AsVendor() { return NULL; }
 	virtual class CAugmentationDeviceWeenie *AsAugmentationDevice() { return NULL; }
+	virtual class GameWeenie *AsGame() { return nullptr; }
+	virtual class GamePieceWeenie *AsGamePiece() { return nullptr; }
 
 	virtual bool IsAdvocate() { return false; }
 	virtual bool IsSentinel() { return false; }
 	virtual bool IsAdmin() { return false; }
 	bool IsLocked();
+	bool InUse = false;
 
 	void SetLocked(BOOL locked);
 	virtual void ResetToInitialState() { }
@@ -271,11 +274,11 @@ public:
 	virtual void SpeakLocal(const char *text, LogTextType ltt = LTT_SPEECH);
 	virtual void EmoteLocal(const char *text);
 	virtual void ActionLocal(const char *text);
-
+	
 	// REAL WEENIE VIRTUAL FUNCTIONS
 
 	virtual BOOL _IsPlayer() { return AsPlayer() != NULL; /*m_Qualities.GetID() == 1;*/ } // 0x10
-																						  // virtual bool IsThePlayer(); // 0x14
+	// virtual bool IsThePlayer(); // 0x14
 	virtual ITEM_TYPE InqType(); // 0x18
 
 	virtual BOOL IsPK(); // 0x20
@@ -305,7 +308,7 @@ public:
 
 	DWORD GetLandcell();
 	const Position &GetPosition();
-
+	
 	bool IsCorpse() { return m_Qualities.m_WeenieType == Corpse_WeenieType; }
 	bool IsDoor() { return m_Qualities.m_WeenieType == Door_WeenieType; }
 	bool IsInscribable() { return InqBoolQuality(INSCRIBABLE_BOOL, FALSE) ? true : false; }
@@ -315,6 +318,7 @@ public:
 	bool IsPortal() { return m_Qualities.m_WeenieType == Portal_WeenieType; }
 	bool IsAttackable() { return InqBoolQuality(ATTACKABLE_BOOL, TRUE) ? true : false; }
 	bool IsContainer() { return InqType() & TYPE_CONTAINER ? true : false; }
+	bool IsGamePiece() { return m_Qualities.m_WeenieType == GamePiece_WeenieType; }
 
 	virtual bool RequiresPackSlot() { return InqBoolQuality(REQUIRES_BACKPACK_SLOT_BOOL, FALSE) ? true : false; }
 
@@ -335,13 +339,15 @@ public:
 
 	bool IsStorage();
 	bool CanPickup(); // custom
-
+		
 	virtual void SendNetMessage(void *_data, DWORD _len, WORD _group, BOOL _event = 0);
 	virtual void SendNetMessage(BinaryWriter *_food, WORD _group, BOOL _event = 0, BOOL del = 1);
 	virtual void SendNetMessageToTopMost(void *_data, DWORD _len, WORD _group, BOOL _event = 0);
 	virtual void SendNetMessageToTopMost(BinaryWriter *_food, WORD _group, BOOL _event = 0, BOOL del = 1);
 
 	void SendText(const char* szText, long lColor);
+
+	void SendTextToOverlay(const char * szText);
 
 	float DistanceTo(CWeenieObject *other, bool bUseSpheres = false);
 	float DistanceSquared(CWeenieObject *other);
@@ -393,7 +399,7 @@ public:
 	bool m_bReviveAfterAnim = false;
 
 	bool TeleportToSpawn(); // on death
-	bool TeleportToLifestone(); // on lifestone recall
+ 	bool TeleportToLifestone(); // on lifestone recall
 	bool TeleportToHouse(); // on house recall
 	bool TeleportToMansion(); // on mansion recall
 	bool TeleportToAllegianceHometown();
@@ -435,6 +441,8 @@ public:
 
 	virtual DWORD RecalculateCoinAmount(int currencyid) { return 0; };
 	virtual DWORD ConsumeCoin(int amountToConsume, int currencyid) { return 0; };
+	virtual DWORD GetItemCount(int itemid) { return 0; };
+	virtual DWORD ConsumeItem(int amountToConsume, int itemid) { return 0; };
 
 	void SetValue(DWORD amount);
 	DWORD GetValue();
@@ -463,14 +471,14 @@ public:
 	virtual void WieldedTick();
 	virtual void InventoryTick();
 	virtual void Tick();
-
+	
 	void CheckForExpiredEnchantments();
 
 	class EmoteManager *m_EmoteManager = NULL;
 	class UseManager *m_UseManager = NULL;
 	class CSpellcastingManager *m_SpellcastingManager = NULL;
 	class AttackManager *m_AttackManager = NULL;
-
+	
 	EmoteManager *MakeEmoteManager();
 	UseManager *MakeUseManager();
 	CSpellcastingManager *MakeSpellcastingManager();
@@ -566,7 +574,7 @@ public:
 	void DoForcedStopCompletely();
 	DWORD DoAutonomousMotion(DWORD motion, MovementParameters *params = NULL);
 	DWORD DoForcedMotion(DWORD motion, MovementParameters *params = NULL);
-
+	
 	virtual bool ImmuneToDamage(class CWeenieObject *other);
 	virtual bool IsBusy();
 	bool IsMovingTo();
@@ -612,7 +620,7 @@ public:
 	virtual void ChangeCombatMode(COMBAT_MODE mode, bool playerRequested) { }
 
 	void ReleaseFromAnyWeenieParent(bool bBroadcastContainerChange = true, bool bBroadcastEquipmentChange = true);
-
+	
 	void SetWeenieContainer(DWORD container_id);
 	void SetWielderID(DWORD wielder_id);
 	void SetWieldedLocation(DWORD location);
@@ -642,6 +650,8 @@ public:
 
 	virtual double GetOffenseMod();
 	virtual int GetAttackTime();
+	virtual double GetManaCon();
+	virtual double GetElementalDamage();
 	virtual int GetAttackTimeUsingWielded();
 	virtual int GetAttackDamage();
 
@@ -685,13 +695,13 @@ public:
 	virtual std::string Ktref(const char *questName) { return ""; }
 	virtual unsigned int InqQuestMax(const char *questName) { return 0; }
 
-
+	
 	bool LearnSpell(DWORD spell_id, bool showTextAndEffect);
 
 	BYTE _stackSequence = 0;
 
 	DWORD _lastOpenedRemoteContainerId = 0;
-
+	
 	double _nextReset = -1.0;
 	double _nextRegen = -1.0;
 	double _timeToRot = -1.0;
@@ -722,8 +732,12 @@ public:
 
 	double _blockNewAttacksUntil = -1.0;
 
+	virtual bool CanTarget(CWeenieObject* target) { return false; }
+
+	virtual void NotifyRemoveFromWorld() { }
+
 protected:
-	CWorldLandBlock * m_pBlock = NULL;
+	CWorldLandBlock *m_pBlock = NULL;
 
 	std::unordered_map<DWORD, BYTE> m_StatSequences;
 

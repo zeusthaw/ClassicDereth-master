@@ -26,7 +26,7 @@ LRESULT CALLBACK AboutProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam
 	switch (message)
 	{
 	case WM_INITDIALOG:
-		SetWindowText(GetDlgItem(hDlg, IDC_CREDITS), "GDL - Classic Dereth " SERVER_VERSION_NUMBER_STRING "\n" SERVER_VERSION_STRING "\n\nClassic Dereth created by Dekaru (dekaru@protonmail.com)\nhttps://github.com/bDekaru/ClassicDereth\n\nBased on the GamesDeadLol Server project.\nhttps://github.com/GamesDeadLol/GDL\n\nPhatAC originally created by Pea and halted in September 2017.\n\nPhatAC was created in C++ and compiled with Visual Studio. Third-party libraries used include zlib, SHA512 and ISAAC algorithms.");
+		SetWindowText(GetDlgItem(hDlg, IDC_CREDITS), "GDLEnhanced " SERVER_VERSION_NUMBER_STRING "\n" SERVER_VERSION_STRING "\n\nGDLEnhanced updated and maintained by Scribble, ChosenOne and LikeableLime" "\n\nClassic Dereth created by Dekaru (dekaru@protonmail.com)\nhttps://github.com/bDekaru/ClassicDereth\n\nBased on the GamesDeadLol Server project.\nhttps://github.com/GamesDeadLol/GDL\n\nPhatAC originally created by Pea and halted in September 2017.\n\nPhatAC was created in C++ and compiled with Visual Studio. Third-party libraries used include zlib, SHA512 and ISAAC algorithms.");
 		// SetWindowText(GetDlgItem(hDlg, IDC_PACKETCREDITS), PACKET_CAPTURE_CREDITS);
 		return TRUE;
 
@@ -310,7 +310,7 @@ INT_PTR CALLBACK MainProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 			g_Logger.AddLogCallback(OutputConsole);
 
 			HWND hVersion = GetDlgItem(hDlg, IDC_VERSION);
-			SetWindowText(hVersion, "GDL - Classic Dereth " SERVER_VERSION_NUMBER_STRING " " SERVER_VERSION_STRING); // "PhatAC compiled " __TIMESTAMP__);
+			SetWindowText(hVersion, "GDLEnhanced " SERVER_VERSION_NUMBER_STRING " " SERVER_VERSION_STRING); // "PhatAC compiled " __TIMESTAMP__);
 
 			HICON hIcon = LoadIcon(g_hInstance, MAKEINTRESOURCE(IDI_PHATAC));
 			SendMessage(hDlg, WM_SETICON, ICON_SMALL, (LPARAM)hIcon);
@@ -370,8 +370,7 @@ INT_PTR CALLBACK MainProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 						HWND hWndConsole = GetDlgItem(hDlg, IDC_CONSOLE);
 
 						SetWindowText(hWndConsole, "");
-						//LOG(Temp, Normal, "Console cleared.\n");
-						SERVER_INFO << "Console Cleared.";
+						SERVER_INFO << "Console cleared.";
 					}
 				}
 				break;
@@ -380,8 +379,8 @@ INT_PTR CALLBACK MainProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 				{
 					if (!g_pPhatServer)
 					{
-						//LOG(Temp, Normal, "You must be running a server to broadcast a system message.\n");
-						SERVER_INFO << "You must be running a server to broadcast a system message.";						break;
+						SERVER_INFO << "You must be running a server to broadcast a system message.";
+						break;
 					}
 
 					char text[400];
@@ -497,8 +496,7 @@ INT_PTR CALLBACK MainProc(HWND hDlg, UINT message, WPARAM wParam, LPARAM lParam)
 						SetWindowText(GetDlgItem(hDlg, IDC_CONNECTLINK), "");
 
 						WINLOG(Temp, Normal, "Server shutdown.\n");
-						SERVER_INFO << "Server Shutdown.";
-						//LOG(Temp, Normal, "Server shutdown.\n");
+						SERVER_INFO << "Server shutdown.";
 					}
 				}
 				break;
@@ -527,7 +525,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 #if !defined(QUICKSTART) && defined(_DEBUG)
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 #endif
-
+	el::Loggers::configureFromGlobal("./GDLELogging.conf");
+	el::Loggers::addFlag(el::LoggingFlag::AutoSpacing);
 	SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_NORMAL);
 	srand((unsigned int)time(NULL));
 	Random::Init();
@@ -557,9 +556,8 @@ int APIENTRY WinMain(HINSTANCE hInstance,
 	extern DWORD64 g_RandomAdminPassword;
 	g_RandomAdminPassword = ((DWORD64)Random::GenUInt(0, 0xFFFFFFF0) << 32) | Random::GenUInt(0, 0xFFFFFFF0) + GetTickCount64();
 
-	WINLOG(Temp, Normal, "Welcome to GDL - Classic Dereth!\n");
-	SERVER_INFO << "Welcome to GDL - Classic Dereth!";
-	//LOG(UserInterface, Normal, "Welcome to GDL - Classic Dereth!\n");
+	WINLOG(Temp, Normal, "Welcome to GDLEnhanced!\n");
+	SERVER_INFO << "Welcome to GDLEnhanced!";
 
 	ShowWindow(g_hWndMain, nCmdShow);
 

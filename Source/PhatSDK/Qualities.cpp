@@ -823,6 +823,10 @@ DEFINE_PACK(Emote)
 	case TeleportSelf_EmoteType:
 		mPosition.Pack(pWriter);
 		break;
+	case Generate_EmoteType:
+		pWriter->Write<DWORD>(amount);
+		break;
+
 	}
 }
 
@@ -1074,6 +1078,10 @@ DEFINE_UNPACK(Emote)
 	case 0x64:
 		mPosition.UnPack(pReader);
 		break;
+	case Generate_EmoteType:
+		amount = pReader->Read<DWORD>();
+		break;
+
 	}
 
 	return true; // Emote::IsValid()
@@ -1304,6 +1312,10 @@ DEFINE_PACK_JSON(Emote)
 	case 0x64:
 		mPosition.PackJson(writer["mPosition"]);
 		break;
+	case Generate_EmoteType:
+		writer["amount"] = amount;
+		break;
+
 	}
 }
 
@@ -1535,6 +1547,10 @@ DEFINE_UNPACK_JSON(Emote)
 	case 0x64:
 		mPosition.UnPackJson(reader["mPosition"]);
 		break;
+	case Generate_EmoteType:
+		amount = reader["amount"];
+		break;
+
 	}
 
 	return true; // Emote::IsValid()
@@ -3055,12 +3071,24 @@ const char *Attribute::GetAttributeName(STypeAttribute key) // custom
 
 DWORD Attribute::GetMaxXp()
 {
-	return 0;
+	return ExperienceSystem::ExperienceToAttributeLevel(ExperienceSystem::GetMaxAttributeLevel());
 }
 
 DWORD Attribute::GetXpNeededForMaxXp()
 {
-	return 0;
+	const DWORD currentAttrXp = _cp_spent;
+
+	// This uses the virtual method, so this method works for both Attribute and SecondaryAttribute
+	const DWORD maxAttrXp = GetMaxXp();
+
+	const DWORD amountNeededForMaxXp = maxAttrXp - currentAttrXp;
+
+	return amountNeededForMaxXp;
+}
+
+DWORD SecondaryAttribute::GetMaxXp()
+{
+	return ExperienceSystem::ExperienceToAttribute2ndLevel(ExperienceSystem::GetMaxAttribute2ndLevel());
 }
 
 SecondaryAttribute::SecondaryAttribute()
@@ -3831,6 +3859,7 @@ DWORD Skill::GetXpNeededForMaxXp()
 	return amountNeededForMaxXp;
 }
 
+
 DEFINE_UNPACK(SpellBookPage)
 {
 	_casting_likelihood = pReader->Read<float>() - 2.0f;
@@ -3906,6 +3935,15 @@ void CSpellBook::ClearSpells()
 
 CBaseQualities::CBaseQualities()
 {
+	// Initialise - might prevent some crashes?
+	m_IntStats = new PackableHashTableWithJson<STypeInt, int>();
+	m_Int64Stats = new PackableHashTableWithJson<STypeInt64, __int64>();
+	m_BoolStats = new PackableHashTableWithJson<STypeBool, BOOL>();
+	m_FloatStats = new PackableHashTableWithJson<STypeFloat, double>();
+	m_StringStats = new PackableHashTableWithJson<STypeString, std::string>();
+	m_DIDStats = new PackableHashTableWithJson<STypeDID, DWORD>();
+	m_IIDStats = new PackableHashTableWithJson<STypeIID, DWORD>();
+	m_PositionStats = new PackableHashTableWithJson<STypePosition, Position>();
 }
 
 CBaseQualities::~CBaseQualities()
@@ -5387,6 +5425,7 @@ BOOL CACQualities::EnchantAttribute2nd(STypeAttribute2nd key, DWORD &value)
 
 BOOL CACQualities::EnchantSkill(STypeSkill key, DWORD &value)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (_enchantment_reg)
 		return _enchantment_reg->EnchantSkill(key, (int *)&value);
 
@@ -5395,6 +5434,8 @@ BOOL CACQualities::EnchantSkill(STypeSkill key, DWORD &value)
 
 BOOL CACQualities::InqSkill(STypeSkill key, DWORD &value, BOOL raw)
 {
+	key = SkillTable::OldToNewSkill(key);
+
 	if (!InqSkillBaseLevel(key, value, raw))
 		return FALSE;
 
@@ -5470,6 +5511,8 @@ BOOL CACQualities::InqSkill(STypeSkill key, DWORD &value, BOOL raw)
 
 BOOL CACQualities::InqSkill(STypeSkill key, Skill &value)
 {
+	key = SkillTable::OldToNewSkill(key);
+
 	if (_skillStatsTable)
 	{
 		const Skill *pValue = _skillStatsTable->lookup(key);
@@ -5486,6 +5529,7 @@ BOOL CACQualities::InqSkill(STypeSkill key, Skill &value)
 
 BOOL CACQualities::InqSkillAdvancementClass(STypeSkill key, SKILL_ADVANCEMENT_CLASS &value)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (_skillStatsTable)
 	{
 		const Skill *pValue = _skillStatsTable->lookup(key);
@@ -5502,6 +5546,7 @@ BOOL CACQualities::InqSkillAdvancementClass(STypeSkill key, SKILL_ADVANCEMENT_CL
 
 void CACQualities::SetSkill(STypeSkill key, const Skill &val)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (!_skillStatsTable)
 	{
 		_skillStatsTable = new PackableHashTableWithJson<STypeSkill, Skill>();
@@ -5512,6 +5557,7 @@ void CACQualities::SetSkill(STypeSkill key, const Skill &val)
 
 void CACQualities::SetSkillLevel(STypeSkill key, DWORD val)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (!_skillStatsTable)
 	{
 		_skillStatsTable = new PackableHashTableWithJson<STypeSkill, Skill>();
@@ -5522,6 +5568,7 @@ void CACQualities::SetSkillLevel(STypeSkill key, DWORD val)
 
 void CACQualities::SetSkillAdvancementClass(STypeSkill key, SKILL_ADVANCEMENT_CLASS val)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (!_skillStatsTable)
 	{
 		_skillStatsTable = new PackableHashTableWithJson<STypeSkill, Skill>();
@@ -5532,6 +5579,7 @@ void CACQualities::SetSkillAdvancementClass(STypeSkill key, SKILL_ADVANCEMENT_CL
 
 BOOL CACQualities::InqSkillLevel(STypeSkill key, DWORD &value)
 {
+	key = SkillTable::OldToNewSkill(key);
 	if (_skillStatsTable)
 	{
 		const Skill *pValue = _skillStatsTable->lookup(key);
@@ -5548,6 +5596,7 @@ BOOL CACQualities::InqSkillLevel(STypeSkill key, DWORD &value)
 
 BOOL CACQualities::InqSkillBaseLevel(STypeSkill key, DWORD &value, BOOL raw)
 {
+	key = SkillTable::OldToNewSkill(key);
 	SkillTable *pSkillTable = SkillSystem::GetSkillTable();
 
 	if (!pSkillTable)
@@ -5997,7 +6046,7 @@ std::string IntStatKeyEnumPacker(const STypeInt &key)
 void CBaseQualities::CopyFrom(CBaseQualities *pOther)
 {
 	Clear();
-
+	
 	m_WeenieType = pOther->m_WeenieType;
 
 	if (pOther->m_IntStats)
@@ -6205,7 +6254,7 @@ BOOL CACQualities::GetBodyArmorEnchantmentDetails(unsigned int part, DAMAGE_TYPE
 		tryEnchanting = true;
 
 	int baseArmor1 = 0;
-	if(tryEnchanting)
+	if (tryEnchanting)
 		_enchantment_reg->GetBodyArmorEnchantmentDetails(part, DAMAGE_TYPE::UNDEF_DAMAGE_TYPE, val);
 
 	if (!_body)
@@ -6279,7 +6328,6 @@ BOOL CACQualities::GetBodyArmorEnchantmentDetails(unsigned int part, DAMAGE_TYPE
 				val->rawValue = pPart->_acache._armor_vs_pierce;
 				if (tryEnchanting)
 					_enchantment_reg->GetBodyArmorEnchantmentDetails(part, dt, val);
-
 				if (bAddBaseArmor)
 					val->rawValue += baseArmor;
 

@@ -101,6 +101,9 @@ public:
 
 	void AdjustToNewCombatMode();
 
+	virtual DWORD GetItemCount(int itemid) override;
+	virtual DWORD ConsumeItem(int amountToConsume, int itemid) override;
+
 	CWeenieObject *m_WieldedCombat[MAX_WIELDED_COMBAT];
 	std::vector<CWeenieObject *> m_Wielded;
 	std::vector<CWeenieObject *> m_Items;

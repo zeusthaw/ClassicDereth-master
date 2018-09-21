@@ -30,9 +30,21 @@ int CGemWeenie::Use(CPlayerWeenie *player)
 
 int CGemWeenie::DoUseResponse(CWeenieObject *player)
 {
+	if (InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_FOOD)
+	{
+		player->DoForcedMotion(Motion_Eat);
+		player->DoForcedMotion(Motion_Ready);
+	}
+
 	if (DWORD spell_did = InqDIDQuality(SPELL_DID, 0))
 	{
-		MakeSpellcastingManager()->CastSpellInstant(player->GetID(), spell_did);
+		if (cooldown < Timer::cur_time)
+		{
+			MakeSpellcastingManager()->CastSpellInstant(player->GetID(), spell_did);
+			cooldown = Timer::cur_time + InqFloatQuality(COOLDOWN_DURATION_FLOAT, 0, FALSE);
+		}
+		else
+			player->SendText("You can't do that yet!", LTT_ERROR);
 	}
 
 	DecrementStackOrStructureNum();

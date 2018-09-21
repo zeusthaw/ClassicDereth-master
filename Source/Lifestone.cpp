@@ -51,5 +51,6 @@ int CBaseLifestone::Use(CPlayerWeenie *pOther)
 int CBaseLifestone::DoUseResponse(CWeenieObject *player)
 {
 	player->m_Qualities.SetPosition(SANCTUARY_POSITION, player->m_Position);
+	player->AdjustStamina(player->GetStamina() * -0.5);
 	return WERROR_NONE;
 }

@@ -10,6 +10,7 @@ extern BinaryWriter *LocalChat(const char *text, const char *name, DWORD sourceI
 extern BinaryWriter *ActionChat(const char *text, const char *name, DWORD sourceID);
 extern BinaryWriter *EmoteChat(const char *text, const char *name, DWORD sourceID);
 extern BinaryWriter *ServerText(const char *text, long lColor = 0);
+extern BinaryWriter *OverlayText(const char *szText);
 extern BinaryWriter *ServerBroadcast(const char *szSource, const char *text, long lColor = 0);
 extern BinaryWriter *DirectChat(const char* text, const char* name, DWORD sourceID, DWORD dwDestID, long lColor);
 

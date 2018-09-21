@@ -95,7 +95,7 @@ void MotionTableManager::AnimationDone(BOOL success)
 			if (pnode->num_anims > animation_counter)
 				break;
 
-			if (pnode->motion & 0x10000000)
+			if (pnode->motion & CM_Action)
 				state.remove_action_head();
 
 			DWORD motion_id = pnode->motion;
@@ -130,7 +130,7 @@ void MotionTableManager::initialize_state(CSequence *seq)
 		table->SetDefaultState(&state, seq, &num_anims);
 	}
 	
-	add_to_queue(0x41000003, num_anims, seq);
+	add_to_queue(Motion_Ready, num_anims, seq);
 }
 
 void MotionTableManager::remove_redundant_links(CSequence *seq)
@@ -141,9 +141,9 @@ void MotionTableManager::remove_redundant_links(CSequence *seq)
 	{
 		if (entry->num_anims)
 		{
-			if (!(entry->motion & 0x40000000) || (entry->motion & 0x20000000))
+			if (!(entry->motion & CM_SubState) || (entry->motion & CM_Modifier))
 			{
-				if (!(entry->motion & 0x80000000))
+				if (!(entry->motion & CM_Style))
 					return;
 
 				AnimNode *node2 = (AnimNode *)entry->dllist_prev;
@@ -222,7 +222,7 @@ void MotionTableManager::add_to_queue(DWORD motionid, DWORD counter, CSequence *
 DWORD MotionTableManager::PerformMovement(const MovementStruct &ms, CSequence *seq)
 {
 	if (!table)
-		return 7;
+		return WERROR_NO_ANIMATION_TABLE;
 
 	switch (ms.type)
 	{
@@ -230,26 +230,26 @@ DWORD MotionTableManager::PerformMovement(const MovementStruct &ms, CSequence *s
 		{
 			DWORD counter;
 			if (!table->DoObjectMotion(ms.motion, &state, seq, ms.params->speed, &counter))
-				return 0x43;
+				return WERROR_NO_MTABLE_DATA;
 
 			add_to_queue(ms.motion, counter, seq);
-			return 0;
+			return WERROR_NONE;
 		}
 	case 4:
 		{
 			DWORD counter;
 			if (!table->StopObjectMotion(ms.motion, ms.params->speed, &state, seq, &counter))
-				return 0x43;
+				return WERROR_NO_MTABLE_DATA;
 
-			add_to_queue(0x41000003, counter, seq);
-			return 0;
+			add_to_queue(Motion_Ready, counter, seq);
+			return WERROR_NONE;
 		}
 	case 5:
 		{
 			DWORD counter;
 			table->StopObjectCompletely(&state, seq, &counter);
-			add_to_queue(0x41000003, counter, seq);
-			return 0;
+			add_to_queue(Motion_Ready, counter, seq);
+			return WERROR_NONE;
 		}
 
 	default:
@@ -266,7 +266,7 @@ void MotionTableManager::CheckForCompletedMotions()
 		if (pAnim->num_anims)
 			return;
 
-		if (pAnim->motion & 0x10000000)
+		if (pAnim->motion & CM_Action)
 			state.remove_action_head();
 
 		DWORD motion_id = pAnim->motion;
@@ -514,7 +514,8 @@ void CMotionTable::Release(CMotionTable *pMotionTable)
 void CMotionTable::Destroy()
 {
 	cycles.destroy_contents();
-	modifiers.destroy_contents();
+	if (modifiers.GetBucketCount() > 0)
+		modifiers.destroy_contents();
 
 	// kinda assuming this is what the code did.
 	style_defaults.destroy_contents();
@@ -524,25 +525,32 @@ void CMotionTable::Destroy()
 
 	while (!iter.EndReached() && iter.GetCurrent())
 	{
-		auto current = iter.GetCurrent();
-
-		/*
-		HashBaseIter<MotionData> iter2(current->m_Data);
-		while (!iter2.EndReached() && iter2.GetCurrent())
+		try
 		{
-			auto current2 = iter2.GetCurrent();
-			delete current2;
+			auto current = iter.GetCurrent();
 
-			iter2.Next();
+			/*
+			HashBaseIter<MotionData> iter2(current->m_Data);
+			while (!iter2.EndReached() && iter2.GetCurrent())
+			{
+				auto current2 = iter2.GetCurrent();
+				delete current2;
+
+				iter2.Next();
+			}
+			*/
+
+			current->m_Data->destroy_contents();
+
+			delete current->m_Data;
+			current->m_Data = NULL;
+
+			iter.Next();
 		}
-		*/
-
-		current->m_Data->destroy_contents();
-
-		delete current->m_Data;
-		current->m_Data = NULL;
-
-		iter.Next();
+		catch (...)
+		{
+			SERVER_ERROR << "Error in CMotionTable Destroy";
+		}
 	}
 
 	links.destroy_contents();
@@ -572,7 +580,7 @@ BOOL CMotionTable::StopSequenceMotion(DWORD motion, float speed, MotionState *cu
 {
 	*num_anims = 0;
 
-	if ((motion & 0x40000000) && (curr_state->substate == motion))
+	if ((motion & CM_SubState) && (curr_state->substate == motion))
 	{
 		DWORD value;
 		style_defaults.lookup(curr_state->style, &value);
@@ -580,7 +588,7 @@ BOOL CMotionTable::StopSequenceMotion(DWORD motion, float speed, MotionState *cu
 		return TRUE;
 	}
 
-	if (!(motion & 0x20000000))
+	if (!(motion & CM_Modifier))
 		return FALSE;
 
 	MotionList *pmod = curr_state->modifier_head;
@@ -938,10 +946,10 @@ BOOL CMotionTable::GetObjectSequence(DWORD motionid, MotionState *curr_state, CS
 	DWORD new_substate;
 	style_defaults.lookup(curr_state->style, &new_substate);
 
-	if (motionid == new_substate && !stop_modifiers && (mtype2 & 0x20000000))
+	if (motionid == new_substate && !stop_modifiers && (mtype2 & CM_Modifier))
 		return TRUE;
 
-	if (motionid & 0x80000000)
+	if (motionid & CM_Style)
 	{
 		//__asm int 3
 
@@ -998,7 +1006,7 @@ BOOL CMotionTable::GetObjectSequence(DWORD motionid, MotionState *curr_state, CS
 		}
 	}
 
-	if (motionid & 0x40000000)
+	if (motionid & CM_SubState)
 	{
 		DWORD arg_0 = motionid & 0xFFFFFF;
 
@@ -1077,7 +1085,7 @@ BOOL CMotionTable::GetObjectSequence(DWORD motionid, MotionState *curr_state, CS
 		}
 	}
 
-	if (motionid & 0x10000000) // CM_Action
+	if (motionid & CM_Action) // CM_Action
 	{
 		DWORD theKey = (mtype2 & 0xFFFFFF) | (curr_state->style << 16);
 
@@ -1132,7 +1140,7 @@ BOOL CMotionTable::GetObjectSequence(DWORD motionid, MotionState *curr_state, CS
 		}
 	}
 
-	if (motionid & 0x20000000) // CM_Modifier
+	if (motionid & CM_Modifier) // CM_Modifier
 	{
 		DWORD theKey = curr_state->style << 16;
 		MotionData *v24 = cycles.lookup((curr_state->style << 16) | mtype2 & 0xFFFFFF);

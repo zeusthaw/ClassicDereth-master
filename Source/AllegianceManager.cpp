@@ -70,14 +70,14 @@ void AllegianceTreeNode::FillAllegianceNode(AllegianceNode *node)
 	node->_data._loyalty = _loyalty;
 	node->_data._name = _charName;
 	node->_data._id = _charID;
-	//	node->_data._allegiance_age = _unixTimeSwornAt; what unit is this and what does the client do with this information?
-	//	node->_data._time_online = _ingameSecondsSworn; what unit is this and what does the client do with this information?
+//	node->_data._allegiance_age = _unixTimeSwornAt; what unit is this and what does the client do with this information?
+//	node->_data._time_online = _ingameSecondsSworn; what unit is this and what does the client do with this information?
 }
 
 void AllegianceTreeNode::UpdateWithWeenie(CWeenieObject *weenie)
 {
 	_charID = weenie->GetID();
-	_charName = weenie->GetName();
+	_charName = weenie->GetName();	
 	_hg = static_cast<HeritageGroup>(weenie->InqIntQuality(HERITAGE_GROUP_INT, Invalid_HeritageGroup));
 	_gender = static_cast<Gender>(weenie->InqIntQuality(GENDER_INT, Invalid_Gender));
 	_level = weenie->InqIntQuality(LEVEL_INT, 1);
@@ -134,8 +134,7 @@ DEFINE_UNPACK(AllegianceTreeNode)
 	if (version < 2) {
 		_unixTimeSwornAt = time(0); // set to now
 		_ingameSecondsSworn = 1;
-	}
-	else {
+	} else {
 		_unixTimeSwornAt = pReader->Read<DWORD64>();
 		_ingameSecondsSworn = pReader->Read<DWORD64>();
 	}
@@ -245,14 +244,14 @@ void AllegianceManager::Tick()
 		Save();
 		m_LastSave = Timer::cur_time;
 	}
-
+	
 	// check for expired chat gags
 	if (m_LastGagCheck <= (Timer::cur_time - 5))
 	{
-		for (auto entry : _allegInfos) {
+		for (auto entry : _allegInfos) { 
 			auto gagList = entry.second->_info.m_chatGagList;
 			std::vector<DWORD> toRemove;
-			for (auto gagged : gagList) {
+			for (auto gagged : gagList)	{
 				if (gagged.second <= Timer::cur_time) {
 					toRemove.push_back(gagged.first);
 				}
@@ -446,7 +445,7 @@ void AllegianceManager::SetWeenieAllegianceQualities(CWeenieObject *weenie)
 {
 	if (!weenie)
 		return;
-
+	
 	AllegianceTreeNode *monarch;
 	AllegianceTreeNode *patron;
 
@@ -592,7 +591,7 @@ AllegianceProfile *AllegianceManager::CreateAllegianceProfile(DWORD char_id, uns
 
 				if (g_pWorld->FindPlayer(vassal->_charID))
 					vassalNode->_data._bitfield |= LoggedIn_AllegianceIndex;
-
+				
 				prof->_allegiance._nodes.push_back(vassalNode);
 			}
 		}
@@ -1047,7 +1046,7 @@ void AllegianceManager::HandleAllegiancePassup(DWORD source_id, long long amount
 
 	double generatedPercent = 0.01 * (factor1 + factor2 * loyaltyFactor * (1.0 + realDaysSwornFactor * ingameHoursSwornFactor));
 	double receivedPercent = 0.01 * (factor1 + factor2 * leadershipFactor * (1.0 + vassalFactor * avgRealDaysVassalsSwornFactor * avgIngameHoursVassalsSwornFactor));
-
+	
 	double passup = generatedPercent * receivedPercent;
 
 	unsigned long long passupAmount = amount * passup;
@@ -1097,7 +1096,7 @@ void AllegianceManager::ChatPatron(DWORD sender_id, const char *text)
 	CWeenieObject *target = g_pWorld->FindPlayer(node->_patronID);
 	if (!target)
 		return;
-
+	
 	sender_weenie->SendNetMessage(ChannelChat(Patron_ChannelID, NULL, text), PRIVATE_MSG, FALSE, TRUE);
 	target->SendNetMessage(ChannelChat(Patron_ChannelID, sender_weenie->GetName().c_str(), text), PRIVATE_MSG, FALSE, TRUE);
 }
@@ -1544,7 +1543,7 @@ void AllegianceManager::SetOfficerTitle(CPlayerWeenie * player, int level, std::
 
 	if (AllegianceInfo* ai = GetInfo(playerNode->_monarchID))
 	{
-		ai->_info.m_officerTitleList[level - 1] = title;
+		ai->_info.m_officerTitleList[level-1] = title;
 
 		player->NotifyWeenieErrorWithString(WERROR_ALLEGIANCE_OFFICER_TITLE_SET, title.c_str());
 		Save();
@@ -1643,7 +1642,7 @@ void AllegianceManager::SetOfficer(CPlayerWeenie * player, std::string officer_n
 				return;
 			}
 
-			if (IsOfficer(officerNode)) {
+			if (IsOfficer(officerNode))	{
 				ai->_info.m_officerList[officerID] = level;
 				player->SendText(csprintf("%s's allegiance officer status has been modified. %s now holds the position of: %s.", officer_name.c_str(), officer_name.c_str(), ai->_info.m_officerTitleList[level - 1].c_str()), LTT_DEFAULT);
 			}
@@ -1658,7 +1657,7 @@ void AllegianceManager::SetOfficer(CPlayerWeenie * player, std::string officer_n
 			Save();
 		}
 	}
-	else
+	else 
 		player->NotifyWeenieErrorWithString(WERROR_ALLEGIANCE_OFFICER_NOT_SET, officer_name.c_str());
 }
 
@@ -1712,7 +1711,7 @@ void AllegianceManager::RemoveOfficer(CPlayerWeenie * player, std::string office
 					Save();
 					return;
 				}
-			}
+			}	
 		}
 	}
 	player->NotifyWeenieErrorWithString(WERROR_ALLEGIANCE_OFFICER_NOT_REMOVED, officer_name.c_str());
@@ -1808,7 +1807,7 @@ void AllegianceManager::AllegianceInfoRequest(CPlayerWeenie * player, std::strin
 	{
 		player->SendText(csprintf("%s is not a member of your allegiance.", target_name.c_str()), LTT_DEFAULT);
 		return;
-	}
+	}	
 
 	// TODO: convert this to server to client message
 	unsigned int rank = 0;
@@ -1961,7 +1960,7 @@ void AllegianceManager::ApproveVassal(CPlayerWeenie * player, std::string vassal
 void AllegianceManager::BootPlayer(CPlayerWeenie * player, std::string bootee, bool whole_account)
 {
 	AllegianceTreeNode* playerNode = GetTreeNode(player->GetID());
-
+	
 	if (!playerNode) // check caller even has an allegiance
 	{
 		player->NotifyWeenieError(WERROR_ALLEGIANCE_NONEXISTENT);
@@ -2000,7 +1999,7 @@ void AllegianceManager::BootPlayer(CPlayerWeenie * player, std::string bootee, b
 							}
 						}
 					}
-					player->SendText(csprintf("You have successfully booted the account of %s from the allegiance.", bootee.c_str()), LTT_DEFAULT);
+					player->SendText(csprintf("You have successfully booted the account of %s from the allegiance.",bootee.c_str()), LTT_DEFAULT);
 					return;
 				}
 
@@ -2066,8 +2065,8 @@ void AllegianceManager::ChatGag(CPlayerWeenie * player, std::string target, bool
 
 		if (it != ai->_info.m_chatGagList.end()) { // target is in the gag list
 			if (toggle) { // adding a gag, fail		
-				player->NotifyWeenieError(WERROR_ALLEGIANCE_GAG_ALREADY);
-				return;
+					player->NotifyWeenieError(WERROR_ALLEGIANCE_GAG_ALREADY);
+					return;
 			}
 			else { // removing a gag, success
 				ai->_info.m_chatGagList.erase(it);

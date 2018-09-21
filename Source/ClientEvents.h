@@ -102,14 +102,14 @@ public:
 	void HouseMansionRecall();
 
 	void HouseRequestAccessList();
-
+	
 	void HouseAddPersonToAccessList(std::string name);
 	void HouseRemovePersonFromAccessList(std::string name);
 	void HouseAddOrRemovePersonToStorageList(std::string name, bool isAdd);
 
 	void HouseAddOrRemoveAllegianceToAccessList(bool isAdd);
 	void HouseAddOrRemoveAllegianceToStorageList(bool isAdd);
-
+	
 	void HouseToggleOpenAccess(bool newSetting);
 	void HouseToggleOpenStorageAccess();
 
@@ -120,7 +120,7 @@ public:
 	void NoLongerViewingContents(DWORD container_id);
 
 private:
-	CClient * m_pClient;
+	CClient *m_pClient;
 
 	CPlayerWeenie *m_pPlayer;
 

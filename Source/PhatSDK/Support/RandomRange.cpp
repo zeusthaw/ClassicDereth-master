@@ -3,6 +3,7 @@
 #include "RandomRange.h"
 #include "Random.h"
 #include <random>
+#include "easylogging++.h"
 
 std::random_device randomDevice;
 CSharpRandom rng = CSharpRandom(randomDevice());
@@ -38,13 +39,20 @@ void testRandomValueGenerator()
 
 	for each(auto entry in valueDistribution)
 	{
-		LOG(Data, Error, "value: %d amount: %d percent: %f\n", entry.first, entry.second, entry.second * 100.0 / testRolls);
+		SERVER_ERROR << "RNG Distribution - Value:" << entry.first << " Amount:" << entry.second << " Percent:" << (entry.second * 100.0 / testRolls);
 	}
 }
 
 int getRandomNumberWithFavoredValue(int minInclusive, int maxInclusive, double favorValue, double favorStrength)
 {
-	//-----Merged from GDLE2 https://gitlab.com/Scribble/gdlenhanced/commit/8e41110b5c1db340b70acfd30a94a5ffecc2fcda ------//
+	if (favorStrength < DBL_EPSILON)
+	{
+		// favourStrength is zero so were just return a uniform random number
+		int dReturn = floor((rand() / (long double)RAND_MAX) * (maxInclusive - minInclusive + 1)) + minInclusive;
+
+		return min(max(minInclusive, dReturn), maxInclusive);
+	}
+
 	// Okay, so here goes nothing!
 	// 1/a^abs(x-m) is a function that grows exponentially towards m either side of it on the x-axis
 	// where a = 1 + favorStrength^2/(maxInclusive-minInclusive)
@@ -53,34 +61,34 @@ int getRandomNumberWithFavoredValue(int minInclusive, int maxInclusive, double f
 	// between m and n (n>m), the area is (2-a^m-n)/log(a) where m is the favorValue
 
 	int numValues = (maxInclusive - minInclusive) + 1;
-
 	double a = 1 + pow(favorStrength, 2) / numValues;
 	double logA = log(a);
 
 	// we assume that each point has a width of 1 (+-0.5)
 	// so we pick a random number between the area left of (minInclusive-0.5) so:
-	double minArea = pow(a, (minInclusive - 0.5) - favorValue) / logA;
+	double minArea = pow(a, (minInclusive - 0.5) - favorValue);
 	// and the area left of (maxInclusive+0.5)
-	double totArea = (2 - pow(a, favorValue - (maxInclusive + 0.5))) / logA - minArea;
+	double totArea = (2 - pow(a, favorValue - (maxInclusive + 0.5))) - minArea;
 	// here goes...
 	double r = (rand() / (long double)RAND_MAX) * totArea + minArea;
 
+	int iReturn = 0;
+
 	// the area at n=m is a^(n-m)/log(a) = a^0/log(a) = 1/log(a)
-	if (r < 1 / logA)
+	if (r < 1)
 	{
 		// Now we just have to reaarange the equation for n
 		// so n such that a^(n-m)/log(a) = r our randomly picked area
-		return min(max(minInclusive, round(log(r*logA) / logA + favorValue)), maxInclusive);
+		iReturn = round(log(r) / logA + favorValue);
 	}
 	else
-
 	{
 		// similarly,
 		// n such that (2 - a^(m-n))/log(a) = r
-		return min(max(minInclusive, round(favorValue - log(2 - r * logA) / logA)), maxInclusive);
-
+		iReturn = round(favorValue - log(2 - r) / logA);
 	}
 
+	return min(max(minInclusive, iReturn), maxInclusive);
 	// the equations chosen are simply what was here before, but calculated with a bit more elegance...
 }
 
@@ -107,6 +115,7 @@ int getRandomNumber(int minInclusive, int maxInclusive)
 int getRandomNumber(int minInclusive, int maxInclusive, eRandomFormula formula, double favorStrength, double favorModifier, double favorSpecificValue)
 {
 	int numbersAmount = maxInclusive - minInclusive;
+
 	switch (formula)
 	{
 	case eRandomFormula::favorSpecificValue:
@@ -192,7 +201,7 @@ double getRandomDouble(double minInclusive, double maxInclusive, eRandomFormula 
 
 	int favorSpecificValueInt = (int)round(favorSpecificValue * decimalPlaces);
 
-	int randomInt = getRandomNumber(minInt, maxInt, formula, favorStrength, favorModifier, favorSpecificValue);
+	int randomInt = getRandomNumber(minInt, maxInt, formula, favorStrength, favorModifier, favorSpecificValueInt);
 	double returnValue = randomInt / decimalPlaces;
 
 	returnValue = min(returnValue, maxInclusive);

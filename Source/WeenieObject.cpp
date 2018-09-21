@@ -538,7 +538,7 @@ void CWeenieObject::OnDeath(DWORD killer_id)
 
 	ChanceExecuteEmoteSet(killer_id, Death_EmoteCategory);
 
-	if (m_Qualities._enchantment_reg)
+	if (m_Qualities._enchantment_reg && !m_Qualities.GetInt(AUGMENTATION_SPELLS_REMAIN_PAST_DEATH_INT, 0))
 	{
 		PackableList<DWORD> removed;
 
@@ -930,7 +930,7 @@ void CWeenieObject::OnGeneratedDeath(CWeenieObject *weenie)
 				{
 					//we're the child of a generator and all our children have been destroyed/picked up.
 					//so we're done and should cease to exist.
-					if (!IsCreature())
+					if(!IsCreature())
 						MarkForDestroy();
 
 					//make the leftovers rot.
@@ -1921,7 +1921,6 @@ void CWeenieObject::GiveSharedXP(long long amount, bool showText)
 	if (buffDetails.enchantedValue > 0.0)
 		amount *= buffDetails.valueIncreasingMultiplier;
 
-
 	Fellowship *f = GetFellowship();
 
 	if (f)
@@ -1967,6 +1966,9 @@ void CWeenieObject::GiveXP(long long amount, bool showText, bool allegianceXP)
 
 	if (bLeveled)
 	{
+		AllegianceTreeNode *node = g_pAllegianceManager->GetTreeNode(GetID());
+		if(node)
+			node->_level = currentLevel;
 		m_Qualities.SetInt(LEVEL_INT, currentLevel);
 		NotifyIntStatUpdated(LEVEL_INT);
 
@@ -2020,7 +2022,7 @@ void CWeenieObject::TryToUnloadAllegianceXP(bool bShowText)
 			if (bShowText)
 			{
 				// this was from logging in
-				SendText(csprintf("Your Vassals have produced experience points for you.\nTaking your skills as a leader into account, you gain %s xp.",
+				SendText(csprintf("Your Vassals have produced experience points for you. Taking your skills as a leader into account, you gain %s xp.",
 					FormatNumberString(node->_cp_pool_to_unload).c_str()), LTT_DEFAULT);
 			}
 
@@ -2052,6 +2054,9 @@ DWORD CWeenieObject::GiveAttributeXP(STypeAttribute key, DWORD amount)
 			SendText(csprintf("Your base %s is now %u!", Attribute::GetAttributeName(key), newLevel), LTT_ADVANCEMENT);
 		}
 	}
+
+	if (attribute._level_from_cp == 190)
+		EmitEffect(PS_WeddingBliss, 1.0f);
 
 	NotifyAttributeStatUpdated(key);
 
@@ -2102,6 +2107,9 @@ DWORD CWeenieObject::GiveAttribute2ndXP(STypeAttribute2nd key, DWORD amount)
 			SendText(csprintf("Your base %s is now %u!", GetAttribute2ndName(key), newLevel), LTT_ADVANCEMENT);
 		}
 	}
+
+	if (attribute2nd._level_from_cp == 196)
+		EmitEffect(PS_WeddingBliss, 1.0f);
 
 	NotifyAttribute2ndStatUpdated(key);
 	return raised;
@@ -2168,8 +2176,6 @@ DWORD CWeenieObject::GiveSkillXP(STypeSkill key, DWORD amount, bool silent)
 	DWORD oldLevel = skill._level_from_pp;
 	skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
 
-	m_Qualities.SetSkill(key, skill);
-
 	std::string skillName = "Unknown";
 
 	if (SkillTable *pSkillTable = SkillSystem::GetSkillTable())
@@ -2189,6 +2195,11 @@ DWORD CWeenieObject::GiveSkillXP(STypeSkill key, DWORD amount, bool silent)
 
 		SendText(notice, LTT_ADVANCEMENT);
 	}
+
+	if ((skill._sac == TRAINED_SKILL_ADVANCEMENT_CLASS && oldLevel == 208) || (skill._sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS && oldLevel == 226))
+		return 0;
+
+	m_Qualities.SetSkill(key, skill);
 
 	DWORD raised = skill._level_from_pp - oldLevel;
 	if (raised)
@@ -2298,6 +2309,11 @@ void CWeenieObject::GiveSkillCredits(DWORD amount, bool showText)
 void CWeenieObject::SendText(const char* szText, long lColor)
 {
 	SendNetMessage(ServerText(szText, lColor), PRIVATE_MSG, FALSE, TRUE);
+}
+
+void CWeenieObject::SendTextToOverlay(const char* szText)
+{
+	SendNetMessage(OverlayText(szText), PRIVATE_MSG, FALSE, TRUE);
 }
 
 float Calc_BurdenMod(float flBurden)
@@ -2886,7 +2902,7 @@ void CWeenieObject::Tick()
 			{
 				_nextHeartBeatEmote = Timer::cur_time + Random::GenUInt(2, 15); //add a little variation to avoid synchronization.
 
-																				//_last_update_pos is the time of the last attack/movement/action, basically we don't want to do heartBeat emotes if we're active.
+				//_last_update_pos is the time of the last attack/movement/action, basically we don't want to do heartBeat emotes if we're active.
 				if (Timer::cur_time > _last_update_pos + 30.0 && m_Qualities._emote_table)
 				{
 					PackableList<EmoteSet> *emoteSetList = m_Qualities._emote_table->_emote_table.lookup(HeartBeat_EmoteCategory);
@@ -3000,6 +3016,10 @@ void CWeenieObject::CheckRegeneration(double rate, STypeAttribute2nd currentAttr
 					break;
 				case Motion_Sleeping:
 					rate *= 3;
+
+					if (m_Qualities.GetInt(AUGMENTATION_FASTER_REGEN_INT, 0))
+						rate *= 2;
+					
 					break;
 				}
 			}
@@ -3012,7 +3032,7 @@ void CWeenieObject::CheckRegeneration(double rate, STypeAttribute2nd currentAttr
 		// boosted out of combat regen
 		if (get_minterp()->interpreted_state.current_style == Motion_NonCombat)
 		{
-			rate *= 100;
+			rate *= 100; 
 		}
 	}
 
@@ -3100,9 +3120,8 @@ void CWeenieObject::PostSpawn()
 		SetLocked(FALSE);
 	}
 
-	if (!m_Qualities._generator_queue)// Prevents generators that have a generator_registry from reinitializing
+	if (!m_Qualities._generator_queue)// Prevents generators that have a generator_queue from reinitializing
 		InitCreateGenerator();
-
 
 	double heartbeatInterval;
 	if (m_Qualities.InqFloat(HEARTBEAT_INTERVAL_FLOAT, heartbeatInterval, TRUE))
@@ -3806,14 +3825,14 @@ BODY_PART_ENUM GetRandomBodyPartByDamageQuadrant(DAMAGE_QUADRANT dq)
 	}
 	else if (dq & DQ_MEDIUM)
 	{
-		switch (Random::GenInt(0, 6))
+		switch (Random::GenInt(0, 5))
 		{
 		case 0: result = BP_UPPER_LEG; break;
 		case 1: result = BP_ABDOMEN; break;
 		case 2: result = BP_CHEST; break;
 		case 3: result = BP_HAND; break;
-		case 5: result = BP_LOWER_ARM; break;
-		case 6: result = BP_UPPER_ARM; break;
+		case 4: result = BP_LOWER_ARM; break;
+		case 5: result = BP_UPPER_ARM; break;
 		}
 	}
 	else if (dq & DQ_HIGH)
@@ -3877,7 +3896,6 @@ void CWeenieObject::TryToDealDamage(DamageEventData &data)
 				hitHeight = BODY_HEIGHT::MEDIUM_BODY_HEIGHT;
 
 			//todo: taking into account the rest of the quadrant data(front/sides/etc)
-
 			for (auto &bp : data.target->m_Qualities._body->_body_part_table)
 			{
 				if (bp.second._bh == hitHeight)
@@ -3892,8 +3910,10 @@ void CWeenieObject::TryToDealDamage(DamageEventData &data)
 			data.hitPart = (BODY_PART_ENUM)*randomBodyPartIterator;
 		}
 		else
+		{
 			data.hitPart = GetRandomBodyPartByDamageQuadrant(data.hit_quadrant);
-	}
+		}
+	}	
 
 	data.target->TakeDamage(data);
 }
@@ -4116,11 +4136,11 @@ float CWeenieObject::GetEffectiveArmorLevel(DamageEventData &damageData, bool bI
 	float armorLevel = 0.0f;
 
 	bool isShield = InqIntQuality(COMBAT_USE_INT, 0, TRUE) == COMBAT_USE::COMBAT_USE_SHIELD &&
-		InqIntQuality(ARMOR_LEVEL_INT, 0, false) > 0;
-	bool isMeleeSpeced = false;
+		InqIntQuality(SHIELD_VALUE_INT, 0, false) > 0;
+	bool isShieldSpeced = false;
 	SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-	if (damageData.target->m_Qualities.InqSkillAdvancementClass(MELEE_DEFENSE_SKILL, sac))
-		isMeleeSpeced = sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS;
+	if (damageData.target->m_Qualities.InqSkillAdvancementClass(SHIELD_SKILL, sac))
+		isShieldSpeced = sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS;
 
 	if (isShield && (damageData.hit_quadrant & DQ_FRONT) == 0)
 		return 0.0f; //shield only works if the attack was from the front.
@@ -4128,7 +4148,8 @@ float CWeenieObject::GetEffectiveArmorLevel(DamageEventData &damageData, bool bI
 	EnchantedQualityDetails buffDetails;
 	if (!isShield)
 		GetIntEnchantmentDetails(ARMOR_LEVEL_INT, 0, &buffDetails);
-
+	else 
+		GetIntEnchantmentDetails(SHIELD_VALUE_INT, 0, &buffDetails);
 
 	if (bIgnoreMagicArmor)
 		armorLevel = buffDetails.rawValue; //take the Raw armor value for Hollows. Debuffs should not count
@@ -4137,19 +4158,19 @@ float CWeenieObject::GetEffectiveArmorLevel(DamageEventData &damageData, bool bI
 
 	if (isShield)
 	{
-		unsigned long meleeSkill;
-		damageData.target->m_Qualities.InqSkill(MELEE_DEFENSE_SKILL, meleeSkill, false);
+		unsigned long shieldSkill;
+		damageData.target->m_Qualities.InqSkill(SHIELD_SKILL, shieldSkill, false);
 
-		if (!isMeleeSpeced)
+		if (!isShieldSpeced)
 		{
-			if (armorLevel >= meleeSkill / 2)
+			if (armorLevel >= shieldSkill / 2)
 			{
-				armorLevel = meleeSkill / 2;
+				armorLevel = shieldSkill / 2;
 			}
 		}
 		else
 		{
-			armorLevel = min(meleeSkill, armorLevel);
+			armorLevel = min(shieldSkill, armorLevel);
 		}
 	}
 
@@ -4243,7 +4264,10 @@ void CWeenieObject::TakeDamage(DamageEventData &damageData)
 	if (damageData.damageAfterMitigation > 0 || damageData.damage_type == HEALTH_DAMAGE_TYPE || damageData.damage_type == STAMINA_DAMAGE_TYPE || damageData.damage_type == MANA_DAMAGE_TYPE)
 	{
 		if (!AsPlayer() || damageData.ignoreMagicResist)
-			damageData.damageAfterMitigation *= resistanceRegular;
+		{
+			if (resistanceRegular != 0.f)
+				damageData.damageAfterMitigation *= resistanceRegular;
+		}
 		else //only players have natural resistances.
 		{
 			//Some combination of strength and endurance allows one to have a level of "natural resistances" to the 7 damage types.This caps out at a 50 % resistance(the equivalent to level 5 life prots) to these damage types.This resistance is not additive to life protections : higher level life protections will overwrite these natural resistances, although life vulns will take these natural resistances into account, if the player does not have a higher level life protection cast upon them.
@@ -4306,6 +4330,11 @@ void CWeenieObject::TakeDamage(DamageEventData &damageData)
 				if (reduction > 0.25)
 					reduction = 0.25;
 
+				bool isPvP = damageData.source->AsPlayer() && damageData.target->AsPlayer();
+
+				if (isPvP)
+					reduction *= 0.72;
+				
 				damageData.damageAfterMitigation *= 1.0 - reduction;
 			}
 		}
@@ -4315,17 +4344,17 @@ void CWeenieObject::TakeDamage(DamageEventData &damageData)
 		if (shield)
 		{
 			SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-			damageData.target->m_Qualities.InqSkillAdvancementClass(MAGIC_DEFENSE_SKILL, sac);
+			damageData.target->m_Qualities.InqSkillAdvancementClass(SHIELD_SKILL, sac);
 			float cap = shield->InqFloatQuality(ABSORB_MAGIC_DAMAGE_FLOAT, 0.0);
 			float st = sac != SPECIALIZED_SKILL_ADVANCEMENT_CLASS ? .8 : 1;
 
-			unsigned long meleeSkill;
-			damageData.target->m_Qualities.InqSkill(MELEE_DEFENSE_SKILL, meleeSkill, false);
+			unsigned long shieldSkill;
+			damageData.target->m_Qualities.InqSkill(SHIELD_SKILL, shieldSkill, false);
 
-			float capPercent = (static_cast<float>(meleeSkill) / 433.0) * cap * st;
+			float capPercent = (static_cast<float>(shieldSkill) / 433.0) * cap * st;
 			float reduction = 0;
-
-			if (cap > 0.0 && meleeSkill >= 100)
+			
+			if (cap > 0.0 && shieldSkill >= 100)
 			{
 				// Needed?  boils down to the same formula as capPercent above
 				//reduction = 1 * (float(capPercent * st * shieldSkill * 0.0030) - (capPercent * st * .3));
@@ -4845,6 +4874,9 @@ bool CWeenieObject::Load()
 		if (save.UnPack(&reader) && !reader.GetLastError())
 		{
 			LoadEx(save);
+			AllegianceTreeNode *node = g_pAllegianceManager->GetTreeNode(GetID());
+			if (node)
+				node->_level = m_Qualities.GetInt(LEVEL_INT, 1);
 
 #ifndef PUBLIC_BUILD
 			double elapsed = watch.GetElapsed();
@@ -5022,7 +5054,46 @@ int CWeenieObject::Activate(DWORD activator_id)
 		}
 	}
 
-	return WERROR_NONE;
+		//activation code copied from CSwitchWeenie::Activate() seems to fix the generators not spawning mobs on Activate_EmoteType used on mobs like Scold that spawn more mobs on death.
+		if (get_minterp()->interpreted_state.GetNumActions())
+			return WERROR_NONE;
+
+			int activationResponse = InqIntQuality(ACTIVATION_RESPONSE_INT, 0);
+
+			if (DWORD activation_target_id = InqIIDQuality(ACTIVATION_TARGET_IID, 0))
+			{
+				CWeenieObject *activation_target = g_pWorld->FindObject(activation_target_id);
+				if (activation_target)
+					activation_target->Activate(activator_id);
+			}
+
+			//if (activationResponse & Activation_CastSpell)
+			{
+				if (DWORD spell_did = InqDIDQuality(SPELL_DID, 0))
+				{
+					MakeSpellcastingManager()->CastSpellInstant(activator_id, spell_did);
+				}
+			}
+
+			if (activationResponse & Generate_ActivationResponse)
+			{
+				g_pWeenieFactory->AddFromGeneratorTable(this, false);
+			}
+
+			if (activationResponse & Talk_ActivationResponse)
+			{
+				std::string talkText;
+				if (m_Qualities.InqString(ACTIVATION_TALK_STRING, talkText))
+				{
+					CPlayerWeenie *player = g_pWorld->FindPlayer(activator_id);
+					if (player)
+						player->SendText(talkText.c_str(), LTT_DEFAULT);
+				}
+			}
+
+			DoActivationEmote(activator_id);
+
+			return WERROR_NONE;	
 }
 
 int CWeenieObject::DoUseWithResponse(CWeenieObject *player, CWeenieObject *with)
@@ -5528,8 +5599,16 @@ int CWeenieObject::SimulateGiveObject(CContainerWeenie *target_container, CWeeni
 			}
 			else
 			{
-				SendText(csprintf("You give %s %s.", target_container->GetName().c_str(), object_weenie->GetName().c_str()), LTT_DEFAULT);
-				target_container->SendText(csprintf("%s gives you %s.", GetName().c_str(), object_weenie->GetName().c_str()), LTT_DEFAULT);
+				// check emote Refusal here to avoid the extra "%s gives you %s." text on Refuse Emotes.
+				if (m_Qualities._emote_table && HasEmoteForID(Refuse_EmoteCategory, object_weenie->m_Qualities.id))
+				{
+					SendText(csprintf("You allow %s to examine your %s.", target_container->GetName().c_str(), object_weenie->GetName().c_str()), LTT_DEFAULT);
+				}
+				else
+				{
+					SendText(csprintf("You give %s %s.", target_container->GetName().c_str(), object_weenie->GetName().c_str()), LTT_DEFAULT);
+					target_container->SendText(csprintf("%s gives you %s.", GetName().c_str(), object_weenie->GetName().c_str()), LTT_DEFAULT);
+				}
 			}
 		}
 	}
@@ -5754,7 +5833,11 @@ double CWeenieObject::GetMeleeDefenseModUsingWielded()
 
 double CWeenieObject::GetMeleeDefenseMod()
 {
-	double mod = InqFloatQuality(WEAPON_DEFENSE_FLOAT, 1.0, FALSE);
+	double mod = InqFloatQuality(WEAPON_DEFENSE_FLOAT, 1.0, TRUE);
+
+	// Don't enchant Ammunition
+	if (m_Qualities.m_WeenieType == Ammunition_WeenieType)
+		return mod;
 
 	if (m_Qualities._enchantment_reg)
 		m_Qualities._enchantment_reg->EnchantFloat(WEAPON_DEFENSE_FLOAT, &mod);
@@ -5762,7 +5845,7 @@ double CWeenieObject::GetMeleeDefenseMod()
 	CWeenieObject *wielder = GetWorldWielder();
 	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
 	{
-		mod *= wielder->GetMeleeDefenseMod();
+		mod += (wielder->GetMeleeDefenseMod()) - 1.0;
 	}
 
 	return mod;
@@ -5775,7 +5858,11 @@ double CWeenieObject::GetMissileDefenseModUsingWielded()
 
 double CWeenieObject::GetMissileDefenseMod()
 {
-	double mod = InqFloatQuality(WEAPON_MISSILE_DEFENSE_FLOAT, 1.0, FALSE);
+	double mod = InqFloatQuality(WEAPON_MISSILE_DEFENSE_FLOAT, 1.0, TRUE);
+
+	// Don't enchant Ammunition
+	if (m_Qualities.m_WeenieType == Ammunition_WeenieType)
+		return mod;
 
 	if (m_Qualities._enchantment_reg)
 		m_Qualities._enchantment_reg->EnchantFloat(WEAPON_MISSILE_DEFENSE_FLOAT, &mod);
@@ -5783,7 +5870,7 @@ double CWeenieObject::GetMissileDefenseMod()
 	CWeenieObject *wielder = GetWorldWielder();
 	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
 	{
-		mod *= wielder->GetMissileDefenseMod();
+		mod += (wielder->GetMissileDefenseMod()) - 1.0;
 	}
 
 	return mod;
@@ -5796,7 +5883,11 @@ double CWeenieObject::GetMagicDefenseModUsingWielded()
 
 double CWeenieObject::GetMagicDefenseMod()
 {
-	double mod = InqFloatQuality(WEAPON_MAGIC_DEFENSE_FLOAT, 1.0, FALSE);
+	double mod = InqFloatQuality(WEAPON_MAGIC_DEFENSE_FLOAT, 1.0, TRUE);
+
+	// Don't enchant Ammunition
+	if (m_Qualities.m_WeenieType == Ammunition_WeenieType)
+		return mod;
 
 	if (m_Qualities._enchantment_reg)
 		m_Qualities._enchantment_reg->EnchantFloat(WEAPON_MAGIC_DEFENSE_FLOAT, &mod);
@@ -5804,7 +5895,7 @@ double CWeenieObject::GetMagicDefenseMod()
 	CWeenieObject *wielder = GetWorldWielder();
 	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
 	{
-		mod *= wielder->GetMagicDefenseMod();
+		mod += (wielder->GetMagicDefenseMod()) - 1.0;
 	}
 
 	return mod;
@@ -5812,7 +5903,11 @@ double CWeenieObject::GetMagicDefenseMod()
 
 double CWeenieObject::GetOffenseMod()
 {
-	double mod = InqFloatQuality(WEAPON_OFFENSE_FLOAT, 1.0, FALSE);
+	double mod = InqFloatQuality(WEAPON_OFFENSE_FLOAT, 1.0, TRUE);
+
+	// Don't enchant Ammunition
+	if (m_Qualities.m_WeenieType == Ammunition_WeenieType)
+		return mod;
 
 	if (m_Qualities._enchantment_reg)
 		m_Qualities._enchantment_reg->EnchantFloat(WEAPON_OFFENSE_FLOAT, &mod);
@@ -5820,7 +5915,7 @@ double CWeenieObject::GetOffenseMod()
 	CWeenieObject *wielder = GetWorldWielder();
 	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
 	{
-		mod *= wielder->GetOffenseMod();
+		mod += (wielder->GetOffenseMod()) - 1.0;
 	}
 
 	return mod;
@@ -5854,39 +5949,35 @@ void CWeenieObject::AddImbueEffect(ImbuedEffectType effect)
 		return; //it's already present.
 
 	imbueEffects |= effect;
-	m_Qualities.SetInt(IMBUED_EFFECT_INT, (int)effect);
 
-	//imbue effects 2 to 5 are not used by our dataset.
-	//if (!InqIntQuality(IMBUED_EFFECT_INT, 0, FALSE))
-	//	m_Qualities.SetInt(IMBUED_EFFECT_INT, (int)effect);
-	//else if (!InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE))
-	//	m_Qualities.SetInt(IMBUED_EFFECT_2_INT, (int)effect);
-	//else if (!InqIntQuality(IMBUED_EFFECT_3_INT, 0, FALSE))
-	//	m_Qualities.SetInt(IMBUED_EFFECT_3_INT, (int)effect);
-	//else if (!InqIntQuality(IMBUED_EFFECT_4_INT, 0, FALSE))
-	//	m_Qualities.SetInt(IMBUED_EFFECT_4_INT, (int)effect);
-	//else if (!InqIntQuality(IMBUED_EFFECT_5_INT, 0, FALSE))
-	//	m_Qualities.SetInt(IMBUED_EFFECT_5_INT, (int)effect);
-	//else
-	//	return false;
-	//return true;
+	if (!InqIntQuality(IMBUED_EFFECT_INT, 0, FALSE))
+		m_Qualities.SetInt(IMBUED_EFFECT_INT, (int)effect);
+	else if (!InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE))
+		m_Qualities.SetInt(IMBUED_EFFECT_2_INT, (int)effect);
+	else if (!InqIntQuality(IMBUED_EFFECT_3_INT, 0, FALSE))
+		m_Qualities.SetInt(IMBUED_EFFECT_3_INT, (int)effect);
+	else if (!InqIntQuality(IMBUED_EFFECT_4_INT, 0, FALSE))
+		m_Qualities.SetInt(IMBUED_EFFECT_4_INT, (int)effect);
+	else if (!InqIntQuality(IMBUED_EFFECT_5_INT, 0, FALSE))
+		m_Qualities.SetInt(IMBUED_EFFECT_5_INT, (int)effect);
+	else
+		return;
+	return;
 }
+
 
 DWORD CWeenieObject::GetImbueEffects()
 {
-	return InqIntQuality(IMBUED_EFFECT_INT, 0, FALSE);
+	DWORD imbuedEffect = 0;
 
-	//imbue effects 2 to 5 are not used by our dataset.
-	//DWORD imbuedEffect = 0;
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_INT, 0, FALSE);
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE);
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE);
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_3_INT, 0, FALSE);
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_4_INT, 0, FALSE);
+	imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_5_INT, 0, FALSE);
 
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_INT, 0, FALSE);
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE);
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_2_INT, 0, FALSE);
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_3_INT, 0, FALSE);
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_4_INT, 0, FALSE);
-	//imbuedEffect |= (DWORD) InqIntQuality(IMBUED_EFFECT_5_INT, 0, FALSE);
-
-	//return imbuedEffect;
+	return imbuedEffect;
 }
 
 double CWeenieObject::GetManaConversionMod()
@@ -5954,6 +6045,38 @@ int CWeenieObject::GetAttackTime()
 	return speed;
 }
 
+double CWeenieObject::GetManaCon()
+{
+	CWeenieObject *wielder = GetWorldWielder();
+
+	double manacon = 0;
+	m_Qualities.InqFloat(MANA_CONVERSION_MOD_FLOAT, manacon, TRUE);
+
+	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
+	{
+		if (wielder->m_Qualities._enchantment_reg)
+			wielder->m_Qualities._enchantment_reg->EnchantFloat(MANA_CONVERSION_MOD_FLOAT, &manacon);
+	}
+
+	return manacon;
+}
+
+double CWeenieObject::GetElementalDamage()
+{
+	CWeenieObject *wielder = GetWorldWielder();
+
+	double elementdmg = 0;
+	m_Qualities.InqFloat(ELEMENTAL_DAMAGE_MOD_FLOAT, elementdmg, TRUE);
+
+	if (wielder && InqIntQuality(RESIST_MAGIC_INT, 0, FALSE) < 9999)
+	{
+		if (wielder->m_Qualities._enchantment_reg)
+			wielder->m_Qualities._enchantment_reg->EnchantFloat(ELEMENTAL_DAMAGE_MOD_FLOAT, &elementdmg);
+	}
+
+	return elementdmg;
+}
+
 int CWeenieObject::GetAttackTimeUsingWielded()
 {
 	return GetAttackTime();
@@ -5962,6 +6085,10 @@ int CWeenieObject::GetAttackTimeUsingWielded()
 int CWeenieObject::GetAttackDamage()
 {
 	int damage = InqIntQuality(DAMAGE_INT, 0, TRUE);
+	
+	// Don't enchant Ammunition
+	if (m_Qualities.m_WeenieType == Ammunition_WeenieType)
+		return damage;
 
 	if (m_Qualities._enchantment_reg)
 		m_Qualities._enchantment_reg->EnchantInt(DAMAGE_INT, &damage, FALSE);
@@ -6010,7 +6137,7 @@ bool CWeenieObject::TryMeleeEvade(DWORD attackSkill)
 			break;
 		}
 	}
-
+	
 	defenseSkill = (int)round((double)defenseSkill * defenseMod * CalculateDefenseImpact());
 	bool success = ::TryMeleeEvade(attackSkill, defenseSkill);
 
@@ -6191,6 +6318,7 @@ void CWeenieObject::Movement_Teleport(const Position &position, bool bWasDeath)
 
 	SetPositionStruct sps;
 	sps.pos = position;
+	sps.pos.frame.m_origin.z += 0.008f;
 	sps.SetFlags(SEND_POSITION_EVENT_SPF | SLIDE_SPF | PLACEMENT_SPF | TELEPORT_SPF);
 	SetPosition(sps);
 
@@ -6336,10 +6464,9 @@ void CWeenieObject::SetStackSize(DWORD stackSize)
 	if (CWeenieObject *owner = GetWorldTopLevelOwner())
 	{
 		owner->RecalculateEncumbrance();
-		if (owner->AsPlayer() && IsCurrency(m_Qualities.id))
-			owner->RecalculateCoinAmount(m_Qualities.id);
-
-
+		//ToDo: figure out a method to allow this to work while not interfering with pyreal count when buying MMDs.
+		if (owner->AsPlayer() && m_Qualities.id == W_COINSTACK_CLASS)
+			owner->RecalculateCoinAmount(W_COINSTACK_CLASS);
 	}
 }
 
@@ -6577,6 +6704,7 @@ void CWeenieObject::HandleEventInactive()
 		m_Qualities._generator_queue->_queue.clear();
 	}
 }
+
 bool CWeenieObject::IsCurrency(int currencyid)
 {
 	switch (currencyid)// Add alt currencies to this list
@@ -6591,4 +6719,3 @@ bool CWeenieObject::IsCurrency(int currencyid)
 		return FALSE; // Not a currency
 	}
 }
-

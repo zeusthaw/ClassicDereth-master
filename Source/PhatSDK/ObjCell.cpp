@@ -76,22 +76,29 @@ void CObjCell::add_object(CPhysicsObj *pObject)
 
 				while (!it.EndReached())
 				{
-					DWORD voyeur_id = it.GetCurrent()->id;
-
-					if (voyeur_id != pObject->id && voyeur_id && !pObject->parent)
+					try
 					{
-						CPhysicsObj *pVoyeur = CPhysicsObj::GetObjectA(voyeur_id);
+						DWORD voyeur_id = it.GetCurrent()->id;
 
-						if (pVoyeur)
+						if (voyeur_id != pObject->id && voyeur_id && !pObject->parent)
 						{
-							DetectionInfo info;
-							info.object_id = pObject->id;
-							info.object_status = EnteredDetection;
-							pVoyeur->receive_detection_update(&info);
-						}
-					}
+							CPhysicsObj *pVoyeur = CPhysicsObj::GetObjectA(voyeur_id);
 
-					it.Next();
+							if (pVoyeur)
+							{
+								DetectionInfo info;
+								info.object_id = pObject->id;
+								info.object_status = EnteredDetection;
+								pVoyeur->receive_detection_update(&info);
+							}
+						}
+
+						it.Next();
+					}
+					catch (...)
+					{
+						SERVER_ERROR << "Error in Add Object";
+					}
 				}
 			}
 		}
@@ -403,12 +410,12 @@ void CObjCell::find_cell_list(CELLARRAY *cell_array, CObjCell **check_cell, SPHE
 	CObjCell::find_cell_list(&path->check_pos, path->num_sphere, path->global_sphere, cell_array, check_cell, path);
 }
 
-CObjCell *CObjCell::GetVisible(DWORD cell_id)
+CObjCell *CObjCell::GetVisible(DWORD cell_id, bool bDoPostLoad)
 {
 	if (cell_id)
 	{
 		if ((WORD)cell_id >= 0x100)
-			return CEnvCell::GetVisible(cell_id);
+			return CEnvCell::GetVisible(cell_id, bDoPostLoad);
 		else
 			return CLandCell::Get(cell_id);
 	}

@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "AttackManager.h"
 #include "WeenieObject.h"
@@ -10,9 +9,12 @@
 
 // TODO fix memory leak with attack data
 
-const double DISTANCE_REQUIRED_FOR_MELEE_ATTACK = 1.0;
-const double MAX_MELEE_ATTACK_CONE_ANGLE = 15.0;
+const double DISTANCE_REQUIRED_FOR_MELEE_ATTACK = 2.0;
+const double MAX_MELEE_ATTACK_CONE_ANGLE = 90.0;
 const double MAX_MISSILE_ATTACK_CONE_ANGLE = 3.0;
+
+#define MISSILE_SLOW_SPEED 0.9f
+#define MISSILE_FAST_SPEED 1.25f
 
 CAttackEventData::CAttackEventData()
 {
@@ -66,7 +68,7 @@ void CAttackEventData::Begin()
 		return;
 	}
 
-	if (!target->IsAttackable())
+	if (!target->IsAttackable() && !_weenie->CanTarget(target))
 	{
 		Cancel();
 		return;
@@ -88,7 +90,7 @@ void CAttackEventData::MoveToAttack()
 	params.can_sidestep = 0;
 	params.can_walk_backwards = 0;
 	params.move_away = 1;
-	params.can_charge = 1;
+	params.can_charge = m_bCanCharge || !_weenie->AsPlayer() ? 1 : 0;
 	params.fail_walk = 1;
 	params.use_final_heading = 1;
 	params.sticky = _use_sticky;
@@ -100,6 +102,17 @@ void CAttackEventData::MoveToAttack()
 	params.action_stamp = ++_weenie->m_wAnimSequence;
 	_weenie->last_move_was_autonomous = false;
 	_weenie->MoveToObject(_target_id, &params);
+}
+
+void CAttackEventData::TurnToAttack()
+{
+	_move_to = true;
+
+	MovementParameters params;
+
+	_weenie->last_move_was_autonomous = false;
+
+	_weenie->TurnToObject(_target_id, &params);
 }
 
 void CAttackEventData::CheckTimeout()
@@ -239,7 +252,7 @@ bool CAttackEventData::IsValidTarget()
 {
 	CWeenieObject *target = GetTarget();
 
-	if (!target || !target->IsAttackable() || target->IsDead() || target->IsInPortalSpace() || target->ImmuneToDamage(_weenie))
+	if (!target || (!target->IsAttackable() && !_weenie->CanTarget(target)) || target->IsDead() || target->IsInPortalSpace() || target->ImmuneToDamage(_weenie))
 	{
 		return false;
 	}
@@ -278,7 +291,16 @@ void CMeleeAttackEvent::Setup()
 	{
 		if (_weenie->_combatTable)
 		{
-			CWeenieObject *weapon = _weenie->GetWieldedCombat(COMBAT_USE_MELEE);
+			CWeenieObject *weapon = NULL;
+			if (!_weenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
+			{
+				weapon = _weenie->GetWieldedCombat(COMBAT_USE_MELEE);
+			}
+			else 
+			{
+				weapon = _weenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED);
+			}
+
 			if (weapon)
 			{
 				//_max_attack_distance = weapon->InqFloatQuality(WEAPON_LENGTH_FLOAT, 0.5); //todo: this would be interesting but something makes the character still move next to the target anyway. Is it the client?
@@ -289,7 +311,7 @@ void CMeleeAttackEvent::Setup()
 
 				if (attack_type == (Thrust_AttackType | Slash_AttackType))
 				{
-					if (_attack_power >= 0.75f)
+					if (_attack_power >= 0.25f)
 						attack_type = Slash_AttackType;
 					else
 						attack_type = Thrust_AttackType;
@@ -297,7 +319,9 @@ void CMeleeAttackEvent::Setup()
 
 				if (CombatManeuver *combat_maneuver = _weenie->_combatTable->TryGetCombatManuever(_weenie->get_minterp()->InqStyle(), attack_type, _attack_height))
 				{
-					attack_motion = combat_maneuver->motion;
+					//don't load attack_motion for UA full speed attacks (Low and Med only) so that attack power is used to calculate motion instead.
+					if ((weapon->m_Qualities.GetInt(DEFAULT_COMBAT_STYLE_INT, 0) != 1) || _attack_power >= 0.25f || _attack_height == 1)
+						attack_motion = combat_maneuver->motion;
 				}
 			}
 		}
@@ -328,6 +352,8 @@ void CMeleeAttackEvent::Setup()
 			}
 		}
 	
+		// melee attacks can charge!
+		m_bCanCharge = true;
 		_do_attack_animation = attack_motion;
 	}
 
@@ -340,8 +366,8 @@ void CMeleeAttackEvent::Setup()
 	int attackTime = (creatureAttackTime + weaponAttackTime) / 2; //our attack time is the average between our speed and the speed of our weapon.
 	attackTime = max(0, min(120, attackTime));
 
-	_attack_speed = 2.5f - (attackTime * (1.0 / 70.0));
-	_attack_speed = max(min(_attack_speed, 2.5), 0.8);
+	_attack_speed = 2.25f - (attackTime * (1.0 / 70.0));
+	_attack_speed = max(min(_attack_speed, 2.25), 0.8);
 
 	//old formula:
 	//int attackTime = max(0, min(120, _weenie->GetAttackTimeUsingWielded()));
@@ -406,7 +432,12 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 	double offenseMod = 1.0;
 
 	bool isBodyPart = false;
-	CWeenieObject *weapon = _weenie->GetWieldedCombat(COMBAT_USE_MELEE);
+	CWeenieObject *weapon = NULL;
+	if (!_weenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
+		weapon = _weenie->GetWieldedCombat(COMBAT_USE_MELEE);
+	else {
+		weapon = _weenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED);
+	}
 
 	if (!weapon) //if we still don't have a weapon use our body parts
 	{
@@ -444,12 +475,12 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 		damageType = weapon->InqDamageType();
 	}
 	offenseMod = weapon->GetOffenseMod();
-	weaponSkill = (STypeSkill)weapon->InqIntQuality(WEAPON_SKILL_INT, UNARMED_COMBAT_SKILL, TRUE);
+	weaponSkill = SkillTable::OldToNewSkill((STypeSkill)weapon->InqIntQuality(WEAPON_SKILL_INT, LIGHT_WEAPONS_SKILL, TRUE));
 
 	//todo: maybe handle this differently as to integrate all possible damage type combos
 	if (damageType == (DAMAGE_TYPE::SLASH_DAMAGE_TYPE|DAMAGE_TYPE::PIERCE_DAMAGE_TYPE))
 	{
-		if (_attack_power >= 0.75f)
+		if (_attack_power >= 0.25f)
 			damageType = DAMAGE_TYPE::SLASH_DAMAGE_TYPE;
 		else
 			damageType = DAMAGE_TYPE::PIERCE_DAMAGE_TYPE;
@@ -458,7 +489,7 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 	{
 		//todo: as far as I know only the Mattekar Claw had this, figure out what it did exactly, was it like this? or was it a bit of both damages?
 		//or even a chance for fire damage?
-		if (_attack_power >= 0.75f)
+		if (_attack_power >= 0.25f)
 			damageType = DAMAGE_TYPE::SLASH_DAMAGE_TYPE;
 		else
 			damageType = DAMAGE_TYPE::FIRE_DAMAGE_TYPE;
@@ -496,7 +527,11 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 
 	bool hadEnoughStamina = true;
 	if (_weenie->GetStamina() < necessaryStamina)
+	{
 		hadEnoughStamina = false;
+		_attack_power = 0.00f;
+	}
+
 
 	_weenie->AdjustStamina(-necessaryStamina);
 
@@ -507,16 +542,83 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 
 		if (!hadEnoughStamina)
 		{
-			_weenie->NotifyWeenieError(WERROR_STAMINA_TOO_LOW);
-			weaponSkillLevel *= 0.5; //50% penalty to our attack skill when we don't have enough to perform it.
-			
+			if (weaponSkillLevel > 50)
+				weaponSkillLevel -= 50;
+			else if (weaponSkillLevel <= 50)
+				weaponSkillLevel *= 0.0;
+			if (CPlayerWeenie *pPlayer = _weenie->AsPlayer())
+			{
+				pPlayer->SendText("You're exhausted!", LTT_ERROR);
+			}
 		}
+	}
+
+	DamageEventData dmgEvent;
+	dmgEvent.source = _weenie;
+	dmgEvent.weapon = weapon;
+	dmgEvent.damage_form = DF_MELEE;
+	dmgEvent.damage_type = damageType;
+	dmgEvent.attackSkill = weaponSkill;
+	dmgEvent.attackSkillLevel = weaponSkillLevel;
+	dmgEvent.preVarianceDamage = preVarianceDamage;
+	dmgEvent.baseDamage = preVarianceDamage * (1.0f - Random::GenFloat(0.0f, variance)) * (0.5 + _attack_power);
+	
+	HandlePerformAttack(target, dmgEvent);
+
+	int cleaveTargets = weapon->InqIntQuality(CLEAVING_INT, 1) - 1;
+	if (cleaveTargets)
+	{
+		std::list<CWeenieObject *> lpNearby;
+
+		g_pWorld->EnumNearby(dmgEvent.source, _max_attack_distance, &lpNearby);
+		int numTargets = cleaveTargets;
+		for (auto tg : lpNearby)
+		{
+			if (!numTargets)
+				break;
+
+			if (tg == target)
+				continue;
+
+			if (
+					!tg->IsAttackable() ||
+					(
+						tg->AsPlayer() &&
+						(
+							(
+								_weenie->IsPK() && !tg->IsPK()
+							) ||
+							(
+								_weenie->IsPKLite() && !tg->IsPKLite()
+							)
+						)
+					)
+				)
+				continue;
+
+			if (tg->HeadingFrom(_weenie, true) < CLEAVING_ATTACK_ANGLE / 2)
+			{
+				HandlePerformAttack(tg, dmgEvent);
+				numTargets--;
+			}
+		}
+	}
+}
+
+void CMeleeAttackEvent::HandlePerformAttack(CWeenieObject *target, DamageEventData dmgEvent)
+{
+
+	// okay, we're attacking. check for pvp interactions
+	if (target->AsPlayer() && _weenie->AsPlayer())
+	{
+		target->AsPlayer()->UpdatePKActivity();
+		_weenie->AsPlayer()->UpdatePKActivity();
 	}
 
 	DWORD meleeDefense = 0;
 	if (target->InqSkill(MELEE_DEFENSE_SKILL, meleeDefense, FALSE) && meleeDefense > 0)
 	{
-		if (target->TryMeleeEvade(weaponSkillLevel))
+		if (target->TryMeleeEvade(dmgEvent.attackSkillLevel))
 		{
 			target->OnEvadeAttack(_weenie);
 
@@ -561,18 +663,32 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 	else
 		hitQuadrant = (DAMAGE_QUADRANT)(hitQuadrant | DAMAGE_QUADRANT::DQ_FRONT);
 
-	DamageEventData dmgEvent;
-	dmgEvent.source = _weenie;
-	dmgEvent.target = target;
-	dmgEvent.weapon = weapon;
-	dmgEvent.damage_form = DF_MELEE;
-	dmgEvent.damage_type = damageType;
 	dmgEvent.hit_quadrant = hitQuadrant;
-	dmgEvent.attackSkill = weaponSkill;
-	dmgEvent.attackSkillLevel = weaponSkillLevel;
-	dmgEvent.preVarianceDamage = preVarianceDamage;
-	dmgEvent.baseDamage = preVarianceDamage * (1.0f - Random::GenFloat(0.0f, variance)) * (0.5 + _attack_power);
 
+	dmgEvent.target = target;
+
+	CalculateCriticalHitData(&dmgEvent, NULL);
+	dmgEvent.wasCrit = (Random::GenFloat(0.0, 1.0) < dmgEvent.critChance) ? true : false;
+	if (dmgEvent.wasCrit)
+	{
+		dmgEvent.baseDamage = dmgEvent.preVarianceDamage * (0.5 + _attack_power);//Recalculate baseDamage with no variance (uses max dmg on weapon)
+	}
+
+	//cast on strike
+	if (dmgEvent.weapon->InqDIDQuality(PROC_SPELL_DID, 0))
+	{
+		double procChance = dmgEvent.weapon->InqFloatQuality(PROC_SPELL_RATE_FLOAT, 0.0f);
+
+		bool proc = (Random::GenFloat(0.0, 1.0) < procChance) ? true : false;
+
+		if (proc && target)
+		{
+			DWORD targetid = target->GetID();
+			DWORD procspell = dmgEvent.weapon->InqDIDQuality(PROC_SPELL_DID, 0);
+
+			dmgEvent.weapon->TryCastSpell(targetid, procspell);
+		}
+	}
 	CalculateDamage(&dmgEvent);
 
 	_weenie->TryToDealDamage(dmgEvent);
@@ -581,6 +697,11 @@ void CMeleeAttackEvent::HandleAttackHook(const AttackCone &cone)
 
 void CMissileAttackEvent::Setup()
 {
+	if (!_weenie)
+	{
+		return;
+	}
+
 	if (_attack_charge_time >= 0.0)
 	{
 		_attack_charge_time += 1; // for reload animation
@@ -591,24 +712,6 @@ void CMissileAttackEvent::Setup()
 
 	if (!_do_attack_animation)
 	{
-		/*
-		if (_weenie->_combatTable)
-		{
-			CWeenieObject *weapon = _weenie->GetWieldedCombat(COMBAT_USE_MISSILE);
-			if (weapon)
-			{
-				weapon_id = weapon->GetID();
-
-				AttackType attack_type = (AttackType)weapon->InqIntQuality(ATTACK_TYPE_INT, 0);
-
-				if (CombatManeuver *combat_maneuver = _weenie->_combatTable->TryGetCombatManuever(_weenie->get_minterp()->InqStyle(), attack_type, _attack_height))
-				{
-					attack_motion = combat_maneuver->motion;
-				}
-			}
-		}
-		*/
-
 		if (!attack_motion)
 		{
 			switch (_attack_height)
@@ -645,16 +748,38 @@ void CMissileAttackEvent::Setup()
 	_attack_speed = 2.5f - (attackTime * (1.0 / 70.0));
 	_attack_speed = max(min(_attack_speed, 2.5), 0.8);
 
-	//old formula:
-	//int attackTime = max(0, min(120, _weenie->GetAttackTimeUsingWielded()));
-	//_attack_speed = 1.0 / (1.0 / (1.0 + ((120 - attackTime) * (0.005))));
-
 	CAttackEventData::Setup();
 
-	_max_attack_distance = 60.0;
+	_max_attack_distance = 80.0;
 	_max_attack_angle = MAX_MISSILE_ATTACK_CONE_ANGLE;
 	_timeout = Timer::cur_time + 15.0;
-	_use_sticky = false;
+	m_bTurned = false;
+}
+
+void CMissileAttackEvent::PostCharge()
+{
+	_attack_charge_time = -1.0;
+
+	if ((_max_attack_distance + F_EPSILON) < DistanceToTarget())
+	{
+		// out of range so just stop
+		if (auto pPlayer = _weenie->AsPlayer())
+		{
+			pPlayer->NotifyAttackDone();
+			pPlayer->NotifyWeenieError(0x550);
+		}
+	}
+
+	if (m_bTurned)
+	{
+		OnReadyToAttack();
+	}
+	else
+	{
+		TurnToAttack();
+		m_bTurned = true;
+	}
+
 }
 
 void CMissileAttackEvent::OnReadyToAttack()
@@ -666,12 +791,75 @@ void CMissileAttackEvent::OnReadyToAttack()
 		params.speed = _attack_speed;
 		params.autonomous = 0;
 
+		CalculateAttackMotion();
+
 		ExecuteAnimation(_do_attack_animation, &params);
 	}
 	else
 	{
 		Finish();
 	}
+}
+
+void CMissileAttackEvent::CalculateAttackMotion()
+{
+	CWeenieObject *weapon = _weenie->GetWieldedCombat(COMBAT_USE::COMBAT_USE_MISSILE);
+
+	if (!weapon)
+	{
+		_weenie->DoForcedStopCompletely();
+		return;
+	}
+
+	CWeenieObject *equippedAmmo;
+
+	bool isThrownWeapon = (weapon->InqIntQuality(DEFAULT_COMBAT_STYLE_INT, 0) == ThrownWeapon_CombatStyle);
+	bool isAtlatl = (weapon->InqIntQuality(DEFAULT_COMBAT_STYLE_INT, 0) == Atlatl_CombatStyle);
+
+	if (isThrownWeapon)
+		equippedAmmo = weapon;
+	else
+		equippedAmmo = _weenie->GetWieldedCombat(COMBAT_USE::COMBAT_USE_AMMO);
+
+	if (!equippedAmmo)
+	{
+		_weenie->DoForcedStopCompletely();
+		_weenie->NotifyWeenieError(WERROR_COMBAT_OUT_OF_AMMO);
+		return;
+	}
+
+	CalculateTargetPosition();
+	CalculateSpawnPosition(equippedAmmo->GetRadius());
+
+	bool bTrack = false;
+	float fSpeed = weapon->InqFloatQuality(MAXIMUM_VELOCITY_FLOAT, 20.0);
+	if (CPlayerWeenie *pPlayer = _weenie->AsPlayer())
+	{
+		bTrack = pPlayer->GetCharacterOptions2() & LeadMissileTargets_CharacterOptions2;
+		fSpeed *= pPlayer->GetCharacterOptions2() & UseFastMissiles_CharacterOptions2 ? MISSILE_FAST_SPEED : MISSILE_SLOW_SPEED;
+	}
+	else
+	{
+		fSpeed *= MISSILE_SLOW_SPEED;
+	}
+
+	CalculateMissileVelocity(bTrack, true, fSpeed);
+
+	float fVertAngle = RAD2DEG(asin(_missile_velocity.z / _missile_velocity.magnitude()));
+
+	int motions[] = { Motion_AimLevel, Motion_AimHigh15, Motion_AimHigh30, Motion_AimHigh45, Motion_AimHigh60, Motion_AimHigh75, Motion_AimHigh90, Motion_AimLow15, Motion_AimLow30, Motion_AimLow45, Motion_AimLow60, Motion_AimLow75, Motion_AimLow90 };
+	int iMotionIndex = 0;
+
+	if (fVertAngle > 7.5)
+	{
+		iMotionIndex = min(floor((fVertAngle + 7.55) / 15), 6);
+	}
+	else if (fVertAngle < -7.5)
+	{
+		iMotionIndex = -min(ceil((fVertAngle - 7.55) / 15), 6) + 6;
+	}
+
+	_do_attack_animation = motions[min(max(0, iMotionIndex), 12)];
 }
 
 bool CMissileAttackEvent::CalculateTargetPosition()
@@ -760,11 +948,11 @@ bool CMissileAttackEvent::CalculateMissileVelocity(bool track, bool gravity, flo
 		{
 			v.z += (9.8*t) / 2.0f;
 		}
-
 		//Vector targetDir = v;
 		//targetDir.normalize();
 
 		_missile_velocity = v;
+
 		return true;
 	}
 
@@ -844,6 +1032,10 @@ void CMissileAttackEvent::FireMissile()
 		return;
 	}
 
+	//This converts Generic_WeenieType items (plates, mugs, etc.) to Missile_WeenieType so that they can be cast as Ammunition below.
+	if (isThrownWeapon && equippedAmmo->m_Qualities.m_WeenieType == Generic_WeenieType)
+		equippedAmmo->m_Qualities.m_WeenieType = Missile_WeenieType;
+
 	CWeenieObject *missileAsWeenieObject = g_pWeenieFactory->CloneWeenie(equippedAmmo);
 
 	if (!missileAsWeenieObject)
@@ -877,11 +1069,26 @@ void CMissileAttackEvent::FireMissile()
 
 	missile->SetInitialPhysicsState(INELASTIC_PS | GRAVITY_PS | PATHCLIPPED_PS | ALIGNPATH_PS | MISSILE_PS | REPORT_COLLISIONS_PS);
 	missile->SetInitialPosition(_weenie->GetPosition());
+	missile->SetPlacementFrame(Placement::MissileFlight, FALSE);
 	missile->InitPhysicsObj();
 
 	CalculateTargetPosition();
 	CalculateSpawnPosition(missile->GetRadius());
-	CalculateMissileVelocity(true, true, weapon->InqFloatQuality(MAXIMUM_VELOCITY_FLOAT, 20.0));
+
+	//Set to non-tracking by default so mobs don't track
+	bool bTrack = false;
+	float fSpeed = weapon->InqFloatQuality(MAXIMUM_VELOCITY_FLOAT, 20.0);
+	if (CPlayerWeenie *pPlayer = _weenie->AsPlayer())
+	{
+		bTrack = pPlayer->GetCharacterOptions2() & LeadMissileTargets_CharacterOptions2;
+		fSpeed *= pPlayer->GetCharacterOptions2() & UseFastMissiles_CharacterOptions2 ? MISSILE_FAST_SPEED : MISSILE_SLOW_SPEED;
+	}
+	else
+	{
+		fSpeed *= MISSILE_SLOW_SPEED;
+	}
+
+	CalculateMissileVelocity(bTrack, true, fSpeed);
 
 	missile->m_Position = _missile_spawn_position;
 	missile->set_velocity(_missile_velocity, FALSE);
@@ -892,6 +1099,7 @@ void CMissileAttackEvent::FireMissile()
 	missile->_launcherID = launcher ? launcher->GetID() : 0;
 	missile->_targetID = target ? target->GetID() : 0;
 	missile->_attackPower = _attack_power;
+	missile->_timeToRot = Timer::cur_time + 5.0;
 
 	CWeenieObject *shield = _weenie->GetWieldedCombat(COMBAT_USE::COMBAT_USE_SHIELD); //thrown weapons users can have a shield
 
@@ -927,7 +1135,7 @@ void CMissileAttackEvent::FireMissile()
 
 	_weenie->AdjustStamina(-necessaryStamina);
 
-	missile->_weaponSkill = (STypeSkill)weapon->InqIntQuality(WEAPON_SKILL_INT, UNDEF_SKILL, false);
+	missile->_weaponSkill = SkillTable::OldToNewSkill((STypeSkill)weapon->InqIntQuality(WEAPON_SKILL_INT, UNDEF_SKILL, false));
 	if (_weenie->InqSkill(missile->_weaponSkill, missile->_weaponSkillLevel, false))
 	{
 		double offenseMod = weapon->GetOffenseMod();
@@ -1023,6 +1231,7 @@ AttackManager::~AttackManager()
 {
 	SafeDelete(_attackData);
 	SafeDelete(_cleanupData);
+	SafeDelete(_queuedAttackData);
 }
 
 void AttackManager::MarkForCleanup(CAttackEventData *data)
@@ -1046,7 +1255,7 @@ void AttackManager::OnAttackCancelled(DWORD error)
 	if (_attackData)
 	{
 		_weenie->NotifyAttackDone();
-		_weenie->DoForcedStopCompletely();
+		_weenie->DoForcedMotion(_weenie->get_minterp()->InqStyle());
 		_weenie->unstick_from_object();
 
 		MarkForCleanup(_attackData);
@@ -1067,14 +1276,13 @@ bool AttackManager::RepeatAttacks()
 
 void AttackManager::OnAttackDone(DWORD error)
 {
-	if(_weenie->_blockNewAttacksUntil < Timer::cur_time) //fix for cancelling reload animation making attacking faster 
-		_weenie->_blockNewAttacksUntil = Timer::cur_time + 1.0;
+	//if(_weenie->_blockNewAttacksUntil < Timer::cur_time) //fix for cancelling reload animation making attacking faster 
+		//_weenie->_blockNewAttacksUntil = Timer::cur_time + 1.0;
 	if (_attackData)
 	{
 		if (RepeatAttacks() && _attackData->IsValidTarget())
 		{
-			_weenie->NotifyAttackDone();
-			
+
 			if (_queuedAttackData != NULL)
 			{
 				//we have a queued attack, change to that.
@@ -1082,16 +1290,13 @@ void AttackManager::OnAttackDone(DWORD error)
 				_attackData = _queuedAttackData;
 				_queuedAttackData = NULL;
 			}
-			
-			if (_attackData->AsMissileAttackEvent())
+
+			if (!_attackData->AsMissileAttackEvent())
 			{
-				//This is needed for missile attacks otherwise the client won't start the next shot.
-				//Although this makes it so the client's power bar doesn't animate(it starts filled up to the attack power chosen).
-				//So we don't want it for melee weapons as those work correctly without this. Did missile attacks animate the power bar on retail?
-				_weenie->NotifyCommenceAttack();
+				_weenie->NotifyAttackDone();
 			}
 
-			_attackData->_attack_charge_time = Timer::cur_time + (_attackData->_attack_power * 2);
+			_attackData->_attack_charge_time = Timer::cur_time + (_attackData->_attack_power);
 			_attackData->Begin();
 		}
 		else
@@ -1140,6 +1345,11 @@ void AttackManager::OnMotionDone(DWORD motion, BOOL success)
 	if (_attackData)
 	{
 		_attackData->OnMotionDone(motion, success);
+
+		if (motion == Motion_Reload)
+		{
+			_weenie->NotifyAttackDone();
+		}
 	}
 }
 

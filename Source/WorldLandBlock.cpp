@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "World.h"
 #include "WorldLandBlock.h"
@@ -73,20 +72,34 @@ void CWorldLandBlock::ClearOldDatabaseEntries()
 	std::list<unsigned int> weeniesList = g_pDBIO->GetWeeniesAt(m_wHeader);
 	for (auto entry : weeniesList)
 	{
-		bool stillExists = false;
-		for (auto &entity : m_EntityList)
+		try
 		{
-			if (entity->GetID() == entry)
+			bool stillExists = false;
+			for (auto &entity : m_EntityList)
 			{
-				stillExists = true;
-				break;
+				try
+				{
+					if (entity->GetID() == entry)
+					{
+						stillExists = true;
+						break;
+					}
+				}
+				catch (...)
+				{
+					SERVER_ERROR << "Error getting ID for " << entity;
+				}
+			}
+
+			if (!stillExists)
+			{
+				g_pDBIO->RemoveWeenieFromBlock(entry);
+				g_pDBIO->DeleteWeenie(entry);
 			}
 		}
-
-		if (!stillExists)
+		catch (...)
 		{
-			g_pDBIO->RemoveWeenieFromBlock(entry);
-			g_pDBIO->DeleteWeenie(entry);
+			SERVER_ERROR << "Failed to get data for " << entry;
 		}
 	}
 }
@@ -204,6 +217,8 @@ void CWorldLandBlock::SpawnDynamics()
 	CLandBlockExtendedData *data = g_pCellDataEx->GetLandBlockData((DWORD)m_wHeader << 16);
 	if (data)
 	{
+		SmartArray<CLandBlockWeenieLink> tmp_links = data->weenie_links;
+
 		for (DWORD i = 0; i < data->weenies.num_used; i++)
 		{
 			DWORD wcid = data->weenies.array_data[i].wcid;
@@ -306,21 +321,21 @@ void CWorldLandBlock::SpawnDynamics()
 				if (bDynamicID)
 				{
 					DWORD weenie_id = weenie->GetID();
-					for (DWORD i = 0; i < data->weenie_links.num_used; i++)
+					for (DWORD i = 0; i < tmp_links.num_used; i++)
 					{
-						if (data->weenie_links.array_data[i].source == iid)
-							data->weenie_links.array_data[i].source = weenie_id;
-						if (data->weenie_links.array_data[i].target == iid)
-							data->weenie_links.array_data[i].target = weenie_id;
+						if (tmp_links.array_data[i].source == iid)
+							tmp_links.array_data[i].source = weenie_id;
+						if (tmp_links.array_data[i].target == iid)
+							tmp_links.array_data[i].target = weenie_id;
 					}
 				}
 			}
 		}
 
-		for (DWORD i = 0; i < data->weenie_links.num_used; i++)
+		for (DWORD i = 0; i < tmp_links.num_used; i++)
 		{
-			DWORD source_id = data->weenie_links.array_data[i].source;
-			DWORD target_id = data->weenie_links.array_data[i].target;
+			DWORD source_id = tmp_links.array_data[i].source;
+			DWORD target_id = tmp_links.array_data[i].target;
 
 			CWeenieObject *source_weenie = g_pWorld->FindObject(source_id); // often creature, or respawnable item
 			if (source_weenie)
@@ -329,7 +344,6 @@ void CWorldLandBlock::SpawnDynamics()
 				if (target_weenie)
 				{
 					target_weenie->EnsureLink(source_weenie);
-
 					if (target_weenie->m_Qualities._generator_table)
 					{
 						GeneratorProfile prof;
@@ -439,13 +453,15 @@ void CWorldLandBlock::Insert(CWeenieObject *pEntity, WORD wOld, BOOL bNew, bool 
 {
 	if (CPlayerWeenie *player = pEntity->AsPlayer())
 	{
+		Position pos = pEntity->GetPosition();
 		m_PlayerMap.insert(std::pair<DWORD, CPlayerWeenie *>(pEntity->GetID(), player));
 		m_PlayerList.push_back(player);
 
 		MakeNotDormant();
 
-		// spawn up adjacent landblocks
-		ActivateLandblocksWithinPVS(pEntity->GetLandcell());
+		// spawn up adjacent landblocks only if outdoors, otherwise only load the block you're on.
+		if ((pos.objcell_id & 0xFFFF) < 0x100) //outdoors
+			ActivateLandblocksWithinPVS(pEntity->GetLandcell());
 	}
 
 	m_EntityMap.insert(std::pair<DWORD, CWeenieObject *>(pEntity->GetID(), pEntity));
@@ -588,6 +604,16 @@ void CWorldLandBlock::ExchangePVS(CWeenieObject *pSource, WORD old_block_id)
 	if (!pSource)
 		return;
 
+	WORD cell = CELL_WORD(pSource->GetLandcell());
+
+	CWorldLandBlock *pBlock = pSource->GetBlock();
+
+	//if in a Dungeon only exchange data on this landblock. Indoor landblocks, such as inside buildings should still exchange.
+	if ((pBlock && (pSource->GetLandcell() & 0xFFFF) > 0x100) && !PossiblyVisibleToOutdoors(pSource->GetLandcell()))
+	{
+			pBlock->ExchangeData(pSource);
+	}
+	else
 	{
 		// outdoor exchange -- this should eventually become obselete
 
@@ -665,7 +691,7 @@ bool CWorldLandBlock::HasAnySeenOutside()
 	return _cached_any_seen_outside;
 }
 
-bool CWorldLandBlock::PossiblyVisibleToOutdoors(DWORD cell_id)
+bool CWorldLandBlock::PossiblyVisibleToOutdoors(WORD cell_id)
 {
 	if (cell_id >= LandDefs::first_envcell_id && cell_id <= LandDefs::last_envcell_id)
 	{
@@ -803,6 +829,8 @@ void CWorldLandBlock::Destroy(CWeenieObject *pEntity, bool bDoRelease)
 	// LOG(Temp, Normal, "Removing entity %08X %04X @ %08X \n", pEntity->GetID(), pEntity->_instance_timestamp, pEntity->GetLandcell());
 #endif
 
+	pEntity->NotifyRemoveFromWorld();
+
 	pEntity->exit_world();
 	pEntity->leave_world();
 	pEntity->unset_parent();
@@ -817,7 +845,8 @@ void CWorldLandBlock::Destroy(CWeenieObject *pEntity, bool bDoRelease)
 			target->NotifyGeneratedDeath(pEntity);
 	}
 
-	DELETE_ENTITY(pEntity);
+	if (pEntity)
+		delete pEntity;
 }
 
 BOOL CWorldLandBlock::Think()
@@ -888,6 +917,7 @@ BOOL CWorldLandBlock::Think()
 
 			if (!pEntity->ShouldDestroy())
 			{
+				// ...why?
 #ifdef DEBUG
 				static bool checkMe = true;
 				if (checkMe)
@@ -896,6 +926,7 @@ BOOL CWorldLandBlock::Think()
 					checkMe = false;
 				}
 #endif
+
 				if (!pEntity->cell)
 				{
 					if (CPlayerWeenie *player = pEntity->AsPlayer())

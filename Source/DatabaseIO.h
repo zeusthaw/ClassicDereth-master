@@ -34,7 +34,8 @@ enum DBIOGlobalDataID
 {
 	DBIO_GLOBAL_ALLEGIANCE_DATA = 1,
 	DBIO_GLOBAL_BAN_DATA = 2,
-	DBIO_GLOBAL_HOUSING_DATA = 3
+	DBIO_GLOBAL_HOUSING_DATA = 3,
+	DBIO_GLOBAL_ID_RANGE_START = 4
 };
 
 class CDatabaseIO
@@ -62,13 +63,15 @@ public:
 	std::list<unsigned int> GetWeeniesAt(unsigned int block_id);
 	bool AddOrUpdateWeenieToBlock(unsigned int weenie_id, unsigned int block_id);
 	bool RemoveWeenieFromBlock(unsigned int weenie_id);
-
+	bool IDRangeTableExistsAndValid();
+	std::list<unsigned int> GetNextIDRange(unsigned int rangeStart, unsigned int count);
 	unsigned int GetHighestWeenieID(unsigned int min_range, unsigned int max_range);
+	std::list< std::pair<unsigned int, unsigned int> > CDatabaseIO::GetUnusedIdRanges(unsigned int min_range, unsigned int max_range);
 	bool IsCharacterNameOpen(const char *name);
 	bool IsPlayerCharacter(unsigned int weenie_id);
 	DWORD GetPlayerCharacterId(const char *name);
 	std::string GetPlayerCharacterName(DWORD weenie_id);
-	DWORD GetAccountHouseId(unsigned int accountid);
+	DWORD GeAccountHouseId(unsigned int accountid);
 
 	bool CreateOrUpdateWeenie(unsigned int weenie_id, unsigned int top_level_object_id, unsigned int block_id, void *data, unsigned int data_length);
 	bool GetWeenie(unsigned int weenie_id, unsigned int *top_level_object_id, unsigned int *block_id, void **data, unsigned long *data_length);

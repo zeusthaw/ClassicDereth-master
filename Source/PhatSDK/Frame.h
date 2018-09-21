@@ -102,7 +102,7 @@ public:
 		// For legacy purposes.
 		return (sizeof(DWORD) + frame.pack_size());
 	}
-
+	
 	DECLARE_PACKABLE()
 	DECLARE_PACKABLE_JSON()
 
@@ -113,7 +113,7 @@ public:
 	BOOL operator==(const Position& Pos) const;
 
 	Vector localtolocal(const Position& Pos, const Vector& Offset) const;
-
+	
 	Vector localtoglobalvec(const Vector &v) const;
 	Vector globaltolocalvec(const Vector& point) const;
 

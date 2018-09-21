@@ -47,7 +47,7 @@ void CAmmunitionWeenie::MakeIntoAmmo()
 
 	SetPlacementFrame(Placement::Resting, TRUE);
 
-	_timeToRot = Timer::cur_time + 60.0;
+	_timeToRot = Timer::cur_time + 1.0;
 	_beganRot = false;
 	m_Qualities.SetFloat(TIME_TO_ROT_FLOAT, _timeToRot);
 }
@@ -109,6 +109,11 @@ BOOL CAmmunitionWeenie::DoCollision(const class AtkCollisionProfile &prof)
 			float variance;
 
 			CWeenieObject *weapon = g_pWorld->FindObject(_launcherID);
+
+			// For thrown weaps, the weapon no longer exists on the last missile in a stack. So for these we will just use the cloned ammo weenie itself.
+			if (!weapon && m_Qualities.GetInt(DEFAULT_COMBAT_STYLE_INT, 0) == ThrownWeapon_CombatStyle)
+				weapon = g_pWorld->FindObject(id);
+
 			if (weapon)
 			{		
 				bool bEvaded = false;
@@ -124,11 +129,16 @@ BOOL CAmmunitionWeenie::DoCollision(const class AtkCollisionProfile &prof)
 						BinaryWriter attackerEvadeEvent;
 						attackerEvadeEvent.Write<DWORD>(0x01B3);
 						attackerEvadeEvent.WriteString(pHit->GetName());
-						pSource->SendNetMessage(&attackerEvadeEvent, PRIVATE_MSG, TRUE, FALSE);
+						if (pSource != nullptr)
+							pSource->SendNetMessage(&attackerEvadeEvent, PRIVATE_MSG, TRUE, FALSE);
+
 
 						BinaryWriter attackedEvadeEvent;
 						attackedEvadeEvent.Write<DWORD>(0x01B4);
-						attackedEvadeEvent.WriteString(pSource->GetName());
+						if (pSource != nullptr)
+							attackedEvadeEvent.WriteString(pSource->GetName());
+						else
+							attackedEvadeEvent.WriteString("Unknown");
 						pHit->SendNetMessage(&attackedEvadeEvent, PRIVATE_MSG, TRUE, FALSE);
 						bEvaded = true;
 					}
@@ -138,13 +148,19 @@ BOOL CAmmunitionWeenie::DoCollision(const class AtkCollisionProfile &prof)
 				{
 					EmitSound(Sound_Collision, 1.0f);
 
+					if (pSource != nullptr && pSource && pHit && pSource->AsPlayer() && pHit->AsPlayer())
+					{
+						pSource->AsPlayer()->UpdatePKActivity();
+						pHit->AsPlayer()->UpdatePKActivity();
+					}
+
 					// todo: do this in a better way?
 					// 50% medium, 30% low, 20% high
 					DAMAGE_QUADRANT hitQuadrant = DAMAGE_QUADRANT::DQ_UNDEF;
 					double roll = Random::RollDice(0.0, 1.0);
-					if(roll < 50.0)
+					if(roll < 0.5)
 						hitQuadrant = DQ_MEDIUM;
-					else if (roll < 80.0)
+					else if (roll < 0.8)
 						hitQuadrant = DQ_LOW;
 					else
 						hitQuadrant = DQ_HIGH;
@@ -169,24 +185,54 @@ BOOL CAmmunitionWeenie::DoCollision(const class AtkCollisionProfile &prof)
 					int elementalDamageBonus = weapon->InqDamageType() == InqDamageType() ? weapon->InqIntQuality(ELEMENTAL_DAMAGE_BONUS_INT, 0) : 0;
 					double damageMod = weapon->InqFloatQuality(DAMAGE_MOD_FLOAT, 1.0);
 
-					preVarianceDamage *= damageMod;
 					preVarianceDamage += weaponDamage + elementalDamageBonus;
+					preVarianceDamage *= damageMod;
 
 					DamageEventData dmgEvent;
 					dmgEvent.source = pSource;
 					dmgEvent.target = pHit;
 					dmgEvent.weapon = weapon;
 					dmgEvent.damage_form = DF_MISSILE;
-					dmgEvent.damage_type = InqDamageType();
+
+					if (InqDamageType() != BASE_DAMAGE_TYPE)
+						dmgEvent.damage_type = InqDamageType();
+					else if (!weapon->InqDamageType())
+						dmgEvent.damage_type = PIERCE_DAMAGE_TYPE;
+					else
+						dmgEvent.damage_type = weapon->InqDamageType();
+
 					dmgEvent.hit_quadrant = hitQuadrant;
 					dmgEvent.attackSkill = _weaponSkill;
 					dmgEvent.attackSkillLevel = _weaponSkillLevel;
 					dmgEvent.preVarianceDamage = preVarianceDamage;
 					dmgEvent.baseDamage = preVarianceDamage * (1.0f - Random::GenFloat(0.0f, variance));
 
-					CalculateDamage(&dmgEvent);
+					CalculateCriticalHitData(&dmgEvent, NULL);
+					dmgEvent.wasCrit = (Random::GenFloat(0.0, 1.0) < dmgEvent.critChance) ? true : false;
+					if (dmgEvent.wasCrit)
+					{
+						dmgEvent.baseDamage = dmgEvent.preVarianceDamage;//Recalculate baseDamage with no variance (uses max dmg on weapon)
+					}
 
-					pSource->TryToDealDamage(dmgEvent);
+					//cast on strike
+					if (weapon->InqDIDQuality(PROC_SPELL_DID, 0))
+					{
+						double procChance = weapon->InqFloatQuality(PROC_SPELL_RATE_FLOAT, 0.0f);
+
+						bool proc = (Random::GenFloat(0.0, 1.0) < procChance) ? true : false;
+
+						if (proc && _targetID)
+						{
+							DWORD targetid = _targetID;
+							DWORD procspell = weapon->InqDIDQuality(PROC_SPELL_DID, 0);
+
+							weapon->TryCastSpell(targetid, procspell);
+						}
+					}
+
+					CalculateDamage(&dmgEvent);
+					if (pSource != nullptr)
+						pSource->TryToDealDamage(dmgEvent);
 				}
 			}
 		}

@@ -19,9 +19,16 @@ DEFINE_UNPACK(SpellComponentBase)
 {
 	_name = pReader->ReadString();
 
-	// these are obfuscated, swap low/high nibbles
-	for (int i = 0; i < _name.size(); i++)
-		_name[i] = (char)(BYTE)((BYTE)((BYTE)_name[i] << 4) | (BYTE)((BYTE)_name[i] >> 4));
+	try
+	{
+		// these are obfuscated, swap low/high nibbles
+		for (int i = 0; i < _name.size(); i++)
+			_name[i] = (char)(BYTE)((BYTE)((BYTE)_name[i] << 4) | (BYTE)((BYTE)_name[i] >> 4));
+	}
+	catch(...)
+	{
+		SERVER_ERROR << "Error unpacking spell components";
+	}
 
 	_category = (SpellComponentCategory)pReader->Read<int>();
 	_iconID = pReader->Read<DWORD>();
@@ -30,9 +37,16 @@ DEFINE_UNPACK(SpellComponentBase)
 	_time = pReader->Read<float>();
 	_text = pReader->ReadString();
 
-	// these are obfuscated, swap low/high nibbles
+	try
+	{
+		// these are obfuscated, swap low/high nibbles
 	for (int i = 0; i < _text.size(); i++)
 		_text[i] = (char)(BYTE)((BYTE)((BYTE)_text[i] << 4) | (BYTE)((BYTE)_text[i] >> 4));
+	}
+	catch (...)
+	{
+		SERVER_ERROR << "Error unpacking spell component names";
+	}
 
 	_CDM = pReader->Read<float>();
 

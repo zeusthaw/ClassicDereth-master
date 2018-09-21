@@ -1,6 +1,10 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <mutex>
+#include <thread>
+
 #include "StatTracker.h"
 #include "Config.h"
 
@@ -41,8 +45,8 @@ private:
 	CStatTracker m_Stats;
 	CPhatACServerConfig m_Config;
 
-	HANDLE m_hQuitEvent = NULL;
-	HANDLE m_hServerThread = NULL;
+	bool m_running;
+	std::thread m_serverThread;
 
 	double m_fStartupTime;
 };

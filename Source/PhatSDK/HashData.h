@@ -1,5 +1,6 @@
 
 #pragma once
+#include "easylogging++.h"
 
 template<typename _Kty> class HashBase;
 template<typename _Kty> class HashBaseData;
@@ -27,7 +28,7 @@ public:
 		id = 0;
 	}
 
-	const _Kty GetID()
+	 _Kty GetID()
 	{
 		return id;
 	}
@@ -404,10 +405,25 @@ public:
 
 	void destroy_contents()
 	{
-		_MybaseIter it(this);
+		try
+		{
+			_MybaseIter it(this);
+			try
+			{
+				while (!it.EndReached())
+					it.DeleteCurrent();
+			}
+			catch (...)
+			{
+				SERVER_ERROR << "Error progressing over iteration";
+			}
 
-		while (!it.EndReached())
-			it.DeleteCurrent();
+		}
+		catch (...)
+		{
+			SERVER_ERROR << "Failed to create iterator";
+		}
+
 	}
 };
 
@@ -788,10 +804,17 @@ public:
 		{
 			_Mty *pNodeData = it.GetCurrentData();
 
-			it.Next();
+			try
+			{
+				it.Next();
 
-			if (pNodeData)
-				delete pNodeData;
+				if (pNodeData)
+					delete pNodeData;
+			}
+			catch (...)
+			{
+				SERVER_ERROR << "Error in HashData DeleteAll";
+			}
 		}
 
 		flush();

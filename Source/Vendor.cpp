@@ -61,10 +61,10 @@ void CVendor::AddVendorItem(DWORD wcid, int ptid, float shade, int amount)
 void CVendor::AddVendorItem(DWORD wcid, int amount)
 {
 	CWeenieObject *weenie = g_pWeenieFactory->CreateWeenieByClassID(wcid);
-
+		
 	if (!weenie)
 		return;
-
+	
 	if (!g_pWorld->CreateEntity(weenie))
 		return;
 
@@ -89,7 +89,7 @@ int CVendor::TrySellItemsToPlayer(CPlayerWeenie *buyer, const std::list<ItemProf
 {
 	const DWORD MAX_COIN_PURCHASE = 2000000000; // // limit to purchases less than 2 billion pyreal
 
-												// using WERROR_NO_OBJECT as a generic error, change later if it matters
+	// using WERROR_NO_OBJECT as a generic error, change later if it matters
 	if (desiredItems.size() >= 100)
 		return WERROR_NO_OBJECT;
 
@@ -125,9 +125,9 @@ int CVendor::TrySellItemsToPlayer(CPlayerWeenie *buyer, const std::list<ItemProf
 
 	if (totalCost >= MAX_COIN_PURCHASE)
 		return WERROR_NO_OBJECT; // limit to purchases less than 2 billion pyreal
-
+	
 	if (profile.trade_num == 0 && currencyamount < totalCost)
-	{
+	{		
 		buyer->SendText("You don't have enough money.", LTT_DEFAULT);
 		return WERROR_NO_OBJECT;
 	}
@@ -147,7 +147,7 @@ int CVendor::TrySellItemsToPlayer(CPlayerWeenie *buyer, const std::list<ItemProf
 		//This shouldn't happen.
 		buyer->SendText("Couldn't find all the money for the payment.", LTT_DEFAULT);
 		buyer->SpawnInContainer(currencyid, coinConsumed); //give back what we consumed and abort.
-
+		
 		return WERROR_NO_OBJECT;
 	}
 
@@ -172,7 +172,7 @@ int CVendor::TryBuyItemsFromPlayer(CPlayerWeenie *seller, const std::list<ItemPr
 	const DWORD MAX_COIN_PURCHASE = 1000000000; // limit to purchases less than 1 billion pyreal
 	const DWORD MAX_COIN_ALLOWED = 2000000000; // limit to max amount of coin to less than 2 billion pyreal
 
-											   // using WERROR_NO_OBJECT as a generic error, change later if it matters
+	// using WERROR_NO_OBJECT as a generic error, change later if it matters
 	if (desiredItems.size() >= 100)
 		return WERROR_NO_OBJECT;
 
@@ -190,7 +190,7 @@ int CVendor::TryBuyItemsFromPlayer(CPlayerWeenie *seller, const std::list<ItemPr
 		if (desiredItem->amount <= 0)
 			continue;
 
-		if (sellerItem->InqIntQuality(ITEM_TYPE_INT, TYPE_UNDEF) == TYPE_PROMISSORY_NOTE)
+		if(sellerItem->InqIntQuality(ITEM_TYPE_INT, TYPE_UNDEF) == TYPE_PROMISSORY_NOTE)
 			totalValue += (DWORD)round(sellerItem->InqIntQuality(VALUE_INT, 0));
 		else
 			totalValue += (DWORD)round(sellerItem->InqIntQuality(VALUE_INT, 0) * profile.buy_price);
@@ -250,7 +250,7 @@ void CVendor::AddVendorItemByAllMatchingNames(const char *name)
 {
 	int index = 0;
 	DWORD wcid;
-
+	
 	while (wcid = g_pWeenieFactory->GetWCIDByName(name, index++))
 	{
 		AddVendorItem(wcid, -1);
@@ -287,7 +287,7 @@ void CVendor::PreSpawnCreate()
 	{
 		for (auto i = m_Qualities._create_list->begin(); i != m_Qualities._create_list->end(); i++)
 		{
-			if (i->destination == DestinationType::Shop_DestinationType | DestinationType::Contain_DestinationType)
+			if (i->destination == DestinationType::Shop_DestinationType || i->destination == DestinationType::Contain_DestinationType)
 			{
 				if (i->destination == DestinationType::Contain_DestinationType || i->destination == DestinationType::Wield_DestinationType)
 				{
@@ -313,7 +313,7 @@ void CVendor::SendVendorInventory(CWeenieObject *other)
 	vendorInfo.Write<DWORD>(GetID());
 
 	profile.Pack(&vendorInfo);
-
+	
 	vendorInfo.Write<DWORD>(m_Items.size());
 	for (auto item : m_Items)
 	{
@@ -370,7 +370,7 @@ int CVendor::DoUseResponse(CWeenieObject *player)
 	}
 	else
 		player->RecalculateCoinAmount(W_COINSTACK_CLASS);
-
+		
 	SendVendorInventory(player);
 	DoVendorEmote(Open_VendorTypeEmote, player->GetID());
 	return WERROR_NONE;

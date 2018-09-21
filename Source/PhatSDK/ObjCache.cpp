@@ -2,7 +2,7 @@
 #include "StdAfx.h"
 #include "DATDisk.h"
 #include "ObjCache.h"
-
+#include "easylogging++.h"
 #include "RegionDesc.h"
 #include "LandBlock.h"
 #include "LandBlockInfo.h"
@@ -73,7 +73,7 @@ void ObjCaches::OutputCacheInfo()
 		if (!*cache)
 			continue;
 
-		LOG(Data, Normal, "Total %s: %u\n", (*cache)->GetName(), (*cache)->GetCachedCount());
+		DEBUG_DATA << "ObjCache - Total" << (*cache)->GetName() << ":" << (*cache)->GetCachedCount();
 	}
 }
 
@@ -230,7 +230,7 @@ void ObjCaches::DestroyCaches()
 		ObjCache *pcache = *ppcache;
 		if (pcache->GetCachedCount() > 0)
 		{
-			LOG(Data, Warning, "ObjCache \"%s\" still has %u objects cached! Missing release somewhere?\n", pcache->GetName(), pcache->GetCachedCount());
+			DEBUG_DATA << "ObjCache" << pcache->GetName() << "still has" << pcache->GetCachedCount() << "objects  cached! Missing release somewhere?";
 		}
 	}
 
@@ -412,8 +412,15 @@ DWORD ObjCache::GetCachedCount()
 
 	DWORD Count = 0;
 	while (!Iter.EndReached()) {
-		Count++;
-		Iter.Next();
+		try
+		{
+			Count++;
+			Iter.Next();
+		}
+		catch (...)
+		{
+			SERVER_ERROR << "Error in Cached Count";
+		}
 	}
 
 	return Count;

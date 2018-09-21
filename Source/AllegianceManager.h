@@ -23,7 +23,7 @@ public:
 	AllegianceTreeNode *FindCharByNameRecursivelySlow(const std::string &charName);
 	void FillAllegianceNode(AllegianceNode *node);
 	void UpdateWithWeenie(CWeenieObject *weenie);
-
+	
 	unsigned int _charID = 0;
 	std::string _charName;
 
@@ -52,7 +52,7 @@ public:
 	virtual ~AllegianceManager();
 
 	DECLARE_PACKABLE()
-
+	
 	void Load();
 	void Save();
 	void Tick();
@@ -118,7 +118,7 @@ public:
 
 	void ApproveVassal(CPlayerWeenie * player, std::string vassal_name);
 	void BootPlayer(CPlayerWeenie* player, std::string bootee, bool whole_account);
-
+	
 	bool IsGagged(DWORD player_id);
 	void ChatGag(CPlayerWeenie* player, std::string target, bool toggle);
 	void ChatBoot(CPlayerWeenie* player, std::string target, std::string reason);

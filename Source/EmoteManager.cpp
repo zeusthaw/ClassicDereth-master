@@ -1,3 +1,4 @@
+
 #include "StdAfx.h"
 #include "EmoteManager.h"
 #include "WeenieObject.h"
@@ -115,14 +116,46 @@ std::string EmoteManager::ReplaceEmoteText(const std::string &text, DWORD target
 
 	if (result.find("%tqt") != std::string::npos)
 	{
-		while (ReplaceString(result, "%tqt", "some amount of time"));
+		std::string targetName;
+		if (!g_pWorld->FindObjectName(target_id, targetName))
+			return ""; // Couldn't resolve name, don't display this message.
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		std::string questString = target->Ktref(result.c_str()); //trims the @%tqt off of the quest name and returns the questflag to validate the quest timer against.
+
+		if (target->InqQuest(questString.c_str()))
+		{
+			int timeTilOkay = target->InqTimeUntilOkayToComplete(questString.c_str());
+
+			if (timeTilOkay > 0)
+			{
+				int secs = timeTilOkay % 60;					
+				timeTilOkay /= 60;
+
+				int mins = timeTilOkay % 60;
+				timeTilOkay /= 60;
+
+				int hours = timeTilOkay % 24;
+				timeTilOkay /= 24;
+
+				int days = timeTilOkay;
+
+				result = csprintf("You must wait %dd %dh %dm %ds to complete this quest again.", days, hours, mins, secs);
+			}
+			else
+			{
+				return ""; //Quest timer has expired so return blank cooldown message.
+			}
+		}
 	}
 
 	return result;
 }
 
+
 void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 {
+	_weenie->m_Qualities.SetBool(EXECUTING_EMOTE, true);
 	switch (emote.type)
 	{
 	default:
@@ -424,6 +457,21 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 
 			break;
 		}
+
+	case LockFellow_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
+		{
+			Fellowship *fellow = target->GetFellowship();
+
+			if (fellow)
+				fellow->_locked = true;
+		}
+
+		break;
+	}
+
 	case TextDirect_EmoteType:
 		{
 			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
@@ -642,12 +690,25 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 	case StampQuest_EmoteType:
 		{
 			CWeenieObject *target = g_pWorld->FindObject(target_id);
+			if (target && emote.msg.find("@#kt") != std::string::npos)  //if @#kt found in quest string this is a killtask call collect data pass to killtask func.
+			{
+				auto kCountName = target->Ktref(emote.msg.c_str()); //trims the @#kt off of the quest name and returns the questflag used by the quest for stamping/validation
+
+				std::string mobName;
+				_weenie->m_Qualities.InqString((STypeString)1, mobName);
+
+				killTask(mobName, kCountName.c_str(), target_id);
+				break;
+			}
+			
 			if (target)
 			{
 				target->StampQuest(emote.msg.c_str());
 			}
-			break;
+			
 		}
+		break;
+
 	case StampFellowQuest_EmoteType:
 		{
 			CWeenieObject *target = g_pWorld->FindObject(target_id);
@@ -1095,7 +1156,10 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		{
 			CWeenieObject *target = g_pWorld->FindObject(target_id);
 			if (target)
+			{
 				target->m_Qualities.SetInt((STypeInt)emote.stat, emote.amount);
+				target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
+			}
 			break;
 		}
 	case IncrementIntStat_EmoteType:
@@ -1105,6 +1169,7 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 			{
 				int intStat = target->InqIntQuality((STypeInt)emote.stat, 0, TRUE) + 1;
 				target->m_Qualities.SetInt((STypeInt)emote.stat, intStat);
+				target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
 			}
 			break;
 		}
@@ -1115,6 +1180,7 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		{
 			int intStat = target->InqIntQuality((STypeInt)emote.stat, 0, TRUE) - 1;
 			target->m_Qualities.SetInt((STypeInt)emote.stat, intStat);
+			target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
 		}
 		break;
 	}
@@ -1187,20 +1253,169 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 	}
 	case SetSanctuaryPosition_EmoteType:
 	{
+		if (!emote.mPosition)
+		{
+			CWeenieObject *target = g_pWorld->FindObject(target_id);
+			if (target)
+			{
+				target->SetInitialPosition(target->m_Position);
+				target->m_Qualities.SetPosition(SANCTUARY_POSITION, target->m_Position);
+			}
+		}
+		else
+		{
+			CWeenieObject *target = g_pWorld->FindObject(target_id);
+			if (target)
+			{
+				target->m_Qualities.SetPosition(SANCTUARY_POSITION, emote.mPosition);
+			}
+		}
+
+		break;
+	}
+	case InqInt64Stat_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
 		CWeenieObject *target = g_pWorld->FindObject(target_id);
 		if (target)
 		{
-			target->SetInitialPosition(target->m_Position);
-			target->m_Qualities.SetPosition(SANCTUARY_POSITION, target->m_Position);
+			bool success = false;
+			bool hasQuality = false;
+
+			long long intStat64;
+			if (target->m_Qualities.InqInt64((STypeInt64)emote.stat, intStat64))
+			{
+				hasQuality = true;
+				if (intStat64 >= emote.min64 && intStat64 <= emote.max64)
+				{
+					success = true;
+				}
+			}
+
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
+		}
+
+		break;
+	}
+
+	case SetQuestCompletions_EmoteType:
+
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		if (target)
+		{
+			target->SetQuestCompletions(emote.msg.c_str(), emote.amount);
+		}
+
+	}
+	break;
+
+	case Generate_EmoteType: //type:72 adds from generator table attached to creature weenie. Sets init value of generator table and calls weenie factory to begin generation. Can use same emote with value of 0 in amount field to disable generator.
+	{
+		CMonsterWeenie *monster = _weenie->AsMonster();
+		if (monster)
+			_weenie->m_Qualities.SetInt((STypeInt)82, emote.amount);
+		{
+			if ((emote.amount) != 0)
+				_weenie->InitCreateGeneratorOnDeath();
+		}
+
+		break;
+	}
+
+	case PopUp_EmoteType: //type: 68 causes a popup message to appear with a with the text from emote.msg and an OK dialog button.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		if (target)
+		{
+
+			BinaryWriter popupMessage;
+			popupMessage.Write<DWORD>(0x4);
+			popupMessage.WriteString(emote.msg);
+
+			target->SendNetMessage(&popupMessage, PRIVATE_MSG, TRUE, FALSE);
+
+		}
+		break;
+	}
+
+	case InqYesNo_EmoteType: //type: 75 causes a popup message to appear with a with the text from emote.msg and Yes/No dialog buttons.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		if (target)
+		{
+			BinaryWriter yesnoMessage;
+			yesnoMessage.Write<DWORD>(0x274);	// Message Type
+			yesnoMessage.Write<DWORD>(0x07);		// Confirm type (Yes/No)
+			yesnoMessage.Write<int>(_weenie->id);			// Sequence number ?? context id
+			yesnoMessage.WriteString(emote.teststring);
+
+			target->SendNetMessage(&yesnoMessage, PRIVATE_MSG, TRUE, FALSE);
+
+		}
+		break;
+	}
+
+	case InqOwnsItems_EmoteType: //type: 76 checks to see if a particular item and count exists in pack.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		DWORD itemWCID = emote.cprof.wcid;
+		int itemAmount = emote.cprof.stack_size;
+		bool success = false;
+
+		if (target)
+		{
+			if (target->GetItemCount(itemWCID) >= itemAmount)
+				success = true;
+
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
+		}
+		break;
+	}
+
+	case TakeItems_EmoteType: //type: 74 removes items from pack.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		DWORD itemWCID = emote.cprof.wcid;
+		int itemAmount = emote.cprof.stack_size;
+
+		if (target)
+		{
+			if (target->GetItemCount(itemWCID) >= itemAmount)
+				target->ConsumeItem(itemAmount, itemWCID);
 		}
 		break;
 	}
 	}
+	_weenie->m_Qualities.SetBool(EXECUTING_EMOTE, false);
 }
 
 bool EmoteManager::IsExecutingAlready()
 {
-	return !_emoteQueue.empty();
+	return _weenie->m_Qualities.GetBool(EXECUTING_EMOTE, false);
 }
 
 void EmoteManager::Tick()
@@ -1233,7 +1448,7 @@ void EmoteManager::OnDeath(DWORD killer_id)
 		ChanceExecuteEmoteSet(Death_EmoteCategory, killer_id);
 }
 
-/*void EmoteManager::killTask(std::string mobName, std::string kCountName, DWORD target_id)
+void EmoteManager::killTask(std::string mobName, std::string kCountName, DWORD target_id)
 {
 	{
 		CWeenieObject *target = g_pWorld->FindObject(target_id);
@@ -1297,11 +1512,9 @@ void EmoteManager::killTaskSub(std::string &mobName, std::string &kCountName, CW
 	{
 		targormember->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
 	}
-}*/
+}
 
 void EmoteManager::ConfirmationResponse(bool accepted, DWORD target_id)
 {
 	ChanceExecuteEmoteSet(accepted ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, accepted ? "Yes_Response" : "No_Response", target_id);
 }
-
-

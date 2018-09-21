@@ -164,11 +164,11 @@ public:
 	bool IsUsing();
 
 	void MarkForCleanup(CUseEventData *data);
+	double _next_allowed_use = Timer::cur_time;
 
 private:
 	class CWeenieObject *_weenie = NULL;
-
-	double _next_allowed_use = 0.0;
+		
 	CUseEventData *_useData = NULL;
 	CUseEventData *_cleanupData = NULL;
 };

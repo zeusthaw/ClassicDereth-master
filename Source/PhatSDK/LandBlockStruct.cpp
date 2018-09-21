@@ -766,8 +766,8 @@ void CLandBlockStruct::CalcCellWater(long x, long y, BOOL& CellHasWater, BOOL& C
 	CellHasWater = FALSE;
 	CellFullyFlooded = TRUE;
 
-	for (int vx = (x * LandDefs::vertex_per_cell); vx < ((x + 1) * LandDefs::vertex_per_cell); vx++) {
-		for (int vy = (y * LandDefs::vertex_per_cell); vy < ((y + 1) * LandDefs::vertex_per_cell); vy++)
+	for (int vx = (x * LandDefs::vertex_per_cell); vx <= ((x + 1) * LandDefs::vertex_per_cell); vx++) {
+		for (int vy = (y * LandDefs::vertex_per_cell); vy <= ((y + 1) * LandDefs::vertex_per_cell); vy++)
 		{
 			static BOOL terrain_is_water[32] = {
 				0, 0, 0, 0, 0, 0, 0, 0,
@@ -805,72 +805,26 @@ SURFCHAR TERRAIN_SURF_CHAR[32] = {
 
 double CLandBlockStruct::calc_water_depth(unsigned int cell_id, Vector *point)
 {
-#if 0
-	CLandBlockStruct *v3; // esi@1
-	unsigned int v4; // ecx@3
-	unsigned int v5; // edx@3
-	float v6; // et1@5
-	double v8; // st6@5
-	unsigned __int8 v9; // c0@5
-	unsigned __int8 v10; // c2@5
-	bool v11; // pf@5
-	unsigned __int8 v13; // c0@5
-	unsigned __int8 v14; // c3@5
-	SURFCHAR v15; // eax@7
-	int v16; // ecx@9
-	unsigned __int16 *v17; // eax@9
-	unsigned int v18; // ecx@10
-	double result; // st7@15
-	unsigned int v20; // [sp+8h] [bp-4h]@0
+	int cellX = ((cell_id - 1) & 0xFFFF) / 8;
+	int cellY = ((cell_id - 1) & 0xFFFF) % 8;
 
-	v3 = this;
-	if (LandDefs::inbound_valid_cellid(cell_id) && (unsigned __int16)cell_id < 0x100u)
-	{
-		v4 = ((unsigned int)(unsigned __int16)cell_id - 1) >> 3;
-		v5 = ((_BYTE)cell_id - 1) & 7;
-	}
-	else
-	{
-		v5 = cell_id;
-		v4 = v20;
-	}
-	v6 = point->x;
-	v8 = point->y;
-	v11 = (v9 | v10) == 0;
-	if (v11)
-	{
-		v16 = v5 + 8 * v4 + v4;
-		v17 = v3->terrain;
-		if (v13 | v14)
-			v18 = LOBYTE(v17[v16]);
-		else
-			v18 = LOBYTE(v17[v16 + 1]);
-		v15 = TERRAIN_SURF_CHAR[(v18 >> 2) & 0x1F];
-	}
-	else if (v13 | v14)
-	{
-		v15 = TERRAIN_SURF_CHAR[((unsigned int)LOBYTE(v3->terrain[v5 + 8 * (v4 + 1) + v4 + 1]) >> 2) & 0x1F];
-	}
-	else
-	{
-		v15 = TERRAIN_SURF_CHAR[((unsigned int)*((_BYTE *)&v3->terrain[8 * v4 + 10] + 2 * v5 + 2 * v4) >> 2) & 0x1F];
-	}
-	if (v15)
-	{
-		if (v15 == 1)
-			result = 0.44999999;
-		else
-			result = 0.0;
-	}
-	else
-	{
-		result = 0.1;
-	}
-	return result;
-#endif
+	int terrainIdx = cellX * 9 + cellY;
 
-	UNFINISHED();
-	return 0.1;
+	if (fmod(point->x, 24.0f) > 12.0f)
+		terrainIdx += 9;
+
+	if(fmod(point->y, 24.0f) > 12.0f)
+		terrainIdx++;
+
+	WORD cell_terrain = terrain[terrainIdx];
+	int surfCharIdx = cell_terrain >> 2 & 0x1F;
+
+	bool has_water = TERRAIN_SURF_CHAR[surfCharIdx];
+
+	if (has_water)
+		return 0.44999999;
+	else
+		return 0.1;
 }
 
 

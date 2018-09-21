@@ -102,6 +102,16 @@ BinaryWriter *ServerText(const char *szText, long lColor)
 	MESSAGE_END(ServerText);
 }
 
+BinaryWriter *OverlayText(const char *szText)
+{
+	MESSAGE_BEGIN(OverlayText);
+
+	OverlayText->Write<DWORD>(0x02EB);
+	OverlayText->WriteString(szText);
+
+	MESSAGE_END(OverlayText);
+}
+
 BinaryWriter *ServerBroadcast(const char *szSource, const char *szText, long lColor)
 {
 	// Using string class to prevent from static buffer collisions.

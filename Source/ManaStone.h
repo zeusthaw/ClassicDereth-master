@@ -1,10 +1,3 @@
-
-//*************************************************************************************
-//Code merged from https://gitlab.com/fourk/gdlenhanced/commits/use_mana_stones_on_self
-//*************************************************************************************
-
-//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/75132b15809a026a58d5ed5abefac26290b14461 //
-
 #pragma once
 
 #include "WeenieObject.h"
@@ -26,7 +19,8 @@ public:
 
 	virtual void ApplyQualityOverrides() override;
 	virtual int UseWith(CPlayerWeenie *player, CWeenieObject *with) override;
+	virtual int DoUseWithResponse(CWeenieObject * player, CWeenieObject * pTarget) override;
 
 protected:
 };
-#pragma once
+

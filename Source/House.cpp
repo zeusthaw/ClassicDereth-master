@@ -17,6 +17,7 @@ CHouseManager::CHouseManager()
 
 CHouseManager::~CHouseManager()
 {
+	_houseDataMap.clear();
 }
 
 void CHouseManager::Load()
@@ -69,6 +70,8 @@ CHouseData *CHouseManager::GetHouseData(DWORD houseId)
 			houseData->_houseId = houseId;
 
 			_houseDataMap.add(houseId, houseData);
+			delete houseData;
+			houseData = _houseDataMap.lookup(houseId);
 		}
 	}
 
@@ -78,6 +81,8 @@ CHouseData *CHouseManager::GetHouseData(DWORD houseId)
 		houseData->_houseId = houseId;
 
 		_houseDataMap.add(houseId, houseData);
+		delete houseData;
+		houseData = _houseDataMap.lookup(houseId);
 	}
 
 	return houseData;
@@ -217,6 +222,8 @@ void CHouseData::AbandonHouse()
 
 		if (owner)
 			g_pHouseManager->SendHouseData(owner->AsPlayer(), _houseId);
+
+		g_pHouseManager->SaveHouseData(_houseId);
 }
 
 void CHouseData::Save()
@@ -327,11 +334,15 @@ bool CHouseWeenie::HasAccess(CPlayerWeenie *requester)
 
 	if (houseData->_allegianceAccess)
 	{
-		AllegianceTreeNode *ownerAllegianceNode = g_pAllegianceManager->GetTreeNode(houseOwnerId);
-		AllegianceTreeNode *requesterAllegianceNode = g_pAllegianceManager->GetTreeNode(requesterId);
+		std::string alleg;
+		if (requester->m_Qualities.InqString(ALLEGIANCE_NAME_STRING, alleg)) {
 
-		if (ownerAllegianceNode->_monarchID == requesterAllegianceNode->_monarchID)
-			return true;
+			AllegianceTreeNode *ownerAllegianceNode = g_pAllegianceManager->GetTreeNode(houseOwnerId);
+			AllegianceTreeNode *requesterAllegianceNode = g_pAllegianceManager->GetTreeNode(requesterId);
+
+			if (ownerAllegianceNode->_monarchID == requesterAllegianceNode->_monarchID)
+				return true;
+		}
 	}
 
 	return HasStorageAccess(requester); //storage access automatically grants access.
@@ -361,11 +372,14 @@ bool CHouseWeenie::HasStorageAccess(CPlayerWeenie *requester)
 
 	if (houseData->_allegianceStorageAccess)
 	{
-		AllegianceTreeNode *ownerAllegianceNode = g_pAllegianceManager->GetTreeNode(houseOwnerId);
-		AllegianceTreeNode *requesterAllegianceNode = g_pAllegianceManager->GetTreeNode(requesterId);
+		std::string alleg;
+		if (requester->m_Qualities.InqString(ALLEGIANCE_NAME_STRING, alleg)) {
+			AllegianceTreeNode *ownerAllegianceNode = g_pAllegianceManager->GetTreeNode(houseOwnerId);
+			AllegianceTreeNode *requesterAllegianceNode = g_pAllegianceManager->GetTreeNode(requesterId);
 
-		if (ownerAllegianceNode->_monarchID == requesterAllegianceNode->_monarchID)
-			return true;
+			if (ownerAllegianceNode->_monarchID == requesterAllegianceNode->_monarchID)
+				return true;
+		}
 	}
 
 	return false;
@@ -789,7 +803,8 @@ void CSlumLordWeenie::BuyHouse(CPlayerWeenie *player, const PackableList<DWORD> 
 		DoForcedMotion(Motion_On);
 		g_pHouseManager->SendHouseData(player, house->GetHouseDID());
 		DoUseResponse(player);
-		player->RecalculateCoinAmount(W_COINSTACK_CLASS);		player->Save();
+		player->RecalculateCoinAmount(W_COINSTACK_CLASS);
+		player->Save();
 		if(house->ShouldSave())
 			house->Save();
 		houseData->Save();
@@ -855,8 +870,13 @@ void CSlumLordWeenie::CheckRentPeriod()
 			}
 			else
 			{
-				houseData->AbandonHouse();
+				//houseData->AbandonHouse(); temporarily disable abandon house on rent not paid
 			}
+
+			if (house->ShouldSave()) //Added an extra save after rent period switches over.
+				house->Save();
+			houseData->Save();
+
 		}
 	}
 }
@@ -1032,6 +1052,8 @@ void CSlumLordWeenie::RentHouse(CPlayerWeenie *player, const PackableList<DWORD>
 		player->Save();
 		if (house->ShouldSave())
 			house->Save();
+		houseData->Save();
+
 
 		if (CWeenieObject *owner = g_pWorld->FindObject(houseData->_ownerId))
 			g_pHouseManager->SendHouseData(owner->AsPlayer(), house->GetHouseDID()); //update house's owner panel if the owner is online.
@@ -1190,6 +1212,8 @@ void CHookWeenie::UpdateHookedObject(CWeenieObject *hookedItem, bool sendUpdate)
 		return;
 
 	DWORD value;
+
+
 	if (hookedItem->m_Qualities.InqDataID(SETUP_DID, value))
 	{
 		m_Qualities.SetDataID(SETUP_DID, value);
@@ -1288,6 +1312,9 @@ void CHookWeenie::ClearHookedObject(bool sendUpdate)
 	CWeenieDefaults *defaults = g_pWeenieFactory->GetWeenieDefaults(m_Qualities.id);
 
 	DWORD value;
+
+
+
 	if (defaults->m_Qualities.InqDataID(SETUP_DID, value))
 	{
 		m_Qualities.SetDataID(SETUP_DID, value);

@@ -133,8 +133,8 @@ public:
 	BOOL point_inside_cell_bsp(const Vector& point);
 	BoundingType sphere_intersects_cell_bsp(CSphere *sphere);
 	int box_intersects_cell_bsp(BBox *box);
-	void DetachPortalsAndPurgeNodes(SmartArray<BSPNODE *> *io_PortalsToKeep);
-	void LinkPortalNodeChain(SmartArray<BSPNODE *> *_Portals);
+	void DetachPortalsAndPurgeNodes(std::vector<BSPNODE*> &keep);//SmartArray<BSPNODE *> *io_PortalsToKeep);
+	void LinkPortalNodeChain(std::vector<BSPNODE*> &portal);//SmartArray<BSPNODE *> *_Portals);
 
 	CSphere sphere; //0x04 (size: 0x10)
 	Plane splitting_plane; //0x14 (size: 0x10)

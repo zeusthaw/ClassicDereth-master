@@ -238,7 +238,7 @@ DEFINE_UNPACK_JSON(CraftRequirements)
 	{
 		_boolRequirement.UnPackJson(reader);
 	}
-	return true;
+	return true; 
 }
 
 
@@ -549,4 +549,3 @@ bool CraftMods::UnPackJson(const json & reader)
 	_unknown10 = reader["Unknown10"];
 	return true;
 }
-

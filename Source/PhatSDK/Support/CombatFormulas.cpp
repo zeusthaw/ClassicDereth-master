@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "PhatSDK.h"
 #include "CombatFormulas.h"
@@ -8,7 +7,9 @@ double GetImbueMultiplier(double currentSkill, double minEffectivenessSkill, dou
 	double multiplier = (currentSkill - minEffectivenessSkill) / (maxEffectivenessSkill - minEffectivenessSkill);
 	double value = multiplier * maxMultiplier;
 	if (!allowNegative)
+	{
 		value = max(value, 0.0);
+	}
 	value = min(value, maxMultiplier);
 	return value;
 }
@@ -16,27 +17,50 @@ double GetImbueMultiplier(double currentSkill, double minEffectivenessSkill, dou
 void CalculateDamage(DamageEventData *dmgEvent, SpellCastData *spellData)
 {
 	if (!dmgEvent)
+	{
 		return;
+	}	
 
 	dmgEvent->damageBeforeMitigation = dmgEvent->damageAfterMitigation = dmgEvent->baseDamage;
-
 	if (!dmgEvent->source)
 		return;
 
+	CalculateRendingAndMiscData(dmgEvent);
 	CalculateAttributeDamageBonus(dmgEvent);
 	CalculateSkillDamageBonus(dmgEvent, spellData);
-	CalculateCriticalHitData(dmgEvent, spellData);
 	CalculateSlayerData(dmgEvent);
-	CalculateRendingAndMiscData(dmgEvent);
+
 
 	double damageCalc = dmgEvent->baseDamage;
 	damageCalc += dmgEvent->attributeDamageBonus;
 	damageCalc += dmgEvent->skillDamageBonus;
 	damageCalc += dmgEvent->slayerDamageBonus;
 
-	dmgEvent->wasCrit = (Random::GenFloat(0.0, 1.0) < dmgEvent->critChance) ? true : false;
+	bool critDefended = false;
+
 	if (dmgEvent->wasCrit)
-		damageCalc += damageCalc * dmgEvent->critMultiplier;
+	{
+		if (bool critDefense = dmgEvent->target->m_Qualities.GetInt(AUGMENTATION_CRITICAL_DEFENSE_INT, 0))
+		{
+			if (Random::GenFloat(0.0, 1.0) < (dmgEvent->source->AsPlayer() ? 0.05 : 0.25))
+			{
+				//do not apply crit multiplier - treat this as a normal hit
+				critDefended = true;
+			}			
+		}
+
+		if (!critDefended)
+			damageCalc += damageCalc * dmgEvent->critMultiplier; //Leave the old formula for Melee/Missile crits.
+
+		if (dmgEvent->damage_form == DF_MAGIC) //Multiply base spell damage by the critMultiplier before adding skill and slayer damage bonuses for Magic.
+		{
+			damageCalc = dmgEvent->baseDamage;
+			if(!critDefended)
+				damageCalc += damageCalc * dmgEvent->critMultiplier;
+			damageCalc += dmgEvent->skillDamageBonus;
+			damageCalc += dmgEvent->slayerDamageBonus;
+		}
+	}
 
 	if (dmgEvent->damage_form == DF_MAGIC && !dmgEvent->source->AsPlayer())
 		damageCalc /= 2; //creatures do half magic damage. Unconfirmed but feels right. Should this be projectile spells only?
@@ -50,24 +74,27 @@ void CalculateAttributeDamageBonus(DamageEventData *dmgEvent)
 		return;
 	if (!dmgEvent->source)
 		return;
+	if (!dmgEvent->source->GetWielded(MELEE_WEAPON_LOC) && !dmgEvent->source->AsPlayer())
+		return;
 
+	
 	switch (dmgEvent->damage_form)
 	{
 	case DF_MELEE:
 	case DF_MISSILE:
 	{
 		DWORD attrib = 0;
-		if (dmgEvent->attackSkill == DAGGER_SKILL || dmgEvent->attackSkill == BOW_SKILL || dmgEvent->attackSkill == CROSSBOW_SKILL)
+		if (dmgEvent->attackSkill == FINESSE_WEAPONS_SKILL || dmgEvent->attackSkill == MISSILE_WEAPONS_SKILL)			
 			dmgEvent->source->m_Qualities.InqAttribute(COORDINATION_ATTRIBUTE, attrib, FALSE);
 		else
 			dmgEvent->source->m_Qualities.InqAttribute(STRENGTH_ATTRIBUTE, attrib, FALSE);
 
 		double attribDamageMod;
-		if(attrib >= 1000000) //this makes /godly characters use the old formula(huge damage!)
+		if (attrib >= 1000000) //this makes /godly characters use the old formula(huge damage!)
 			attribDamageMod = ((int)attrib - 55.0) / 33.0;
 		else
 			attribDamageMod = 6.75*(1.0 - exp(-0.005*((int)attrib - 55)));
-		if (attribDamageMod < 0)
+		if (attribDamageMod < 0 || dmgEvent->ignoreMagicArmor || dmgEvent->ignoreMagicResist) //half attribute bonus for hollow weapons.
 			dmgEvent->attributeDamageBonus = dmgEvent->baseDamage * (attribDamageMod / 2.0);
 		else
 			dmgEvent->attributeDamageBonus = dmgEvent->baseDamage * (attribDamageMod - 1.0);
@@ -83,6 +110,8 @@ void CalculateSkillDamageBonus(DamageEventData *dmgEvent, SpellCastData *spellDa
 	if (!dmgEvent)
 		return;
 	if (!dmgEvent->source)
+		return;
+	if (!dmgEvent->source->AsPlayer())
 		return;
 
 	switch (dmgEvent->damage_form)
@@ -104,7 +133,13 @@ void CalculateSkillDamageBonus(DamageEventData *dmgEvent, SpellCastData *spellDa
 			{
 				float minDamage = (float)meta->_baseIntensity;
 
-				float skillDamageMod = ((int)spellData->current_skill - (spellData->spell->_power + 50)) / 250.0; //made up formula.
+				float difficulty = spellData->spell->_power - 100; // add fudge factor
+				if (spellData->spell->_power == 400)
+				{
+					difficulty -= 75; // Adjust for level 8s
+				}
+
+				float skillDamageMod = ((int)spellData->current_skill - difficulty) / 1000.0; //better made up formula.
 				if (skillDamageMod > 0)
 					dmgEvent->skillDamageBonus = minDamage * skillDamageMod;
 			}
@@ -135,14 +170,20 @@ void CalculateCriticalHitData(DamageEventData *dmgEvent, SpellCastData *spellDat
 
 		imbueEffects = dmgEvent->weapon->GetImbueEffects();
 
-		dmgEvent->critChance += (dmgEvent->critChance * dmgEvent->weapon->GetBitingStrikeFrequency());
-		dmgEvent->critMultiplier += dmgEvent->weapon->GetCrushingBlowMultiplier();
+		if (dmgEvent->weapon->GetBitingStrikeFrequency())
+			dmgEvent->critChance = dmgEvent->weapon->GetBitingStrikeFrequency();
+
+		if (dmgEvent->weapon->GetCrushingBlowMultiplier())
+			dmgEvent->critMultiplier += dmgEvent->weapon->GetCrushingBlowMultiplier();
 
 		if (imbueEffects & CriticalStrike_ImbuedEffectType)
 			dmgEvent->critChance += GetImbueMultiplier(dmgEvent->attackSkillLevel, 150, 400, 0.5);
 
 		if (imbueEffects & CripplingBlow_ImbuedEffectType)
 			dmgEvent->critMultiplier += GetImbueMultiplier(dmgEvent->attackSkillLevel, 150, 400, 6);
+
+		if (bool critExpertise = dmgEvent->source->m_Qualities.GetInt(AUGMENTATION_CRITICAL_EXPERTISE_INT, 0))
+			dmgEvent->critChance += 0.01;
 
 		dmgEvent->critMultiplier = min(max(dmgEvent->critMultiplier, 0.0), 7.0);
 		dmgEvent->critChance = min(max(dmgEvent->critChance, 0.0), 1.0);
@@ -156,14 +197,20 @@ void CalculateCriticalHitData(DamageEventData *dmgEvent, SpellCastData *spellDat
 
 		imbueEffects = dmgEvent->weapon->GetImbueEffects();
 
-		dmgEvent->critChance += (dmgEvent->critChance * dmgEvent->weapon->GetBitingStrikeFrequency());
-		dmgEvent->critMultiplier += dmgEvent->weapon->GetCrushingBlowMultiplier();
+		if (dmgEvent->weapon->GetBitingStrikeFrequency())
+			dmgEvent->critChance = dmgEvent->weapon->GetBitingStrikeFrequency();
+
+		if (dmgEvent->weapon->GetCrushingBlowMultiplier())
+			dmgEvent->critMultiplier += dmgEvent->weapon->GetCrushingBlowMultiplier();
 
 		if (imbueEffects & CriticalStrike_ImbuedEffectType)
 			dmgEvent->critChance += GetImbueMultiplier(dmgEvent->attackSkillLevel, 125, 360, 0.5);
 
 		if (imbueEffects & CripplingBlow_ImbuedEffectType)
 			dmgEvent->critMultiplier += GetImbueMultiplier(dmgEvent->attackSkillLevel, 125, 360, 6);
+
+		if (bool critExpertise = dmgEvent->source->m_Qualities.GetInt(AUGMENTATION_CRITICAL_EXPERTISE_INT, 0))
+			dmgEvent->critChance += 0.01;
 
 		dmgEvent->critMultiplier = min(max(dmgEvent->critMultiplier, 0.0), 7.0);
 		dmgEvent->critChance = min(max(dmgEvent->critChance, 0.0), 1.0);
@@ -178,6 +225,12 @@ void CalculateCriticalHitData(DamageEventData *dmgEvent, SpellCastData *spellDat
 			return;
 
 		imbueEffects = dmgEvent->weapon->GetImbueEffects();
+
+		if(dmgEvent->weapon->GetBitingStrikeFrequency())
+		dmgEvent->critChance = dmgEvent->weapon->GetBitingStrikeFrequency();
+
+		if(dmgEvent->weapon->GetCrushingBlowMultiplier())
+		dmgEvent->critMultiplier += dmgEvent->weapon->GetCrushingBlowMultiplier();
 
 		if (dmgEvent->attackSkill == WAR_MAGIC_SKILL)
 		{
@@ -204,11 +257,15 @@ void CalculateCriticalHitData(DamageEventData *dmgEvent, SpellCastData *spellDat
 				//PvP: Crippling Blow for War Magic currently scales from adding 50 % of the spells damage on critical hits 
 				//to adding 100 % at maximum effectiveness
 				if (isPvP)
-					dmgEvent->critMultiplier += GetImbueMultiplier(dmgEvent->attackSkillLevel, 150, 400, 1.0);
+					dmgEvent->critMultiplier += GetImbueMultiplier(dmgEvent->attackSkillLevel, 150, 400, 0.5);
 				else
 					dmgEvent->critMultiplier += GetImbueMultiplier(dmgEvent->attackSkillLevel, 125, 360, 5.0);
 			}
 		}
+		
+		if (bool critExpertise = dmgEvent->source->m_Qualities.GetInt(AUGMENTATION_CRITICAL_EXPERTISE_INT, 0))
+			dmgEvent->critChance += 0.01;
+
 		dmgEvent->critMultiplier = min(max(dmgEvent->critMultiplier, 0.0), 7.0);
 		dmgEvent->critChance = min(max(dmgEvent->critChance, 0.0), 1.0);
 		return;
@@ -305,8 +362,31 @@ void CalculateRendingAndMiscData(DamageEventData *dmgEvent)
 			dmgEvent->rendingMultiplier = max(GetImbueMultiplier(dmgEvent->attackSkillLevel, 0, 400, 2.5), 1.0f);
 			break;
 		case DF_MISSILE:
+			dmgEvent->rendingMultiplier = max(0.25 + GetImbueMultiplier(dmgEvent->attackSkillLevel, 0, 360, 2.25), 1.0f);
+			break;
 		case DF_MAGIC:
 			dmgEvent->rendingMultiplier = max(0.25 + GetImbueMultiplier(dmgEvent->attackSkillLevel, 0, 360, 2.25), 1.0f);
+			break;
+		default:
+			return;
+		}
+	}
+
+	if (dmgEvent->weapon->InqIntQuality(RESISTANCE_MODIFIER_TYPE_INT, 0, FALSE))
+		dmgEvent->isResistanceCleaving = TRUE;
+
+	if (dmgEvent->isResistanceCleaving)
+	{
+		switch (dmgEvent->damage_form)
+		{
+		case DF_MELEE:
+			dmgEvent->rendingMultiplier = 2.5;
+			break;
+		case DF_MISSILE:
+			dmgEvent->rendingMultiplier = 2.25;
+			break;
+		case DF_MAGIC:
+			dmgEvent->rendingMultiplier = 2.25;
 			break;
 		default:
 			return;
@@ -327,4 +407,23 @@ void CalculateRendingAndMiscData(DamageEventData *dmgEvent)
 			return;
 		}
 	}
+
+	if (dmgEvent->weapon->InqFloatQuality(IGNORE_ARMOR_FLOAT, 0, FALSE))
+		dmgEvent->isArmorCleaving = TRUE;
+
+	if (dmgEvent->isArmorCleaving)
+	{
+		switch (dmgEvent->damage_form)
+		{
+		case DF_MELEE:
+			dmgEvent->armorRendingMultiplier = 1.0 / 2.5;
+		case DF_MISSILE:
+			dmgEvent->armorRendingMultiplier = 1.0 / 2.25;
+			break;
+		case DF_MAGIC:
+		default:
+			return;
+		}
+	}
+
 }

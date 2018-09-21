@@ -605,21 +605,18 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 		if (shieldLoc && *shieldLoc == static_cast<int>(INVENTORY_LOC::SHIELD_LOC))
 		{
 			SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-			pSource->m_Qualities.InqSkillAdvancementClass(MELEE_DEFENSE_SKILL, sac);
+			pSource->m_Qualities.InqSkillAdvancementClass(SHIELD_SKILL, sac);
 
 			if (sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
 			{
-				profile._intStatsTable->add(ARMOR_LEVEL_INT, profile._intStatsTable->lookup(ARMOR_LEVEL_INT));
-				profile._intStatsTable->add(ARMOR_LEVEL_INT, profile._intStatsTable->lookup(SHIELD_VALUE_INT));
+				profile._intStatsTable->add(SHIELD_VALUE_INT, profile._intStatsTable->lookup(ARMOR_LEVEL_INT));
 			}
 			else
 			{
 				int *halfShieldValue = profile._intStatsTable->lookup(ARMOR_LEVEL_INT);
 				int halfTrueValue = *halfShieldValue;
 				halfTrueValue /= 2;
-				profile._intStatsTable->add(ARMOR_LEVEL_INT, &halfTrueValue);
 				profile._intStatsTable->add(SHIELD_VALUE_INT, &halfTrueValue);
-		
 			}
 		}
 
@@ -667,6 +664,11 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 
 		double *weapon_defense = profile._floatStatsTable->lookup(WEAPON_DEFENSE_FLOAT);
 		double old_weapon_defense = weapon_defense ? *weapon_defense : 1.0;
+		double *mana_con = profile._floatStatsTable->lookup(MANA_CONVERSION_MOD_FLOAT);
+		double old_mana_con = mana_con ? *mana_con : 0.0;
+		double *elemental_dmg = profile._floatStatsTable->lookup(ELEMENTAL_DAMAGE_MOD_FLOAT);
+		double old_elemental_dmg = elemental_dmg ? *elemental_dmg : 0.0;
+
 
 		if (pEntity->m_Qualities._enchantment_reg)
 		{
@@ -681,11 +683,34 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 		{
 			*weapon_defense = pEntity->GetMeleeDefenseMod();
 
-			if (fabs(*weapon_defense - old_weapon_defense) >= F_EPSILON)
+			// Don't enchant Ammunition
+			if ((fabs(*weapon_defense - old_weapon_defense) >= F_EPSILON) && pEntity->m_Qualities.m_WeenieType != Ammunition_WeenieType)
 			{
 				profile.weapon_ench_bitfield |= BF_WEAPON_DEFENSE;
 				if (*weapon_defense > old_weapon_defense)
 					profile.weapon_ench_bitfield |= BF_WEAPON_DEFENSE_HI;
+			}
+		}
+		if (mana_con)
+		{
+			*mana_con = pEntity->GetManaCon();
+
+			if (fabs(*mana_con - old_mana_con) >= F_EPSILON)
+			{
+				profile.resist_ench_bitfield |= BF_MANA_CON_MOD;
+				if (*mana_con > old_mana_con)
+					profile.resist_ench_bitfield |= BF_MANA_CON_MOD_HI;
+			}
+		}
+		if (elemental_dmg)
+		{
+			*elemental_dmg = pEntity->GetElementalDamage();
+
+			if (fabs(*elemental_dmg - old_elemental_dmg) >= F_EPSILON)
+			{
+				profile.resist_ench_bitfield |= BF_ELE_DAMAGE_MOD;
+				if (*elemental_dmg > old_elemental_dmg)
+					profile.resist_ench_bitfield |= BF_ELE_DAMAGE_MOD_HI;
 			}
 		}
 	}
@@ -775,7 +800,7 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 			profile._spellBook->add((DWORD *)&spell.first);
 	}
 
-	if (pEntity->IsCreature())
+	if (pEntity->IsCreature() && !pEntity->m_Qualities.GetBool(NPC_LOOKS_LIKE_OBJECT_BOOL, false))
 	{
 		profile.creature_profile = new CreatureAppraisalProfile();
 
@@ -903,7 +928,8 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 			int baseWeaponDamage = pEntity->InqIntQuality(DAMAGE_INT, 0, TRUE);
 			profile.weapon_profile->weapon_damage = pEntity->GetAttackDamage();
 
-			if (baseWeaponDamage != profile.weapon_profile->weapon_damage)
+			// Don't enchant Ammunition
+			if ((baseWeaponDamage != profile.weapon_profile->weapon_damage) && pEntity->m_Qualities.m_WeenieType != Ammunition_WeenieType)
 			{
 				profile.weapon_ench_bitfield |= WeaponEnchantment_BFIndex::BF_DAMAGE;
 				if (profile.weapon_profile->weapon_damage > baseWeaponDamage)
@@ -917,7 +943,8 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 			double baseWeaponOffense = pEntity->InqFloatQuality(WEAPON_OFFENSE_FLOAT, 0, TRUE);
 			profile.weapon_profile->weapon_offense = pEntity->GetOffenseMod();
 
-			if (fabs(baseWeaponOffense - profile.weapon_profile->weapon_offense) >= F_EPSILON)
+			// Don't enchant Ammunition
+			if ((fabs(baseWeaponOffense - profile.weapon_profile->weapon_offense) >= F_EPSILON) && pEntity->m_Qualities.m_WeenieType != Ammunition_WeenieType)
 			{
 				profile.weapon_ench_bitfield |= WeaponEnchantment_BFIndex::BF_WEAPON_OFFENSE;
 				if (profile.weapon_profile->weapon_offense > baseWeaponOffense)
@@ -980,7 +1007,7 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 		if (shieldLoc && *shieldLoc == static_cast<int>(INVENTORY_LOC::SHIELD_LOC))
 		{
 			SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-			pSource->m_Qualities.InqSkillAdvancementClass(MELEE_DEFENSE_SKILL, sac);
+			pSource->m_Qualities.InqSkillAdvancementClass(SHIELD_SKILL, sac);
 
 			if (sac != SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
 				shieldMod = .5;

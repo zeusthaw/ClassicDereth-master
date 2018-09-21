@@ -671,18 +671,21 @@ void PlayerModule::Destroy()
 
 PlayerModule &PlayerModule::operator=(const PlayerModule &other)
 {
-	options_ = other.options_;
-	options2_ = other.options2_;
-	spell_filters_ = other.spell_filters_;
+	if (&other)
+	{
+		options_ = other.options_;
+		options2_ = other.options2_;
+		spell_filters_ = other.spell_filters_;
 
-	for (DWORD i = 0; i < 8; i++)
-		favorite_spells_[i] = other.favorite_spells_[i];
+		for (DWORD i = 0; i < 8; i++)
+			favorite_spells_[i] = other.favorite_spells_[i];
 
-	CloneMemberPointerData<ShortCutManager>(shortcuts_, other.shortcuts_);
-	CloneMemberPointerData<PackableHashTable<DWORD, long>>(desired_comps_, other.desired_comps_);
-	CloneMemberPointerData<GenericQualitiesData>(m_pPlayerOptionsData, other.m_pPlayerOptionsData);
+		CloneMemberPointerData<ShortCutManager>(shortcuts_, other.shortcuts_);
+		CloneMemberPointerData<PackableHashTable<DWORD, long>>(desired_comps_, other.desired_comps_);
+		CloneMemberPointerData<GenericQualitiesData>(m_pPlayerOptionsData, other.m_pPlayerOptionsData);
 
-	return *this;
+		return *this;
+	}
 }
 
 void PlayerModule::SetPackHeader(DWORD *bitfield)

@@ -29,7 +29,7 @@ public:
 	virtual void OnTargetAttacked(CWeenieObject *pTarget, CWeenieObject *pSource) override;
 
 protected:
-	void SelectPlayer(CPlayerWeenie *pPlayer);
+	void SelectPlayer(CPlayerWeenie * pPlayer);
 	void UnselectPlayer();
 
 	CPlayerWeenie *m_pSelectedPlayer;

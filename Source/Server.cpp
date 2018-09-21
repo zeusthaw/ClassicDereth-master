@@ -24,12 +24,14 @@
 #include "GameEventManager.h"
 #include "House.h"
 #include "easylogging++.h"
+#include "ChessManager.h"
 #include "..\RecipeFactory.h"
 
 // should all be encapsulated realistically, but we aren't going to multi-instance the server...
 CDatabase *g_pDB = NULL;
 CMYSQLDatabase *g_pDB2 = NULL;
 CMYSQLDatabase *g_pDB2Async = NULL;
+CMYSQLDatabase *g_pDBDynamicIDs = NULL;
 CDatabaseIO *g_pDBIO = NULL;
 CGameDatabase *g_pGameDatabase = NULL;
 ServerCellManager *g_pCellManager = NULL;
@@ -56,26 +58,15 @@ CPhatServer::CPhatServer(const char *configFilePath)
 
 	m_fStartupTime = g_pGlobals->UpdateTime();
 
-	m_hQuitEvent = CreateEvent(NULL, TRUE, FALSE, NULL);
-	m_hServerThread = CreateThread(NULL, 0, InternalThreadProcStatic, this, 0, NULL);
+	m_serverThread = std::thread([&](){ InternalThreadProc(); });
 }
 
 CPhatServer::~CPhatServer()
 {
-	SetEvent(m_hQuitEvent);
+	m_running = false;
 
-	if (m_hServerThread)
-	{
-		WaitForSingleObject(m_hServerThread, 60000);
-		CloseHandle(m_hServerThread);
-		m_hServerThread = NULL;
-	}
-
-	if (m_hQuitEvent)
-	{
-		CloseHandle(m_hQuitEvent);
-		m_hQuitEvent = NULL;
-	}
+	if (m_serverThread.joinable())
+		m_serverThread.join();
 }
 
 DWORD WINAPI CPhatServer::InternalThreadProcStatic(LPVOID lpThis)
@@ -85,26 +76,24 @@ DWORD WINAPI CPhatServer::InternalThreadProcStatic(LPVOID lpThis)
 
 DWORD CPhatServer::InternalThreadProc()
 {
-	WSADATA	wsaData;
-	USHORT wVersionRequested = 0x0202;
-	WSAStartup(wVersionRequested, &wsaData);
-
 	srand((unsigned int)time(NULL));
 	Random::Init();
 
-	Init();
-
-	DWORD sleepTime = g_pConfig->FastTick() ? 0 : 1;
-
-	while (WaitForSingleObject(m_hQuitEvent, 0) != WAIT_OBJECT_0)
+	if (Init())
 	{
-		Tick();
-		Sleep(sleepTime);
+		m_running = true;
+
+		while (m_running)
+		{
+			Tick();
+			if (g_pConfig->FastTick())
+				std::this_thread::yield();
+			else
+				std::this_thread::sleep_for(std::chrono::milliseconds(1));
+		}
 	}
 
 	Shutdown();
-
-	WSACleanup();
 
 	return 0;
 }
@@ -112,17 +101,12 @@ DWORD CPhatServer::InternalThreadProc()
 bool CPhatServer::Init()
 {
 	unsigned long bind_ip = m_Config.BindIP();
-	assert(sizeof(bind_ip) == sizeof(in_addr));
-	memcpy(&m_hostaddr, &bind_ip, sizeof(in_addr));
+	//assert(sizeof(bind_ip) == sizeof(in_addr));
+	memset(&m_hostaddr, 0, sizeof(in_addr));
+	m_hostaddr.S_un.S_addr = bind_ip;
 	m_hostport = m_Config.BindPort();
 
 	g_pGlobals->ResetPackets();
-
-	m_socketCount = 10;
-	for (int i = 0; i < m_socketCount; i++)
-		m_sockets[i] = INVALID_SOCKET;
-
-	InitializeSocket(m_hostport, m_hostaddr);
 
 	g_pPortal = new TURBINEPORTAL();
 	g_pCell = new TURBINECELL();
@@ -160,9 +144,23 @@ bool CPhatServer::Init()
 		m_Config.DatabasePassword(),
 		m_Config.DatabaseName()); // Newer, shiny, makes pancakes in the morning
 
+	g_pDBDynamicIDs = new CMYSQLDatabase(
+		m_Config.DatabaseIP(),
+		m_Config.DatabasePort(),
+		m_Config.DatabaseUsername(),
+		m_Config.DatabasePassword(),
+		m_Config.DatabaseName());
+
 	g_pHouseManager = new CHouseManager();
 
 	g_pObjectIDGen = new CObjectIDGenerator();
+
+	if (!g_pObjectIDGen->IsIdRangeValid())
+	{
+		WINLOG(Temp, Normal, "ID system failed to start.\n");
+		SERVER_INFO << "ID system failed to start.";
+		return false;
+	}
 
 	g_pGameDatabase = new CGameDatabase();
 	g_pCellManager = new ServerCellManager();
@@ -173,7 +171,15 @@ bool CPhatServer::Init()
 	g_pGameEventManager->Initialize();
 
 	g_pWorld = new CWorld();
-	g_pNetwork = new CNetwork(this, m_sockets, m_socketCount);
+
+	//m_socketCount = 10;
+	//for (int i = 0; i < m_socketCount; i++)
+	//	m_sockets[i] = INVALID_SOCKET;
+
+	//InitializeSocket(m_hostport, m_hostaddr);
+	//g_pNetwork = new CNetwork(this, m_sockets, m_socketCount);
+	g_pNetwork = new CNetwork(this, m_hostaddr, m_hostport);
+
 	g_pGameDatabase->Init();
 
 	//#ifndef QUICKSTART
@@ -304,9 +310,10 @@ void CPhatServer::Shutdown()
 #endif
 		g_pNetwork->CompleteLogoutAll();
 		g_pNetwork->Think();
+
 		SafeDelete(g_pNetwork);
 	}
-
+	g_pAllegianceManager->Save();
 	SafeDelete(g_pWorld);
 	SafeDelete(g_pGameEventManager);
 	SafeDelete(g_pFellowshipManager);
@@ -315,6 +322,7 @@ void CPhatServer::Shutdown()
 	SafeDelete(g_pGameDatabase);
 	SafeDelete(g_pHouseManager);
 	SafeDelete(g_pDB2);
+	SafeDelete(g_pDBDynamicIDs);
 	SafeDelete(g_pDBIO);
 	SafeDelete(g_pDB);
 
@@ -322,6 +330,7 @@ void CPhatServer::Shutdown()
 	SafeDelete(g_pPortalDataEx);
 
 	SafeDelete(g_pTreasureFactory);
+	SafeDelete(g_pRecipeFactory);
 	SafeDelete(g_pWeenieFactory);
 	SafeDelete(g_pWeenieLandCoverage);
 	CleanupPhatDataBin();
@@ -353,63 +362,63 @@ CPhatACServerConfig &CPhatServer::Config()
 
 void CPhatServer::InitializeSocket(unsigned short port, in_addr address)
 {
-	SOCKADDR_IN localhost;
-	localhost.sin_family = AF_INET;
-	localhost.sin_addr = address;
+	//SOCKADDR_IN localhost;
+	//localhost.sin_family = AF_INET;
+	//localhost.sin_addr = address;
 
-	for (int i = 0; i < m_socketCount; i++)
-		m_sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+	//for (int i = 0; i < m_socketCount; i++)
+	//	m_sockets[i] = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
 
-	u_short startport = port;
-	u_short failport = startport + 30;
-	while (port < failport)
-	{
-		localhost.sin_port = htons(port);
-		if (!bind(m_sockets[0], (struct sockaddr *)&localhost, sizeof(SOCKADDR_IN)))
-		{
-			WINLOG(Temp, Normal, "Bound to port %u!\n", port);
-			SERVER_INFO << "Bound to port" << port << "!";
-			break;
-		}
-		WINLOG(Temp, Normal, "Failed bind on port %u!\n", port);
-		SERVER_ERROR << "Failed bind on port:" << port;
-		port++;
-	}
+	//u_short startport = port;
+	//u_short failport = startport + 30;
+	//while (port < failport)
+	//{
+	//	localhost.sin_port = htons(port);
+	//	if (!bind(m_sockets[0], (struct sockaddr *)&localhost, sizeof(SOCKADDR_IN)))
+	//	{
+	//		WINLOG(Temp, Normal, "Bound to port %u!\n", port);
+	//		SERVER_INFO << "Bound to port" << port << "!";
+	//		break;
+	//	}
+	//	WINLOG(Temp, Normal, "Failed bind on port %u!\n", port);
+	//	SERVER_ERROR << "Failed bind on port:" << port;
+	//	port++;
+	//}
 
-	if (port == failport)
-	{
-		WINLOG(Temp, Normal, "Failure to bind socket!\n");
-		SERVER_ERROR << "Failed bind on socket";
-	}
-	else
-	{
-		// SendMessage(GetDlgItem(g_pGlobals->GetWindowHandle(), IDC_SERVERPORT), WM_SETTEXT, 0, (LPARAM)csprintf("%u", port));
+	//if (port == failport)
+	//{
+	//	WINLOG(Temp, Normal, "Failure to bind socket!\n");
+	//	SERVER_ERROR << "Failed bind on socket";
+	//}
+	//else
+	//{
+	//	// SendMessage(GetDlgItem(g_pGlobals->GetWindowHandle(), IDC_SERVERPORT), WM_SETTEXT, 0, (LPARAM)csprintf("%u", port));
 
-		int basePort = port;
+	//	int basePort = port;
 
-		// Try to bind the other ports
-		for (int i = 1; i < m_socketCount; i++)
-		{
-			localhost.sin_port = htons(basePort + i);
-			if (bind(m_sockets[i], (struct sockaddr *)&localhost, sizeof(SOCKADDR_IN)))
-			{
-				WINLOG(Temp, Normal, "Failure to bind socket port %d!\n", basePort + i);
-				SERVER_ERROR << "Failed bind on socket port:" << (basePort + i);
-			}
-		}
-	}
+	//	// Try to bind the other ports
+	//	for (int i = 1; i < m_socketCount; i++)
+	//	{
+	//		localhost.sin_port = htons(basePort + i);
+	//		if (bind(m_sockets[i], (struct sockaddr *)&localhost, sizeof(SOCKADDR_IN)))
+	//		{
+	//			WINLOG(Temp, Normal, "Failure to bind socket port %d!\n", basePort + i);
+	//			SERVER_ERROR << "Failed bind on socket port:" << (basePort + i);
+	//		}
+	//	}
+	//}
 
-	//Non-blocking sockets are more fun
-	for (int i = 0; i < m_socketCount; i++)
-	{
-		unsigned long arg = 1;
-		ioctlsocket(m_sockets[i], FIONBIO, &arg);
+	////Non-blocking sockets are more fun
+	//for (int i = 0; i < m_socketCount; i++)
+	//{
+	//	unsigned long arg = 1;
+	//	ioctlsocket(m_sockets[i], FIONBIO, &arg);
 
-		int sndbuf = 131072;
-		int rcvbuf = 131072;
-		setsockopt(m_sockets[i], SOL_SOCKET, SO_SNDBUF, (char *)&sndbuf, sizeof(sndbuf));
-		setsockopt(m_sockets[i], SOL_SOCKET, SO_RCVBUF, (char *)&rcvbuf, sizeof(rcvbuf));
-	}
+	//	int sndbuf = 131072;
+	//	int rcvbuf = 131072;
+	//	setsockopt(m_sockets[i], SOL_SOCKET, SO_SNDBUF, (char *)&sndbuf, sizeof(sndbuf));
+	//	setsockopt(m_sockets[i], SOL_SOCKET, SO_RCVBUF, (char *)&rcvbuf, sizeof(rcvbuf));
+	//}
 }
 
 void CPhatServer::SystemBroadcast(char *text)
@@ -436,6 +445,8 @@ void CPhatServer::Tick(void)
 	g_pFellowshipManager->Tick();
 	g_pAllegianceManager->Tick();
 	g_pDB2->Tick();
+
+	sChessManager->Update();
 
 	m_Stats.EndServerFrame();
 }

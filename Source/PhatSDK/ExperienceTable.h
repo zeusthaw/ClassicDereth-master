@@ -64,9 +64,15 @@ public:
 	static DWORD GetMaxSpecializedSkillLevel();
 
 	static DWORD64 ExperienceToLevel(unsigned int level);
+	static DWORD ExperienceToAttributeLevel(DWORD level);
+	static DWORD ExperienceToAttribute2ndLevel(DWORD level);
+
 	static DWORD GetMaxLevel();
 
 	static DWORD64 GetExperienceForLevel(unsigned int level);
+	static DWORD GetMaxAttributeLevel();
+	static DWORD GetMaxAttribute2ndLevel();
+
 	static DWORD64 ExperienceToRaiseLevel(unsigned int current_level, unsigned int new_level);
 
 	static DWORD GetCreditsForLevel(unsigned int level); // custom

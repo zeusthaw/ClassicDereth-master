@@ -313,7 +313,7 @@ DWORD CSurface::GetOriginalPaletteID()
 DWORD CSurface::GetTextureCode(ImgTex *pTexture, Palette *pPalette)
 {
 	if (pPalette->m_bInCache)
-		return ((pTexture->GetID() << 16) | (pTexture->GetID() & 0xFFFF));
+		return ((pTexture->id << 16) | (pTexture->GetID() & 0xFFFF));
 	else
 		return 0;
 }
@@ -434,7 +434,7 @@ void CSurface::SetTexture(ImgTex *pTexture)
 		if (pTexture->m_bInCache)
 			base1map = ImgTex::Get(pTexture->GetID());
 		else
-			base1map = ImgTex::getCustomTexture(pTexture->GetID());
+			base1map = ImgTex::getCustomTexture(pTexture->id);
 	}
 }
 
@@ -448,7 +448,7 @@ BOOL CSurface::SetTextureAndPalette(ImgTex *pTexture, Palette *pPalette)
 	DWORD custom_texture_ID;
 
 	if (pPalette->m_bInCache)
-		custom_texture_ID = (pTexture->GetID() << 16) | (pPalette->GetID() & 0xFFFF);
+		custom_texture_ID = (pTexture->id << 16) | (pPalette->GetID() & 0xFFFF);
 	else
 		custom_texture_ID = 0;
 

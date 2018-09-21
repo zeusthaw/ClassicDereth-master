@@ -540,13 +540,20 @@ void ParticleManager::UpdateParticles()
 
 	while (!it.EndReached())
 	{
-		ParticleEmitter *pEmitter = it.GetCurrentData();
-		it.Next();
-
-		if (!pEmitter->UpdateParticles())
+		try
 		{
-			m_Emitters.remove(pEmitter->m_EmitterID);
-			delete pEmitter;
+			ParticleEmitter *pEmitter = it.GetCurrentData();
+			it.Next();
+
+			if (!pEmitter->UpdateParticles())
+			{
+				m_Emitters.remove(pEmitter->m_EmitterID);
+				delete pEmitter;
+			}
+		}
+		catch (...)
+		{
+			SERVER_ERROR << "Error in Update Particles";
 		}
 	}
 }

@@ -376,18 +376,18 @@ public:
 			WORD _objdesc_timestamp; // 0x172
 			WORD _instance_timestamp; // 0x174
 
-									  /*
-									  list[0] = LF_ENUMERATE, public, value = 0, name = 'POSITION_TS'
-									  list[1] = LF_ENUMERATE, public, value = 1, name = 'MOVEMENT_TS'
-									  list[2] = LF_ENUMERATE, public, value = 2, name = 'STATE_TS'
-									  list[3] = LF_ENUMERATE, public, value = 3, name = 'VECTOR_TS'
-									  list[4] = LF_ENUMERATE, public, value = 4, name = 'TELEPORT_TS'
-									  list[5] = LF_ENUMERATE, public, value = 5, name = 'SERVER_CONTROLLED_MOVE_TS'
-									  list[6] = LF_ENUMERATE, public, value = 6, name = 'FORCE_POSITION_TS'
-									  list[7] = LF_ENUMERATE, public, value = 7, name = 'OBJDESC_TS'
-									  list[8] = LF_ENUMERATE, public, value = 8, name = 'INSTANCE_TS'
-									  list[9] = LF_ENUMERATE, public, value = 9, name = 'NUM_PHYSICS_TS'
-									  */
+			/*
+			list[0] = LF_ENUMERATE, public, value = 0, name = 'POSITION_TS'
+			list[1] = LF_ENUMERATE, public, value = 1, name = 'MOVEMENT_TS'
+			list[2] = LF_ENUMERATE, public, value = 2, name = 'STATE_TS'
+			list[3] = LF_ENUMERATE, public, value = 3, name = 'VECTOR_TS'
+			list[4] = LF_ENUMERATE, public, value = 4, name = 'TELEPORT_TS'
+			list[5] = LF_ENUMERATE, public, value = 5, name = 'SERVER_CONTROLLED_MOVE_TS'
+			list[6] = LF_ENUMERATE, public, value = 6, name = 'FORCE_POSITION_TS'
+			list[7] = LF_ENUMERATE, public, value = 7, name = 'OBJDESC_TS'
+			list[8] = LF_ENUMERATE, public, value = 8, name = 'INSTANCE_TS'
+			list[9] = LF_ENUMERATE, public, value = 9, name = 'NUM_PHYSICS_TS'
+			*/
 		};
 	};
 

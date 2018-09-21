@@ -508,7 +508,7 @@ void CTreasureProfile::ComputeUniqueSpellIds(std::vector<CPossibleSpells> spellL
 			spellList[i] = spell;
 		}
 	}
-	catch (...)
+	catch(...)
 	{
 		SERVER_ERROR << "ERror in CTreasureProfile::ComputeUniqueSpellIds";
 	}
@@ -1441,11 +1441,11 @@ bool CTreasureFactory::MutateItem(CWeenieObject *newItem, sItemCreationInfo &cre
 
 			/*if (itemType == TYPE_CASTER)
 			{
-			for (int i = 0; i < 2; i++)
-			{
-			//increase chance of no weapon skill casters as that is only used for war magic.
-			possibleWieldTiers.push_back(zeroReqWieldTier);
-			}
+				for (int i = 0; i < 2; i++)
+				{
+					//increase chance of no weapon skill casters as that is only used for war magic.
+					possibleWieldTiers.push_back(zeroReqWieldTier);
+				}
 			}*/
 
 			if (possibleWieldTiers.size() == 0)
@@ -1615,10 +1615,10 @@ bool CTreasureFactory::MutateItem(CWeenieObject *newItem, sItemCreationInfo &cre
 
 			//gemType = g_pPortalDataEx->_treasureTableData.RollMaterialFromBaseMaterial(Gem_MaterialType, tier->tierId);
 			//gemValueMultiplier = *g_pPortalDataEx->_treasureTableData._materialValueAddedPossibly.lookup(gemType);
-
-			newItem->m_Qualities.SetInt(GEM_COUNT_INT, gemCount);
-			newItem->m_Qualities.SetInt(GEM_TYPE_INT, gemType);
-
+	
+				newItem->m_Qualities.SetInt(GEM_COUNT_INT, gemCount);
+				newItem->m_Qualities.SetInt(GEM_TYPE_INT, gemType);
+			
 		}
 	}
 
@@ -2005,7 +2005,7 @@ void CTreasureFactory::MutateCaster(CWeenieObject *newItem, CWieldTier *wieldTie
 			}
 		}
 	}
-	else
+	else 
 	{
 		double manaConversionnowield = round(getRandomDouble(0, 0.10), 2);
 		if (manaConversionnowield > 0)
@@ -2019,22 +2019,22 @@ void CTreasureFactory::MutateCaster(CWeenieObject *newItem, CWieldTier *wieldTie
 
 
 void CTreasureFactory::MutateGem(CWeenieObject *newItem, CWieldTier *wieldTier, sItemCreationInfo &creationInfo, CTreasureTier *tier, CTreasureProfileCategory *category, CItemTreasureProfileEntry *entry)
-{
+{	
 	if (!entry->elementalVariants.empty())
 	{
-		int variantId = entry->elementalVariants[getRandomNumberExclusive((int)entry->elementalVariants.size())];
+			int variantId = entry->elementalVariants[getRandomNumberExclusive((int)entry->elementalVariants.size())];
 
 
-		CWeenieDefaults *weenieDefs = g_pWeenieFactory->GetWeenieDefaults(variantId);
+			CWeenieDefaults *weenieDefs = g_pWeenieFactory->GetWeenieDefaults(variantId);
 
-		if (weenieDefs == NULL)
-			return;
-		else
-		{
-			g_pWeenieFactory->ApplyWeenieDefaults(newItem, variantId);
-			newItem->m_Qualities.SetInt(ITEM_USEABLE_INT, 8);
-			newItem->m_Qualities.m_WeenieType = 38;
-		}
+			if (weenieDefs == NULL)
+				return;
+			else
+			{
+				g_pWeenieFactory->ApplyWeenieDefaults(newItem, variantId);
+				newItem->m_Qualities.SetInt(ITEM_USEABLE_INT, 8);
+				newItem->m_Qualities.m_WeenieType = 38;
+			}
 
 	}
 }
@@ -2119,21 +2119,21 @@ void CTreasureFactory::MutateArmor(CWeenieObject *newItem, CWieldTier *wieldTier
 		}
 	}
 
-	if (wieldTier->minLevel > 0)
-	{
-		if (hasRequirement1)
+		if (wieldTier->minLevel > 0)
 		{
-			newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_2_INT, eWieldRequirements::level);
-			newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_2_INT, 2);
-			newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_2_INT, wieldTier->minLevel);
+			if (hasRequirement1)
+			{
+				newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_2_INT, eWieldRequirements::level);
+				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_2_INT, 2);
+				newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_2_INT, wieldTier->minLevel);
+			}
+			else
+			{
+				newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_INT, eWieldRequirements::level);
+				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_INT, 2);
+				newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_INT, wieldTier->minLevel);
+			}
 		}
-		else
-		{
-			newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_INT, eWieldRequirements::level);
-			newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_INT, 2);
-			newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_INT, wieldTier->minLevel);
-		}
-	}
 }
 
 std::vector<CPossibleSpells> CTreasureFactory::MergeSpellLists(std::vector<CPossibleSpells> list1, std::vector<CPossibleSpells> list2)
@@ -2400,17 +2400,17 @@ void CTreasureFactory::AddSpell(CWeenieObject *newItem, std::vector<CPossibleSpe
 					continue; //invalid spell id
 
 				if (category->category == "gemstones")
-				{
+				{	
 					newItem->m_Qualities.SetDataID(SPELL_DID, spell);
 					newItem->m_Qualities.SetInt(ITEM_USEABLE_INT, 8);
 				}
-
-				newItem->m_Qualities.AddSpell(spell);
-				creationInfo.spellIds.push_back(spell);
-				creationInfo.spells.push_back(possibleSpell);
-				creationInfo.isMagical = true;
-				creationInfo.totalSpellsCount++;
-
+				
+					newItem->m_Qualities.AddSpell(spell);
+					creationInfo.spellIds.push_back(spell);
+					creationInfo.spells.push_back(possibleSpell);
+					creationInfo.isMagical = true;
+					creationInfo.totalSpellsCount++;
+			
 				int spellPower = _TreasureProfile->spellProperties.spellPower[spellVariantIndex];
 				creationInfo.totalPower += spellPower;
 				creationInfo.totalMana += _TreasureProfile->spellProperties.spellMana[spellVariantIndex];

@@ -243,7 +243,7 @@ public:
 
 	DEFINE_LOCAL_PACK_JSON()
 	{
-		SpellEx::PackJson(writer);
+		ProjectileSpellEx::PackJson(writer);
 
 		writer["drain_percentage"] = _drain_percentage;
 		writer["damage_ratio"] = _damage_ratio;
@@ -251,7 +251,7 @@ public:
 
 	DEFINE_LOCAL_UNPACK_JSON()
 	{
-		SpellEx::UnPackJson(reader);
+		ProjectileSpellEx::UnPackJson(reader);
 
 		_drain_percentage = reader["drain_percentage"];
 		_damage_ratio = reader["damage_ratio"];
@@ -623,22 +623,22 @@ public:
 	MetaSpellEx _meta_spell;
 };
 
-class SpellSetTierList : public PackObj
-{
-public:
-	DECLARE_PACKABLE()
-
-	unsigned int m_PieceCount;
-	std::list<unsigned long> m_SpellList;
-};
-
-class SpellSetEx : public PackObj
-{
-public:
-	DECLARE_PACKABLE()
-
-	std::list<SpellSetTierList> m_countTiers;
-};
+//class SpellSetTierList : public PackObj
+//{
+//public:
+//	DECLARE_PACKABLE()
+//
+//	unsigned int m_PieceCount;
+//	std::list<unsigned long> m_SpellList;
+//};
+//
+//class SpellSetEx : public PackObj
+//{
+//public:
+//	DECLARE_PACKABLE()
+//
+//	std::list<SpellSetTierList> m_countTiers;
+//};
 
 class CSpellTableEx : public PackObj, public PackableJson
 {

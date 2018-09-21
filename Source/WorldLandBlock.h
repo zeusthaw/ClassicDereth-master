@@ -5,6 +5,7 @@
 #include "WeenieObject.h"
 #include "Monster.h"
 #include "Player.h"
+#include "easylogging++.h"
 
 #ifdef _DEBUG
 #define DELETE_ENTITY(x) DEBUG_DATA << "Delete Entity" << pEntity->id << "@" << __FUNCTION__; delete pEntity
@@ -64,7 +65,7 @@ public:
 
 	bool IsWaterBlock();
 	bool HasAnySeenOutside();
-	bool PossiblyVisibleToOutdoors(DWORD cell_id);
+	bool PossiblyVisibleToOutdoors(WORD cell_id);
 
 	bool IsTickingWithWorld() { return m_bTickingWithWorld; }
 	void SetIsTickingWithWorld(bool ticking);

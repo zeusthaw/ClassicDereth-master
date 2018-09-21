@@ -58,9 +58,9 @@ public:
 		return NULL;
 	}
 
-	CEnvCell *EnvCell_GetVisible(DWORD cell_id)
+	CEnvCell *EnvCell_GetVisible(DWORD cell_id, bool bDoPostLoad = true)
 	{
-		return (CEnvCell *)g_pCellManager->GetObjCell(cell_id);
+		return (CEnvCell *)g_pCellManager->GetObjCell(cell_id, bDoPostLoad);
 	}
 
 	CQuestDefDB *GetQuestDefDB() override

@@ -5,11 +5,10 @@
 #include "Monster.h"
 #include "Packable.h"
 #include "TradeManager.h"
-#include "easylogging++.h"
-#include "client.h"
 
 class CClient;
 class BinaryWriter;
+
 class TradeManager;
 
 class SalvageResult : public PackObj
@@ -22,9 +21,6 @@ public:
 	int units = 0;
 };
 
-
-
-
 class CPlayerWeenie : public CMonsterWeenie
 {
 public:
@@ -36,19 +32,19 @@ public:
 	virtual class CPlayerWeenie *AsPlayer() { return this; }
 
 	virtual bool IsAdvocate() override;
-
 	virtual bool IsSentinel() override;
 	virtual bool IsAdmin() override;
 	int GetAccessLevel();
 
 	virtual void PreSpawnCreate() override;
 
-	void CalculateAndDropDeathItems(CCorpseWeenie *pCorpse);
+	void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse, DWORD killerID);
 
 	virtual void OnDeathAnimComplete() override;
-	virtual void OnDeath(DWORD killer_id) override;
+	virtual void OnDeath(DWORD killerID) override;
 	virtual void OnMotionDone(DWORD motion, BOOL success) override;
-	void OnRegen(STypeAttribute2nd currentAttrib, int newAmount);	
+	virtual void OnRegen(STypeAttribute2nd currentAttrib, int newAmount) override;
+	
 	virtual void NotifyAttackerEvent(const char *name, unsigned int dmgType, float healthPercent, unsigned int heath, unsigned int crit, unsigned int attackConditions);
 	virtual void NotifyDefenderEvent(const char *name, unsigned int dmgType, float healthPercent, unsigned int health, BODY_PART_ENUM hitPart, unsigned int crit, unsigned int attackConditions);
 	virtual void NotifyKillerEvent(const char *text);
@@ -60,10 +56,10 @@ public:
 	virtual void NotifyWeenieError(int error) override;
 	virtual void NotifyWeenieErrorWithString(int error, const char *text) override;
 	virtual void NotifyInventoryFailedEvent(DWORD object_id, int error) override;
-	
+	std::string ToUpperCase(std::string tName);
+
 	CWeenieObject *m_pCraftingTool;
 	CWeenieObject *m_pCraftingTarget;
-	int InqIntQuality(STypeInt key, int defaultValue, BOOL raw = FALSE);
 
 	virtual int UseEx(CWeenieObject *pTool, CWeenieObject *pTarget);
 	virtual int UseEx(bool bConfirmed = false);
@@ -74,6 +70,8 @@ public:
 	virtual int CPlayerWeenie::GetMaterialMod(int material);
 
 	void PerformSalvaging(DWORD toolId, PackableList<DWORD> items);
+	int CPlayerWeenie::CalculateSalvageAmount(int salvagingSkill, int dWorkmanship, int numAugs);
+
 	DWORD MaterialToSalvageBagId(MaterialType material);
 	bool SpawnSalvageBagInContainer(MaterialType material, int amount, int workmanship, int value, int numItems);
 
@@ -100,8 +98,6 @@ public:
 
 	void AddSpellByID(DWORD id);
 
-	bool IsChunky();
-
 	void DetachClient();
 
 	//Network events.
@@ -113,6 +109,7 @@ public:
 	virtual bool IsDead() override;
 
 	virtual DWORD OnReceiveInventoryItem(CWeenieObject *source, CWeenieObject *item, DWORD desired_slot) override;
+
 	void SetLastHealthRequest(DWORD guid);
 	void RemoveLastHealthRequest();
 	void RefreshTargetHealth();
@@ -127,6 +124,8 @@ public:
 	
 	DWORD GetCharacterOptions() { return _playerModule.options_; }
 	DWORD GetCharacterOptions2() { return _playerModule.options2_; }
+	void SetCharacterOptions(DWORD options) { _playerModule.options_ = options; }
+	void SetCharacterOptions2(DWORD options) { _playerModule.options2_ = options; }
 
 	// AutoRepeatAttack_CharacterOption
 	// AllowGive_CharacterOption
@@ -174,6 +173,9 @@ public:
 	virtual void IncrementQuest(const char *questName) override;
 	virtual void DecrementQuest(const char *questName) override;
 	virtual void EraseQuest(const char *questName) override;
+	virtual void SetQuestCompletions(const char *questName, int numCompletions) override;
+	virtual unsigned int InqQuestMax(const char *questName) override;
+	virtual std::string Ktref(const char *questName) override;
 
 	std::unordered_map<DWORD, double> _objMadeAwareOf;
 
@@ -197,14 +199,14 @@ public:
 
 	CCorpseWeenie *_pendingCorpse = NULL;
 	DWORD GetAccountHouseId();
-
+	
 	TradeManager *GetTradeManager();
 	void SetTradeManager(TradeManager *tradeManager);
-	
+
 	virtual void CPlayerWeenie::ReleaseContainedItemRecursive(CWeenieObject *item) override;
-	
+
 	virtual void ChangeCombatMode(COMBAT_MODE mode, bool playerRequested) override;
-	
+
 	void UpdatePKActivity();
 	bool CheckPKActivity() { return m_iPKActivity > Timer::cur_time; }
 	void ClearPKActivity() { m_iPKActivity = Timer::cur_time; }
@@ -219,6 +221,8 @@ public:
 	void ClearConsent(bool onLogout); // TODO: Add call on logout
 	std::unordered_map<int, int> m_umCorpsePermissions;
 	std::unordered_map<int, int> m_umConsentList;
+
+
 
 protected:
 	CClient *m_pClient;
@@ -240,9 +244,9 @@ protected:
 
 	TradeManager *m_pTradeManager = NULL;
 	double m_fNextTradeCheck = 0;
-	
+
 private:
-		int m_iPKActivity = 0;
+	int m_iPKActivity = 0;
 };
 
 class CWandSpellUseEvent : public CUseEventData
@@ -256,8 +260,8 @@ public:
 	CWandSpellUseEvent(DWORD wandId, DWORD targetId);
 	virtual void OnReadyToUse() override;
 	virtual void OnUseAnimSuccess(DWORD motion) override;
-	//virtual void Cancel(DWORD error = 0) override;
-	//virtual void Done(DWORD error = 0) override;
+	virtual void Cancel(DWORD error = 0) override;
+	virtual void Done(DWORD error = 0) override;
 };
 
 class CLifestoneRecallUseEvent : public CUseEventData

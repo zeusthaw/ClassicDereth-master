@@ -175,6 +175,26 @@ unsigned int QuestTable::InqQuestSolves(const char *questName) // custom
 	return 0;
 }
 
+unsigned int QuestTable::InqQuestMax(const char *questName) // custom subfunction for Kill tasks. Used to determine completion point for msging.
+{
+	std::string trimmedQuestName = GetNeutralQuestName(questName, true);
+	QuestProfile *prof = GetQuest(trimmedQuestName.c_str());
+	
+	if (QuestDef *questDef = CQuestDefDB::GetQuestDef(trimmedQuestName.c_str()))
+	{
+			return questDef->_maxsolves;
+	}
+
+	return 0;
+}
+
+std::string QuestTable::Ktref(const char *questName) // Kill task trim quest name before stamping to remove @kt from quest stamp
+{
+	std::string trimmedQuestName = GetNeutralQuestName(questName, true);
+
+	return trimmedQuestName;
+}
+
 void QuestTable::SetQuestCompletions(const char *questName, int numCompletions)
 {
 	AddQuest(questName);

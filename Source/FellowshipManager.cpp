@@ -108,7 +108,7 @@ void Fellowship::UpdateData()
 	for (auto &entry : _fellowship_table)
 	{
 		if (_even_xp_split)
-			entry.second.splitPercent = FellowshipManager::GetEvenSplitXPPctg((DWORD)_fellowship_table.size());
+			entry.second.splitPercent = FellowshipManager::GetEvenSplitXPPctg((DWORD) _fellowship_table.size());
 		else
 			entry.second.splitPercent = FellowshipManager::GetExperienceProportion(entry.second._level) / (double)xpPortionSum;
 	}
@@ -159,7 +159,7 @@ void Fellowship::GiveXP(CWeenieObject *source, long long amount, bool bShowText)
 			{
 				double degradeMod = CalculateDegradeMod(source, other);
 
-				long long xpGained = (long long)(amount * entry.second.splitPercent * degradeMod);
+				long long xpGained = (long long) (amount * entry.second.splitPercent * degradeMod);
 				if (xpGained > 0)
 					other->GiveXP(xpGained, bShowText);
 			}
@@ -224,18 +224,18 @@ void Fellowship::SendUpdate(int updateType)
 	switch (updateType)
 	{
 	case Fellow_UpdateFull:
-	{
-		BinaryWriter updateMessage;
-		updateMessage.Write<DWORD>(0x2BE);
-		Pack(&updateMessage);
-
-		for (auto &entry : _fellowship_table)
 		{
-			CPlayerWeenie *player = g_pWorld->FindPlayer(entry.first);
-			if (player)
-				player->SendNetMessage(&updateMessage, PRIVATE_MSG, TRUE, FALSE);
+			BinaryWriter updateMessage;
+			updateMessage.Write<DWORD>(0x2BE);
+			Pack(&updateMessage);
+
+			for (auto &entry : _fellowship_table)
+			{
+				CPlayerWeenie *player = g_pWorld->FindPlayer(entry.first);
+				if (player)
+					player->SendNetMessage(&updateMessage, PRIVATE_MSG, TRUE, FALSE);
+			}
 		}
-	}
 	}
 }
 
@@ -376,7 +376,7 @@ void Fellowship::Recruit(DWORD recruitee_id)
 	recruitMessage.Write<DWORD>(recruitee_id);
 	f->Pack(&recruitMessage);
 	recruitMessage.Write<DWORD>(Fellow_UpdateFull);
-
+	
 	for (auto &entry : _fellowship_table)
 	{
 		if (CPlayerWeenie *player = g_pWorld->FindPlayer(entry.first))
@@ -406,7 +406,7 @@ void Fellowship::ChangeOpen(BOOL open)
 		return;
 
 	_open_fellow = open;
-
+	
 	std::string leader_name;
 	CWeenieObject *leader_weenie = g_pWorld->FindPlayer(_leader);
 	if (leader_weenie)
@@ -547,7 +547,7 @@ int FellowshipManager::Create(const std::string &name, DWORD creator_id, BOOL sh
 }
 
 int FellowshipManager::Disband(const std::string &name, DWORD disbander_id)
-{
+{	
 	std::unordered_map<std::string, Fellowship *>::iterator i = m_Fellowships.find(name);
 	if (i == m_Fellowships.end())
 		return WERROR_FELLOWSHIP_NO_FELLOWSHIP;

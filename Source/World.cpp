@@ -19,7 +19,6 @@ CWorld::CWorld()
 {
 	WINLOG(Temp, Normal, "Initializing World..\n");
 	SERVER_INFO << "Initializing World..";
-
 	ZeroMemory(m_pBlocks, sizeof(m_pBlocks));
 
 	LoadDungeonsFile();
@@ -342,11 +341,36 @@ bool CWorld::CreateEntity(CWeenieObject *pEntity, bool bMakeAware)
 		{
 			LOG_PRIVATE(World, Warning, "Trying to spawn second (different) weenie with existing ID 0x%08X! Deleting instead.\n", pEntity->GetID());
 
-			// Already exists.
-			delete pEntity;
+			if (pExistingWeenie->IsContained())
+			{
+				CContainerWeenie *pContainer = (CContainerWeenie*)FindObject(pExistingWeenie->GetContainerID());
+
+				if (pContainer && pContainer->AsCorpse())
+				{
+					// The dupe is in a corpse!
+					// Let's assume the corpse was already recovered.
+
+					while (pContainer->m_Items.size() > 0)
+					{
+						pContainer->m_Items[0]->Remove();
+					}
+
+					// Corpse is now empty. We can get rid of it.
+					pContainer->Remove();
+				}
+				else
+				{
+					delete pEntity;
+					return false;
+				}
+			}
+			else
+			{
+				delete pEntity;
+				return false;
+			}
 		}
 
-		return false;
 	}
 
 	double createTime;
@@ -355,7 +379,14 @@ bool CWorld::CreateEntity(CWeenieObject *pEntity, bool bMakeAware)
 
 	if (!pEntity->GetID())
 	{
-		pEntity->SetID(GenerateGUID(eDynamicGUID));
+		bool useEphemeral = (pEntity->m_PhysicsState & MISSILE_PS)
+			|| pEntity->IsCreature()
+			// player corpses are invisible at create time
+			|| (pEntity->IsCorpse() && pEntity->m_Qualities.GetBool(VISIBILITY_BOOL, true));
+
+		pEntity->SetID(GenerateGUID(
+			useEphemeral ? eEphemeral : eDynamicGUID));
+
 	}
 
 	if (pEntity->AsPlayer() && pEntity->AsPlayer()->GetClient())
@@ -794,7 +825,7 @@ void CWorld::BroadcastPVS(DWORD dwCell, void *_data, DWORD _len, WORD _group, DW
 	maxy = BLOCK_OFFSET(maxy);
 
 	CWorldLandBlock *pBlock = m_pBlocks[block];
-	if (pBlock && !pBlock->PossiblyVisibleToOutdoors(dwCell))
+	if ((pBlock && (dwCell & 0xFFFF) > 0x100) && !pBlock->PossiblyVisibleToOutdoors(dwCell)) //check if inside
 	{
 		// dungeons are usually contained in water blocks usually and we will only broadcast to them individually
 		pBlock->Broadcast(_data, _len, _group, ignore_ent, _game_event);
@@ -836,14 +867,12 @@ void CWorld::BroadcastGlobal(void *_data, DWORD _len, WORD _group, DWORD ignore_
 	}
 }
 
-//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/75132b15809a026a58d5ed5abefac26290b14461 //
 void CWorld::BroadcastLocal(DWORD cellid, std::string text)
 {
 	BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
 	g_pWorld->BroadcastPVS(cellid, textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
 	delete textMsg;
 }
-
 
 void CWorld::Test()
 {
@@ -1117,7 +1146,7 @@ void CWorld::EnumNearby(const Position &position, float fRange, std::list<CWeeni
 	WORD cell = CELL_WORD(dwCell);
 
 	CWorldLandBlock *pBlock = m_pBlocks[block];
-	if (pBlock && !pBlock->PossiblyVisibleToOutdoors(dwCell))
+	if ((pBlock && (dwCell & 0xFFFF) > 0x100) && !pBlock->PossiblyVisibleToOutdoors(dwCell)) //check if inside
 	{
 		pBlock->EnumNearby(position, fRange, pResults);
 	}
@@ -1167,7 +1196,7 @@ void CWorld::EnumNearbyPlayers(const Position &position, float fRange, std::list
 	WORD cell = CELL_WORD(dwCell);
 
 	CWorldLandBlock *pBlock = m_pBlocks[block];
-	if (pBlock && !pBlock->PossiblyVisibleToOutdoors(dwCell))
+	if ((pBlock && (dwCell & 0xFFFF) > 0x100) && !pBlock->PossiblyVisibleToOutdoors(dwCell)) //check if inside
 	{
 		pBlock->EnumNearbyPlayers(position, fRange, pResults);
 	}
@@ -1244,7 +1273,7 @@ void CWorld::EnumNearby(CWeenieObject *pSource, float fRange, std::list<CWeenieO
 		WORD cell = CELL_WORD(dwCell);
 
 		CWorldLandBlock *pBlock = m_pBlocks[block];
-		if (pBlock && !pBlock->PossiblyVisibleToOutdoors(dwCell))
+		if ((pBlock && (dwCell & 0xFFFF) > 0x100) && !pBlock->PossiblyVisibleToOutdoors(dwCell)) //check if inside
 		{
 			pBlock->EnumNearby(pSource, fRange, pResults);
 		}
@@ -1296,7 +1325,7 @@ void CWorld::EnumNearbyPlayers(CWeenieObject *pSource, float fRange, std::list<C
 		WORD cell = CELL_WORD(dwCell);
 
 		CWorldLandBlock *pBlock = m_pBlocks[block];
-		if (pBlock && !pBlock->PossiblyVisibleToOutdoors(dwCell))
+		if ((pBlock && (dwCell & 0xFFFF) > 0x100) && !pBlock->PossiblyVisibleToOutdoors(dwCell)) //check if inside
 		{
 			pBlock->EnumNearbyPlayers(pSource, fRange, pResults);
 		}

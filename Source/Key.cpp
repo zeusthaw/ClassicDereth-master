@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "Key.h"
 #include "UseManager.h"
@@ -37,7 +36,7 @@ int CKeyWeenie::DoUseWithResponse(CWeenieObject *player, CWeenieObject *with)
 		else
 		{
 			std::string lockCode;
-			if (with->m_Qualities.InqString(LOCK_CODE_STRING, lockCode) && !_stricmp(lockCode.c_str(), InqStringQuality(KEY_CODE_STRING, "").c_str()))
+			if ((with->m_Qualities.InqString(LOCK_CODE_STRING, lockCode) && !_stricmp(lockCode.c_str(), InqStringQuality(KEY_CODE_STRING, "").c_str()) || InqBoolQuality(OPENS_ANY_LOCK_BOOL, FALSE)))
 			{
 				DecrementStackOrStructureNum();
 				with->SetLocked(FALSE);

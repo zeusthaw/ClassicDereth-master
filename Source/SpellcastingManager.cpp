@@ -163,7 +163,7 @@ bool CSpellcastingManager::AddMotionsForSpell()
 			if (gesture == 0x1000012F)
 				gesture = 0x13000132; // level 7's are wrong for some reason
 
-									  // m_pWeenie->SendText(csprintf("Component \"%s\": %s %f %f 0x%08X (%u)", pSpellComponent->_name.c_str(), pSpellComponent->_text.c_str(), pSpellComponent->_time, pSpellComponent->_CDM, pSpellComponent->_gesture, pSpellComponent->_gesture & 0xFFFF), 1);
+			// m_pWeenie->SendText(csprintf("Component \"%s\": %s %f %f 0x%08X (%u)", pSpellComponent->_name.c_str(), pSpellComponent->_text.c_str(), pSpellComponent->_time, pSpellComponent->_CDM, pSpellComponent->_gesture, pSpellComponent->_gesture & 0xFFFF), 1);
 			m_PendingMotions.push_back(SpellCastingMotion(gesture, 2.0f, firstMotion, firstMotion, pSpellComponent->_time));
 			firstMotion = false;
 		}
@@ -311,8 +311,23 @@ void CSpellcastingManager::BeginNextMotion()
 
 		if (m_PendingMotions.empty())
 		{
-			int error = LaunchSpellEffect(false);
-			EndCast(error);
+			int bitfield = m_pWeenie->m_SpellcastingManager->m_SpellCastData.spell->_bitfield;
+			if ((bitfield & Resistable_SpellIndex) && (bitfield & PKSensitive_SpellIndex) && (bitfield & FastCast_SpellIndex)) //streaks
+			{
+				if (m_pWeenie->m_Qualities.GetFloat(NEXT_SPELLCAST_TIMESTAMP_FLOAT, 0.0) <= Timer::cur_time)
+				{
+					int error = LaunchSpellEffect(false);
+					EndCast(error);
+					m_pWeenie->m_Qualities.SetFloat(NEXT_SPELLCAST_TIMESTAMP_FLOAT, Timer::cur_time + 2.0);
+				}
+				else
+					EndCast(WERROR_ACTIONS_LOCKED);
+			}
+			else //everything else
+			{
+				int error = LaunchSpellEffect(false);
+				EndCast(error);
+			}
 		}
 		else
 		{
@@ -365,7 +380,7 @@ Position CSpellcastingManager::GetSpellProjectileSpawnPosition(CSpellProjectile 
 		double sn = sin(dDir);
 
 		double x = -1000 * sn;
-		double y = 1000 * cs;
+		double y =  1000 * cs;
 
 		float z = pSource->GetHeight() * (2.0 / 3.0);
 		if (bRing)
@@ -401,7 +416,7 @@ Position CSpellcastingManager::GetSpellProjectileSpawnPosition(CSpellProjectile 
 		double minSpawnDist = (pSource->GetRadius() + pProjectile->GetRadius()) + 0.1f;
 
 		if (bRing)
-			minSpawnDist += 1.0f;
+			minSpawnDist +=	1.0f;
 
 		spawnPosition.frame.m_origin += targetDir * minSpawnDist;
 		spawnPosition.frame.set_vector_heading(targetDir);
@@ -634,8 +649,8 @@ bool CSpellcastingManager::LaunchProjectileSpell(ProjectileSpellEx *meta)
 				bool bRing = false;
 				if (bAngled)
 				{
-					double xRatio = x / (double)numX;
-					xRatio -= (numX - 1.0) / (double)(2 * numX);
+					double xRatio = x / (double) numX;
+					xRatio -= (numX - 1.0) / (double) (2*numX);
 
 					theta = DEG2RAD(xRatio * meta->_spreadAngle);
 
@@ -710,10 +725,10 @@ bool CSpellcastingManager::LaunchProjectileSpell(ProjectileSpellEx *meta)
 
 					/*
 					LOG(Temp, Normal, "Projectile Offset @ %.3f %.3f %.3f %f\n",
-					createOffset.x + projectileGroupOffset.x,
-					createOffset.y + projectileGroupOffset.y,
-					createOffset.z + projectileGroupOffset.z, pProjectile->m_velocityVector.magnitude());
-					*/
+						createOffset.x + projectileGroupOffset.x,
+						createOffset.y + projectileGroupOffset.y,
+						createOffset.z + projectileGroupOffset.z, pProjectile->m_velocityVector.magnitude());
+						*/
 				}
 			}
 		}
@@ -737,8 +752,8 @@ void CSpellcastingManager::PerformCastParticleEffects()
 	// target effect
 	if (m_SpellCastData.spell->_target_effect)
 	{
-		if ((m_SpellCastData.spell->_category == 162 || m_SpellCastData.spell->_category == 164 || m_SpellCastData.spell->_category == 166 || m_SpellCastData.spell->_category == 168 ||
-			m_SpellCastData.spell->_category == 170 || m_SpellCastData.spell->_category == 172 || m_SpellCastData.spell->_category == 174 || m_SpellCastData.spell->_category == 160) &&
+		if ((m_SpellCastData.spell->_category == 162 || m_SpellCastData.spell->_category == 164 || m_SpellCastData.spell->_category == 166 || m_SpellCastData.spell->_category == 168 || 
+			m_SpellCastData.spell->_category == 170 || m_SpellCastData.spell->_category == 172 || m_SpellCastData.spell->_category == 174 || m_SpellCastData.spell->_category == 160) && 
 			(m_SpellCastData.source_id == m_SpellCastData.target_id))
 		{
 			return;
@@ -786,6 +801,16 @@ void CSpellcastingManager::BeginPortalSend(const Position &targetPos)
 		if (!player->IsRecalling())
 		{
 			player->BeginRecall(targetPos);
+		}
+	}
+	else if (m_pWeenie->HasOwner())
+	{
+		if (CPlayerWeenie *gemtarget = m_pWeenie->GetWorldTopLevelOwner()->AsPlayer())
+		{
+			if (!gemtarget->IsRecalling())
+			{
+				gemtarget->BeginRecall(targetPos);
+			}
 		}
 	}
 	else
@@ -1469,8 +1494,8 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 
 		case SpellType::PortalRecall_SpellType:
 		{
-			if (m_pWeenie->HasOwner())
-				break;
+			/*if (m_pWeenie->HasOwner()) //Needed to comment out for Rare gems.
+				break;*/
 
 			if (m_pWeenie->AsPlayer() && m_pWeenie->AsPlayer()->CheckPKActivity())
 			{
@@ -1482,6 +1507,21 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 
 			switch (meta->_index)
 			{
+			case 1: // lifestone sending
+			{
+				Position lifestone;
+				if (m_pWeenie->m_Qualities.InqPosition(SANCTUARY_POSITION, lifestone) && lifestone.objcell_id != 0)
+				{
+					BeginPortalSend(lifestone);
+				}
+				else
+				{
+					m_pWeenie->SendText("Your sould is not bound to a lifestone.", LTT_MAGIC);
+				}
+
+				bSpellPerformed = true;
+				break;
+			}
 			case 2: // lifestone recall
 			{
 				Position lifestone;
@@ -1502,6 +1542,10 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 			{
 				Position lastPortalPos;
 				if (m_pWeenie->m_Qualities.InqPosition(LAST_PORTAL_POSITION, lastPortalPos) && lastPortalPos.objcell_id != 0)
+				{
+					BeginPortalSend(lastPortalPos);
+				}
+				else if (m_pWeenie->GetWorldTopLevelOwner()->m_Qualities.InqPosition(LAST_PORTAL_POSITION, lastPortalPos) && lastPortalPos.objcell_id != 0)
 				{
 					BeginPortalSend(lastPortalPos);
 				}
@@ -1693,7 +1737,7 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 				// NPKs should not be able to buff PKs
 				if (m_pWeenie && castTarget && m_pWeenie->AsPlayer() && castTarget->AsPlayer())
 				{
-					if (!m_pWeenie->AsPlayer()->IsPK() && castTarget->AsPlayer()->IsPK())
+					if (!m_pWeenie->IsPK() && castTarget->IsPK())
 					{
 						bSpellPerformed = false;
 						break;
@@ -1713,7 +1757,7 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 						{
 							if (wielded->GetItemType() & m_SpellCastData.spell->_non_component_target_type)
 							{
-								if (castTarget == m_pWeenie || wielded->parent || m_pWeenie->GetWorldTopLevelOwner()) // for other targets, only physically wielded allowed
+								if (castTarget == m_pWeenie || wielded->parent || m_pWeenie->GetWorldTopLevelOwner() == castTarget->GetWorldTopLevelOwner()) // for other targets, only physically wielded allowed, TopLevelOwner for buff gems.
 								{
 									targets.push_back(wielded);
 								}
@@ -1756,7 +1800,7 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 							if (m_pWeenie && target && m_pWeenie->AsPlayer() && target->AsPlayer())
 							{
 								// Only Update PK Activity if both target and caster are PK, Prevents PKs from tagging NPKs for PK activity.
-								if (m_pWeenie->AsPlayer()->IsPK() && target->AsPlayer()->IsPK())
+								if (m_pWeenie->IsPK() && target->IsPK())
 								{
 									m_pWeenie->AsPlayer()->UpdatePKActivity();
 									target->AsPlayer()->UpdatePKActivity();
@@ -1895,15 +1939,11 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 				break;
 
 			// NPKs should not be able to buff PKs
-			if (m_pWeenie && target && m_pWeenie->AsPlayer() && target->AsPlayer())
+			if (m_pWeenie && target && m_pWeenie->IsPK() && target->IsPK())
 			{
-				if (!m_pWeenie->AsPlayer()->IsPK() && target->AsPlayer()->IsPK())
-				{
 					bSpellPerformed = false;
 					break;
-				}
 			}
-
 			else
 			{
 				Fellowship *fellow = target->GetFellowship();
@@ -1979,7 +2019,7 @@ int CSpellcastingManager::LaunchSpellEffect(bool bFizzled)
 										if (!(m_SpellCastData.spell->_bitfield & Beneficial_SpellIndex))
 										{
 											// Only Update PK Activity if both target and caster are PK, Prevents PKs from tagging NPKs for PK activity.
-											if (m_pWeenie->AsPlayer()->IsPK() && target->AsPlayer()->IsPK())
+											if (m_pWeenie->IsPK() && target->IsPK())
 											{
 												m_pWeenie->AsPlayer()->UpdatePKActivity();
 												target->AsPlayer()->UpdatePKActivity();
@@ -2467,7 +2507,7 @@ bool CSpellcastingManager::DoTransferSpell(CWeenieObject *other, const TransferS
 		// NPKs should not be able to heal PKs
 		if (m_pWeenie && other && m_pWeenie->AsPlayer() && other->AsPlayer())
 		{
-			if (!m_pWeenie->AsPlayer()->IsPK() && other->AsPlayer()->IsPK())
+			if (!m_pWeenie->IsPK() && other->IsPK())
 			{
 				return false;
 			}
@@ -2621,13 +2661,13 @@ bool CSpellcastingManager::DoTransferSpell(CWeenieObject *other, const TransferS
 			if (dest->AsPlayer())
 			{
 				// update the target's health on the casting player asap
-				if (source->AsPlayer())
+				if(source->AsPlayer())
 					((CPlayerWeenie*)source)->RefreshTargetHealth();
 			}
 			if (source->AsPlayer())
 			{
 				// update the target's health on the casting player asap
-				if (dest->AsPlayer())
+				if(dest->AsPlayer())
 					((CPlayerWeenie*)dest)->RefreshTargetHealth();
 			}
 		}
@@ -2651,7 +2691,7 @@ bool CSpellcastingManager::AdjustVital(CWeenieObject *target)
 	// NPKs should not be able to heal PKs
 	if (m_pWeenie && target && m_pWeenie->AsPlayer() && target->AsPlayer())
 	{
-		if (!m_pWeenie->AsPlayer()->IsPK() && target->AsPlayer()->IsPK())
+		if (!m_pWeenie->IsPK() && target->IsPK())
 		{
 			return false;
 		}
@@ -2680,7 +2720,7 @@ bool CSpellcastingManager::AdjustVital(CWeenieObject *target)
 	{
 		if (m_pWeenie && target && m_pWeenie->AsPlayer() && target->AsPlayer())
 		{
-			if (m_pWeenie->AsPlayer()->IsPK() && target->AsPlayer()->IsPK())
+			if (m_pWeenie->IsPK() && target->IsPK())
 			{
 				m_pWeenie->AsPlayer()->UpdatePKActivity();
 				target->AsPlayer()->UpdatePKActivity();
@@ -2862,7 +2902,10 @@ int CSpellcastingManager::CastSpellInstant(DWORD target_id, DWORD spell_id)
 
 	m_bCasting = true;
 	m_SpellCastData = SpellCastData();
-	m_SpellCastData.caster_id = m_pWeenie->GetID();
+	if (oldData.caster_id == 0)
+		m_SpellCastData.caster_id = m_pWeenie->GetID();
+	else
+		m_SpellCastData.caster_id = oldData.caster_id;
 	m_SpellCastData.source_id = m_pWeenie->GetTopLevelID();
 	m_SpellCastData.target_id = target_id;
 	m_SpellCastData.spell_id = spell_id;
@@ -2928,7 +2971,12 @@ int CSpellcastingManager::CastSpellEquipped(DWORD target_id, DWORD spell_id, WOR
 DWORD CSpellcastingManager::DetermineSkillLevelForSpell()
 {
 	int spellcraft = 0;
-	if (m_pWeenie->m_Qualities.InqInt(ITEM_SPELLCRAFT_INT, spellcraft, FALSE, FALSE))
+	CWeenieObject *source = g_pWorld->FindObject(m_SpellCastData.caster_id);
+
+	if (!source)
+		return 0;
+
+	if (source->m_Qualities.InqInt(ITEM_SPELLCRAFT_INT, spellcraft, FALSE, FALSE))
 		return (DWORD)spellcraft;
 
 	if (!m_SpellCastData.spell)
@@ -3141,6 +3189,7 @@ int CSpellcastingManager::TryBeginCast(DWORD target_id, DWORD spell_id)
 			case ITEM_ENCHANTMENT_SKILL: foci = FindFociInContainer(caster, W_PACKITEMESSENCE_CLASS) || caster->InqIntQuality(AUGMENTATION_INFUSED_ITEM_MAGIC_INT, 0); break;
 			case LIFE_MAGIC_SKILL: foci = FindFociInContainer(caster, W_PACKLIFEESSENCE_CLASS) || caster->InqIntQuality(AUGMENTATION_INFUSED_LIFE_MAGIC_INT, 0); break;
 			case WAR_MAGIC_SKILL: foci = FindFociInContainer(caster, W_PACKWARESSENCE_CLASS) || caster->InqIntQuality(AUGMENTATION_INFUSED_WAR_MAGIC_INT, 0); break;
+			case VOID_MAGIC_SKILL: foci = FindFociInContainer(caster, W_FOCIOFSHADOW_CLASS) || caster->InqIntQuality(AUGMENTATION_INFUSED_VOID_MAGIC_INT, 0); break;
 			}
 		}
 
@@ -3210,7 +3259,7 @@ int CSpellcastingManager::TryBeginCast(DWORD target_id, DWORD spell_id)
 		int error = LaunchSpellEffect(FALSE);
 		EndCast(error);
 	}
-
+	
 	BeginCast();
 	return WERROR_NONE;
 }
@@ -3348,14 +3397,14 @@ void CSpellcastingManager::Update()
 			CWeenieObject *pTarget = g_pWorld->FindWithinPVS(m_pWeenie, m_TargetID);
 			if (pTarget)
 			{
-			LOG(Temp, Normal, "%f (%f %f) %08X %f %f %f\n",
-			HeadingToTarget(),
-			m_pWeenie->m_Position.heading(pTarget->m_Position),
-			m_pWeenie->m_Position.frame.get_heading(),
-			m_pWeenie->get_minterp()->interpreted_state.turn_command,
-			m_pWeenie->movement_manager->moveto_manager->sought_position.frame.get_heading(),
-			m_pWeenie->get_heading(),
-			m_pWeenie->get_heading() - m_pWeenie->movement_manager->moveto_manager->sought_position.frame.get_heading());
+				LOG(Temp, Normal, "%f (%f %f) %08X %f %f %f\n",
+					HeadingToTarget(),
+					m_pWeenie->m_Position.heading(pTarget->m_Position),
+					m_pWeenie->m_Position.frame.get_heading(),
+					m_pWeenie->get_minterp()->interpreted_state.turn_command,
+					m_pWeenie->movement_manager->moveto_manager->sought_position.frame.get_heading(),
+					m_pWeenie->get_heading(),
+					m_pWeenie->get_heading() - m_pWeenie->movement_manager->moveto_manager->sought_position.frame.get_heading());
 			}
 			*/
 		}

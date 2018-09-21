@@ -82,7 +82,7 @@ public:
 	static void find_cell_list(Position *p, class CSphere *sphere, CELLARRAY *cell_array, SPHEREPATH *path);
 	static void find_cell_list(CELLARRAY *cell_array, CObjCell **check_cell, SPHEREPATH *path);
 
-	static CObjCell *GetVisible(DWORD cell_id);
+	static CObjCell *GetVisible(DWORD cell_id, bool bDoPostLoad = true);
 
 	int check_collisions(CPhysicsObj *object);
 	LandDefs::WaterType get_block_water_type();

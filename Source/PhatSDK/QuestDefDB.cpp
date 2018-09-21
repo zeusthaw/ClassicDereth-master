@@ -13,10 +13,16 @@ DEFINE_UNPACK(QuestDef)
 	_mindelta = pReader->Read<int>();
 	_maxsolves = pReader->Read<int>();
 	_fullname = pReader->ReadString();
-
-	// these are obfuscated, swap low/high nibbles
-	for (int i = 0; i < _fullname.size(); i++)
-		_fullname[i] = (char)(BYTE)((BYTE)((BYTE)_fullname[i] << 4) | (BYTE)((BYTE)_fullname[i] >> 4));
+	try
+	{
+		// these are obfuscated, swap low/high nibbles
+		for (int i = 0; i < _fullname.size(); i++)
+			_fullname[i] = (char)(BYTE)((BYTE)((BYTE)_fullname[i] << 4) | (BYTE)((BYTE)_fullname[i] >> 4));
+	}
+	catch(...)
+	{
+		SERVER_ERROR << "Error reading quest from DAT";
+	}
 
 	return true;
 }

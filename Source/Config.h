@@ -42,6 +42,7 @@ public:
 	const char *WelcomeMessage() { return m_WelcomeMessage.c_str(); }
 
 	virtual bool FastTick() { return m_bFastTick; }
+	virtual bool UseIncrementalID() { return m_bUseIncrementalIDs; }
 
 	virtual bool HardcoreMode() { return m_bHardcoreMode; }
 	virtual bool HardcoreModePlayersOnly() { return m_bHardcoreModePlayersOnly; }
@@ -65,7 +66,7 @@ public:
 	virtual double RewardXPMultiplier(int level);
 	virtual double DropRateMultiplier() { return m_fDropRateMultiplier; }
 	virtual double RespawnTimeMultiplier() { return m_fRespawnTimeMultiplier; }
-	virtual double IsSpellFociEnabled() { return m_bSpellFociEnabled; }
+	virtual bool IsSpellFociEnabled() { return m_bSpellFociEnabled; }
 
 	virtual bool AutoCreateAccounts() { return m_bAutoCreateAccounts; }
 
@@ -84,12 +85,13 @@ public:
 	virtual const char *SanamarStartPosition() { return m_SanamarStartPosition.c_str(); }
 
 	virtual int PKRespiteTime() { return m_PKRespiteTime; }
+	virtual double SalvageMultiplier() { return m_SalvageMult; }
 	virtual bool SpellPurgeOnLogin() { return m_bSpellPurgeOnLogin; }
 	virtual bool UpdateAllegianceData() { return m_bUpdateAllegianceData; }
 
 
-
-	virtual double SalvageMultiplier() { return m_SalvageMult; }
+	virtual bool AllowGeneralChat() { return m_bAllowGeneralChat; }
+	
 
 protected:
 	virtual void PostLoad() override;
@@ -108,6 +110,7 @@ protected:
 	std::string m_WelcomeMessage;
 
 	bool m_bFastTick = false;
+	bool m_bUseIncrementalIDs = false;
 
 	bool m_bHardcoreMode = false;
 	bool m_bHardcoreModePlayersOnly = false;
@@ -170,6 +173,7 @@ protected:
 	bool m_bSpellPurgeOnLogin = false;
 	bool m_bUpdateAllegianceData = false;
 	float m_SalvageMult = 1.0f;
+	bool m_bAllowGeneralChat = 1;
 };
 
 extern CPhatACServerConfig *g_pConfig;

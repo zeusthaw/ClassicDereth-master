@@ -78,7 +78,7 @@ public:
 
 	float DistanceToHome();
 	bool ShouldSeekNewTarget();
-
+	
 	bool RollDiceCastSpell();
 	bool DoCastSpell(DWORD spell_id);
 	bool DoMeleeAttack();
@@ -132,4 +132,3 @@ public:
 };
 
 extern bool monster_brawl;
-extern bool pet_logic;

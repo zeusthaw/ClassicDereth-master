@@ -76,7 +76,7 @@ public:
 	virtual float GetEffectiveArmorLevel(DamageEventData &damageData, bool bIgnoreMagicArmor) override;
 
 	virtual void HandleAggro(CWeenieObject *attacker) override;
-
+	
 	void DropAllLoot(CCorpseWeenie *pCorpse);
 	virtual void GenerateDeathLoot(CCorpseWeenie *pCorpse);
 
@@ -102,10 +102,10 @@ public:
 	DWORD m_ChargingAttackTarget = 0;
 	DWORD m_ChargingAttackHeight = false;
 	float m_ChargingAttackPower = 0.0f;
-	float m_fChargeAttackStartTime = (float)INVALID_TIME;
+	float m_fChargeAttackStartTime = (float) INVALID_TIME;
 
 	unsigned int m_MeleeDamageBonus = 0;
-
+	
 	virtual void ChangeCombatMode(COMBAT_MODE mode, bool playerRequested) override;
 
 	class MonsterAIManager *m_MonsterAI = NULL;
@@ -113,6 +113,8 @@ public:
 	CWeenieObject *SpawnWielded(CWeenieObject *item, bool deleteItemOnFailure = true);
 	CWeenieObject *SpawnWielded(DWORD wcid, int ptid, float shade);
 	CWeenieObject *SpawnWielded(DWORD index, SmartArray<Style_CG> possibleStyles, DWORD color, SmartArray<DWORD> validColors, long double shade);
+
+	bool CanTarget(CWeenieObject* target) override;
 
 	// Inventory
 	CWeenieObject *FindValidNearbyItem(DWORD itemId, float maxDistance = 2.0);
@@ -161,14 +163,14 @@ private:
 class CBaelZharon : public CMonsterWeenie
 {
 public:
-CBaelZharon();
+	CBaelZharon();
 
-BOOL CrazyThink();
+	BOOL CrazyThink();
 };
 
 class CTargetDrudge : public CMonsterWeenie
 {
 public:
-CTargetDrudge();
+	CTargetDrudge();
 };
 */

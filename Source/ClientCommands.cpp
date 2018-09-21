@@ -38,6 +38,12 @@
 #include "InferredPortalData.h"
 #include "RandomRange.h"
 #include "House.h"
+#include "GameEventManager.h"
+#include "easylogging++.h"
+#include "ObjectMsgs.h"
+#include "EnumUtil.h"
+#include "ChessManager.h"
+#include "AllegianceManager.h"
 
 // Most of these commands are just for experimenting and never meant to be used in a real game
 // TODO: Add flags to these commands so they are only accessible under certain modes such as a sandbox mode
@@ -73,6 +79,77 @@ bool SpawningEnabled(CPlayerWeenie *pPlayer, bool item = false)
 	}
 
 	return true;
+}
+
+#ifndef PUBLIC_BUILD
+CLIENT_COMMAND(skillspendexp, "<skillID> <exp>", "Attempts to spend the input exp to the given skill.", ADMIN_ACCESS)
+{
+
+	if (argc < 2)
+	{
+		pPlayer->SendText("An arg is missing", LTT_DEFAULT);
+		return true;
+	}
+
+	DWORD seq = 1;
+	DWORD eventNum = 0x0046;
+	DWORD dwSkill = (unsigned)atoi(argv[0]);
+	DWORD dwXP = (unsigned)atoi(argv[1]);
+
+	std::vector<DWORD> data;
+	data.push_back(seq);
+	data.push_back(eventNum);
+	data.push_back(dwSkill);
+	data.push_back(dwXP);
+
+	BinaryReader reader(data.data(), data.size() * sizeof(DWORD));
+
+	player_client->GetEvents()->ProcessEvent(&reader);
+
+	pPlayer->SendText(csprintf("Attempted to add %i exp to the skill", dwXP), LTT_DEFAULT);
+
+	return false;
+}
+#endif
+
+CLIENT_COMMAND(testchat, "", "Sends hello back in all chat channel formats.", ADMIN_ACCESS)
+{
+	pPlayer->SendText("Sending text via LTT_DEFAULT", LTT_DEFAULT);
+	pPlayer->SendText("Sending text via LTT_ALL_CHANNELS", LTT_ALL_CHANNELS);
+	pPlayer->SendText("Sending text via LTT_SPEECH", LTT_SPEECH);
+	pPlayer->SendText("Sending text via LTT_SPEECH_DIRECT", LTT_SPEECH_DIRECT);
+	pPlayer->SendText("Sending text via LTT_SPEECH_DIRECT_SEND", LTT_SPEECH_DIRECT_SEND);
+	pPlayer->SendText("Sending text via LTT_SYSTEM_EVENT", LTT_SYSTEM_EVENT);
+	pPlayer->SendText("Sending text via LTT_COMBAT", LTT_COMBAT);
+	pPlayer->SendText("Sending text via LTT_MAGIC", LTT_MAGIC);
+	pPlayer->SendText("Sending text via LTT_CHANNEL", LTT_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_CHANNEL_SEND", LTT_CHANNEL_SEND);
+	pPlayer->SendText("Sending text via LTT_SOCIAL_CHANNEL", LTT_SOCIAL_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_SOCIAL_CHANNEL_SEND", LTT_SOCIAL_CHANNEL_SEND);
+	pPlayer->SendText("Sending text via LTT_EMOTE", LTT_EMOTE);
+	pPlayer->SendText("Sending text via LTT_ADVANCEMENT", LTT_ADVANCEMENT);
+	pPlayer->SendText("Sending text via LTT_ABUSE_CHANNEL", LTT_ABUSE_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_HELP_CHANNEL", LTT_HELP_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_APPRAISAL_CHANNEL", LTT_APPRAISAL_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_MAGIC_CASTING_CHANNEL", LTT_MAGIC_CASTING_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_ALLEGIENCE_CHANNEL", LTT_ALLEGIENCE_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_FELLOWSHIP_CHANNEL", LTT_FELLOWSHIP_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_WORLD_BROADCAST", LTT_WORLD_BROADCAST);
+	pPlayer->SendText("Sending text via LTT_COMBAT_ENEMY", LTT_COMBAT_ENEMY);
+	pPlayer->SendText("Sending text via LTT_COMBAT_SELF", LTT_COMBAT_SELF);
+	pPlayer->SendText("Sending text via LTT_RECALL", LTT_RECALL);
+	pPlayer->SendText("Sending text via LTT_CRAFT", LTT_CRAFT);
+	pPlayer->SendText("Sending text via LTT_SALVAGING", LTT_SALVAGING);
+	pPlayer->SendText("Sending text via LTT_ERROR", LTT_ERROR);
+	pPlayer->SendText("Sending text via LTT_GENERAL_CHANNEL", LTT_GENERAL_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_TRADE_CHANNEL", LTT_TRADE_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_LFG_CHANNEL", LTT_LFG_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_ROLEPLAY_CHANNEL", LTT_ROLEPLAY_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_SPEECH_DIRECT_ADMIN", LTT_SPEECH_DIRECT_ADMIN);
+	pPlayer->SendText("Sending text via LTT_SOCIETY_CHANNEL", LTT_SOCIETY_CHANNEL);
+	pPlayer->SendText("Sending text via LTT_OLTHOI_CHANNEL", LTT_OLTHOI_CHANNEL);
+
+	return false;
 }
 
 #ifndef PUBLIC_BUILD
@@ -147,6 +224,56 @@ CLIENT_COMMAND(spawndoor, "", "Spawns a door at your location.", ADMIN_ACCESS)
 }
 #endif
 
+CLIENT_COMMAND(allegdump, "", "Prints out the allegiance hierarchy info on the last target you assessed.", ADMIN_ACCESS)
+{
+	if (argc < 1)
+		return true;
+
+	if (pPlayer->m_LastAssessed)
+	{
+		CWeenieObject *target = g_pWorld->FindObject(pPlayer->m_LastAssessed);
+		if (target)
+		{
+			AllegianceTreeNode *node = g_pAllegianceManager->GetTreeNode(target->GetID());
+			if (node)
+			{
+				AllegianceInfo *info = g_pAllegianceManager->GetInfo(node->_monarchID);
+				if (info)
+				{
+					AllegianceTreeNode *monarch = g_pAllegianceManager->GetTreeNode(node->_monarchID);
+					// Monarch name
+					pPlayer->SendText(csprintf("Monarch: %s", monarch->_charName), LTT_DEFAULT);
+					
+					AllegianceTreeNode *patron = g_pAllegianceManager->GetTreeNode(node->_patronID);
+					if (patron)
+					{
+						// Patron name
+						pPlayer->SendText(csprintf("Patron: %s", patron->_charName), LTT_DEFAULT);
+					}
+					else
+						pPlayer->SendText("Is Monarch", LTT_DEFAULT);
+
+					// Allegiance name
+					pPlayer->SendText(csprintf("Allegiance Name: %s", info->_info.m_AllegianceName), LTT_DEFAULT);
+					// Number in allegiance
+					pPlayer->SendText(csprintf("Number in Allegiance: %i", monarch->_numFollowers), LTT_DEFAULT);
+					// Number of Vassels
+					pPlayer->SendText(csprintf("Number in Vassels: %i", node->_numFollowers), LTT_DEFAULT);
+					// Bind point
+					Vector *f = info->_info.m_BindPoint.get_origin();
+					float heading = info->_info.m_BindPoint.heading(info->_info.m_BindPoint);
+					pPlayer->SendText(csprintf("Allegiance Hometown: 0x%08x [ X:%.2f Y:%.2f Z:%.2f ] w:%.2f x:0.0 y:0.0 z:0.0", info->_info.m_BindPoint.objcell_id, 
+						f->x, f->y, f->z, heading), LTT_DEFAULT);
+				}
+			}
+			
+			
+		}
+	}
+
+	return false;
+}
+
 CLIENT_COMMAND(global, "<text> [color=1]", "Displays text globally.", ADMIN_ACCESS)
 {
 	if (argc < 1)
@@ -166,9 +293,22 @@ CLIENT_COMMAND(global, "<text> [color=1]", "Displays text globally.", ADMIN_ACCE
 	return false;
 }
 
-/*
+
+CLIENT_COMMAND(overlay, "<text>", "Displays <text> at the top-middle of the 3D window.", ADMIN_ACCESS)
+{
+	if (argc < 1)
+	{
+		return true;
+	}
+	const char* szText = argv[0];
+	pPlayer->SendTextToOverlay(szText);
+	return false;
+}
+
+
 CLIENT_COMMAND(animationall, "<num> [speed]", "Performs an animation for everyone.", ADMIN_ACCESS)
 {
+
 	if (argc < 1)
 	{
 		return true;
@@ -176,17 +316,33 @@ CLIENT_COMMAND(animationall, "<num> [speed]", "Performs an animation for everyon
 
 	WORD wIndex = atoi(argv[0]);
 	float fSpeed = (argc >= 2) ? (float)atof(argv[1]) : 1.0f;
-	float fDelay = 0.5f;
+	fSpeed = min(10.0, max(0.1, fSpeed));
 
 	PlayerWeenieMap *pPlayers = g_pWorld->GetPlayers();
 	for (PlayerWeenieMap::iterator i = pPlayers->begin(); i != pPlayers->end(); i++)
 	{
-		i->second->Animation_PlayPrimary(wIndex, fSpeed, fDelay);
+		i->second->_server_control_timestamp += 2;
+
+		i->second->last_move_was_autonomous = false;
+
+		MovementParameters params;
+		params.action_stamp = ++pPlayer->m_wAnimSequence;
+		params.speed = fSpeed;
+		params.autonomous = 0;
+		params.modify_interpreted_state = 1;
+
+		MovementStruct mvs;
+		mvs.motion = GetCommandID(wIndex);
+		mvs.params = &params;
+		mvs.type = MovementTypes::RawCommand;
+		i->second->get_minterp()->PerformMovement(mvs);
+		i->second->Animation_Update();
+
 	}
 
 	return false;
 }
-*/
+
 
 CLIENT_COMMAND(freezeall, "", "Freezes or unfreezes everyone.", ADMIN_ACCESS)
 {
@@ -600,30 +756,30 @@ CLIENT_COMMAND(serverstatus, "", "Provides information on the server's status.",
 	return false;
 }
 
-CLIENT_COMMAND(netinfo, "", "Provides information on the player's network connection.", BASIC_ACCESS)
-{
-	int sendbuf = 0;
-	int sendbuflen = sizeof(sendbuf);
-	getsockopt(g_pNetwork->m_sockets[0], SOL_SOCKET, SO_SNDBUF, (char *)&sendbuf, &sendbuflen);
-	pPlayer->SendText(csprintf("SNDBUF: %u", sendbuf), LTT_DEFAULT);
-
-	int recvbuf = 0;
-	int recvbuflen = sizeof(recvbuf);
-	getsockopt(g_pNetwork->m_sockets[0], SOL_SOCKET, SO_RCVBUF, (char *)&recvbuf, &recvbuflen);
-	pPlayer->SendText(csprintf("RCVBUF: %u", recvbuf), LTT_DEFAULT);
-
-	pPlayer->SendText(csprintf("INSEQ: %u", player_client->GetPacketController()->m_in.sequence), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("ACTIVESEQ: %u", player_client->GetPacketController()->m_in.activesequence), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("FLUSHSEQ: %u", player_client->GetPacketController()->m_in.flushsequence), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("OUTSEQ: %u", player_client->GetPacketController()->m_out.sequence), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("RECEIVED: %I64u", player_client->GetPacketController()->m_in.receivedbytes), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("SENT: %I64u", player_client->GetPacketController()->m_out._sentBytes), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("RETRANSMIT: %u", player_client->GetPacketController()->m_out.numretransmit), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("DENIED: %u", player_client->GetPacketController()->m_out.numdenied), LTT_DEFAULT);
-	pPlayer->SendText(csprintf("REQUESTED: %u", player_client->GetPacketController()->m_in.numresendrequests), LTT_DEFAULT);
-
-	return false;
-}
+//CLIENT_COMMAND(netinfo, "", "Provides information on the player's network connection.", BASIC_ACCESS)
+//{
+//	int sendbuf = 0;
+//	int sendbuflen = sizeof(sendbuf);
+//	getsockopt(g_pNetwork->m_sockets[0], SOL_SOCKET, SO_SNDBUF, (char *)&sendbuf, &sendbuflen);
+//	pPlayer->SendText(csprintf("SNDBUF: %u", sendbuf), LTT_DEFAULT);
+//
+//	int recvbuf = 0;
+//	int recvbuflen = sizeof(recvbuf);
+//	getsockopt(g_pNetwork->m_sockets[0], SOL_SOCKET, SO_RCVBUF, (char *)&recvbuf, &recvbuflen);
+//	pPlayer->SendText(csprintf("RCVBUF: %u", recvbuf), LTT_DEFAULT);
+//
+//	pPlayer->SendText(csprintf("INSEQ: %u", player_client->GetPacketController()->m_in.sequence), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("ACTIVESEQ: %u", player_client->GetPacketController()->m_in.activesequence), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("FLUSHSEQ: %u", player_client->GetPacketController()->m_in.flushsequence), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("OUTSEQ: %u", player_client->GetPacketController()->m_out.sequence), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("RECEIVED: %I64u", player_client->GetPacketController()->m_in.receivedbytes), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("SENT: %I64u", player_client->GetPacketController()->m_out._sentBytes), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("RETRANSMIT: %u", player_client->GetPacketController()->m_out.numretransmit), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("DENIED: %u", player_client->GetPacketController()->m_out.numdenied), LTT_DEFAULT);
+//	pPlayer->SendText(csprintf("REQUESTED: %u", player_client->GetPacketController()->m_in.numresendrequests), LTT_DEFAULT);
+//
+//	return false;
+//}
 
 #ifndef PUBLIC_BUILD
 CLIENT_COMMAND(debug, "<index>", "", ADMIN_ACCESS)
@@ -882,6 +1038,98 @@ CLIENT_COMMAND(debug, "<index>", "", ADMIN_ACCESS)
 	}
 
 	pPlayer->SendText(info.c_str(), LTT_DEFAULT);
+
+	return false;
+}
+
+CLIENT_COMMAND(monsterbrawl, "", "Toggle monsters fighting each other.", ADMIN_ACCESS)
+{
+	monster_brawl = !monster_brawl;
+
+	if (monster_brawl)
+		pPlayer->SendText("Enabled brawling monsters.", LTT_DEFAULT);
+	else
+		pPlayer->SendText("Disabled brawling monsters.", LTT_DEFAULT);
+
+	return false;
+}
+
+CLIENT_COMMAND(damagesources, "", "Lists all damage sources and values for the last assessed target if it's a monster.", ADMIN_ACCESS)
+{
+	CWeenieObject *target = g_pWorld->FindObject(pPlayer->m_LastAssessed);
+	if (!target)
+		return false;
+	if (target->AsMonster())
+	{
+		std::string info;
+		for (std::map<DWORD, int>::iterator it = target->AsMonster()->m_aDamageSources.begin(), ite = target->AsMonster()->m_aDamageSources.end(); it != ite; ++it)
+		{
+			CWeenieObject *source = g_pWorld->FindObject(it->first);
+			info += csprintf("%s has done %d damage.\n", source->GetName(), it->second);
+		}
+
+		if (!info.empty())
+		{
+			pPlayer->SendText(info.c_str(), LTT_DEFAULT);
+		}
+		else
+		{
+			pPlayer->SendText("No damage taken.", LTT_DEFAULT);
+		}
+	}
+
+	return false;
+}
+
+CLIENT_COMMAND(sweartime, "<unix timestamp>", "Sets the time that the last assessed player swore to their patron to <unix timestamp> seconds. If no argument is given, shows the current timestamp.", ADMIN_ACCESS)
+{
+	CWeenieObject *target = g_pWorld->FindObject(pPlayer->m_LastAssessed);
+	if (!target)
+		return false;
+	if (target->AsPlayer())
+	{
+		if (AllegianceTreeNode* targetNode = g_pAllegianceManager->GetTreeNode(target->id))
+		{
+			if (targetNode->_patronID) {
+				int oldSwornAt = targetNode->_unixTimeSwornAt;
+				if (argc < 1)
+				{
+					pPlayer->SendText(csprintf("%s's unix time sworn at is %d.", targetNode->_charName.c_str(), oldSwornAt), LTT_DEFAULT);
+					return false;
+				}
+				targetNode->_unixTimeSwornAt = atoi(argv[0]);
+				pPlayer->SendText(csprintf("%s's unix time sworn at has been changed from %d to %d.", targetNode->_charName.c_str(), oldSwornAt, targetNode->_unixTimeSwornAt), LTT_DEFAULT);
+			}
+		}
+	}
+
+	return false;
+}
+
+CLIENT_COMMAND(passupbool, "<0 | 1>", "Sets the last assessed player's XP passup bool. If no argument is given, shows the current state.", ADMIN_ACCESS)
+{
+	CWeenieObject *target = g_pWorld->FindObject(pPlayer->m_LastAssessed);
+	if (!target)
+		return false;
+	if (target->AsPlayer())
+	{
+		if (AllegianceTreeNode* targetNode = g_pAllegianceManager->GetTreeNode(target->id)) 
+		{
+			bool canPassup = target->InqBoolQuality(EXISTED_BEFORE_ALLEGIANCE_XP_CHANGES_BOOL, 0);
+			if (argc < 1)
+				pPlayer->SendText(csprintf("%s's XP passup is currently %s.", target->GetName().c_str(), canPassup ? "enabled" : "disabled"), LTT_DEFAULT);
+			else
+			{
+				int input = atoi(argv[0]);
+				if (!input || input == 1) 
+				{
+					target->m_Qualities.SetBool(EXISTED_BEFORE_ALLEGIANCE_XP_CHANGES_BOOL, input);
+					pPlayer->SendText(csprintf("%s's XP passup has now been %s.", target->GetName().c_str(), input ? "enabled" : "disabled"), LTT_DEFAULT);
+				}
+			}
+			
+		}
+	}
 
 	return false;
 }
@@ -1600,6 +1848,55 @@ CLIENT_COMMAND(usecomponents, "<on/off>", "Allows you to cast spells without hav
 	return false;
 }
 
+CLIENT_COMMAND(learnschool, "school", "Adds all spells of the given school (war, life, item, creature).", ADMIN_ACCESS)
+{
+	if (argc < 1)
+		return true;
+
+	std::string school = argv[0];
+
+	int schoolNum = 0;
+
+	if (school == "war")
+	{
+		schoolNum = 1;
+	}
+	else if (school == "life")
+	{
+		schoolNum = 2;
+	}
+	else if (school == "item")
+	{
+		schoolNum = 3;
+	}
+	else if (school == "creature")
+	{
+		schoolNum = 4;
+	}
+	else
+	{
+		pPlayer->SendText("Invalid spell school.", LTT_DEFAULT);
+		return false;
+	}
+
+	CSpellTable* pSpellTable = MagicSystem::GetSpellTable();
+
+	for (auto spell : pSpellTable->_spellBaseHash)
+	{
+		if (spell.second._school == schoolNum)
+		{
+			unsigned int sp = spell.second._meta_spell._spell->_spell_id;
+			pPlayer->m_Qualities.AddSpell(sp);
+			BinaryWriter addSpellToSpellbook;
+			addSpellToSpellbook.Write<DWORD>(0x2C1);
+			addSpellToSpellbook.Write<DWORD>(sp);
+			pPlayer->SendNetMessage(&addSpellToSpellbook, PRIVATE_MSG, TRUE, FALSE);
+		}
+	}
+	return false;
+}
+
+
 
 CLIENT_COMMAND(addspellbyid, "id", "Adds a spell by ID", ADMIN_ACCESS)
 {
@@ -1638,12 +1935,128 @@ CLIENT_COMMAND(fixbusy, "", "Makes you unbusy if you are stuck.", BASIC_ACCESS)
 {
 	pPlayer->NotifyAttackDone();
 	pPlayer->NotifyInventoryFailedEvent(0, 0);
+	if (pPlayer->m_UseManager)
+		pPlayer->m_UseManager->Cancel();
 	pPlayer->NotifyUseDone(0);
 	pPlayer->NotifyWeenieError(0);
 
 	pPlayer->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 
 	return false;
+}
+
+CLIENT_COMMAND(fixclient, "", "Resets the client back to login state.", BASIC_ACCESS)
+{
+	BinaryWriter *LC = ::LoginCharacter(pPlayer);
+	pPlayer->SendNetMessage(LC->GetData(), LC->GetSize(), PRIVATE_MSG, TRUE);
+	delete LC;
+
+	return false;
+}
+
+std::map<std::string, int> commandMap;
+
+CLIENT_COMMAND(config, "<setting> <on/off>", "Manually sets a character option on the server.\nUse /config list to see a list of settings.", BASIC_ACCESS)
+{
+	bool bError = false;
+	if (argc < 1)
+	{
+		bError = true;
+	}
+
+	int iSetTo = 0;
+	if (argc > 1)
+	{
+		if (argv[1] == "on")
+		{
+			iSetTo = 1;
+		}
+		else if (argv[1] == "off")
+		{
+			iSetTo = -1;
+		}
+	}
+
+	if (!bError)
+	{
+		if (strcmp(argv[0], "list") == 0)
+		{
+			pPlayer->SendText("Common settings:\nConfirmVolatileRareUse, MainPackPreferred, SalvageMultiple, SideBySideVitals, UseCraftSuccessDialog", LTT_DEFAULT);
+			pPlayer->SendText("Interaction settings:\nAcceptLootPermits, AllowGive, AppearOffline, AutoAcceptFellowRequest, DragItemOnPlayerOpensSecureTrade, FellowshipShareLoot, FellowshipShareXP, IgnoreAllegianceRequests, IgnoreFellowshipRequests, IgnoreTradeRequests, UseDeception", LTT_DEFAULT);
+			pPlayer->SendText("UI settings:\nCoordinatesOnRadar, DisableDistanceFog, DisableHouseRestrictionEffects, DisableMostWeatherEffects, FilterLanguage, LockUI, PersistentAtDay, ShowCloak, ShowHelm, ShowTooltips, SpellDuration, TimeStamp, ToggleRun, UseMouseTurning", LTT_DEFAULT);
+			pPlayer->SendText("Chat settings:\nHearAllegianceChat, HearGeneralChat, HearLFGChat, HearRoleplayChat, HearSocietyChat, HearTradeChat, StayInChatMode", LTT_DEFAULT);
+			pPlayer->SendText("Combat settings:\nAdvancedCombatUI, AutoRepeatAttack, AutoTarget, LeadMissileTargets, UseChargeAttack, UseFastMissiles, ViewCombatTarget, VividTargetingIndicator", LTT_DEFAULT);
+			pPlayer->SendText("Character display settings:\nDisplayAge, DisplayAllegianceLogonNotifications, DisplayChessRank, DisplayDateOfBirth, DisplayFishingSkill, DisplayNumberCharacterTitles, DisplayNumberDeaths", LTT_DEFAULT);
+			return false;
+		}
+
+		int settingMask = 0;
+		bool bOptions1 = FALSE;
+		bool bOptions2 = FALSE;
+
+		std::string strOption = argv[0];
+		CharacterOption option1 = EnumUtil.StringToCharacterOption(strOption);
+		if (option1)
+		{
+			DWORD charOptions = pPlayer->GetCharacterOptions();
+
+			iSetTo = (charOptions & option1) ? -1 : 1;
+
+			if (iSetTo == 1)
+			{
+				charOptions |= option1;
+			}
+			else
+			{
+				charOptions &= ~option1;
+			}
+
+			pPlayer->SetCharacterOptions(charOptions);
+
+			std::string onOff = iSetTo == 1 ? "on" : "off";
+
+			pPlayer->SendText(("Character option " + strOption + " is now " + onOff + ".").c_str(), LTT_SYSTEM_EVENT);
+
+			// Update the client
+			BinaryWriter *LC = ::LoginCharacter(pPlayer);
+			pPlayer->SendNetMessage(LC->GetData(), LC->GetSize(), PRIVATE_MSG, TRUE);
+			delete LC;
+			return false;
+		}
+
+		CharacterOptions2 option2 = EnumUtil.StringToCharacterOptions2(argv[0]);
+		if (option2)
+		{
+			DWORD charOptions2 = pPlayer->GetCharacterOptions2();
+
+			iSetTo = (charOptions2 & option2) ? -1 : 1;
+
+			if (iSetTo == 1)
+			{
+				charOptions2 |= option2;
+			}
+			else
+			{
+				charOptions2 &= ~option2;
+			}
+
+			pPlayer->SetCharacterOptions2(charOptions2);
+
+			std::string onOff = iSetTo == 1 ? "on" : "off";
+
+			pPlayer->SendText(("Character option " + strOption + " is now " + onOff + ".").c_str(), LTT_SYSTEM_EVENT);
+
+			// Update the client
+			BinaryWriter *LC = ::LoginCharacter(pPlayer);
+			pPlayer->SendNetMessage(LC->GetData(), LC->GetSize(), PRIVATE_MSG, TRUE);
+			delete LC;
+			return false;
+		}
+
+		pPlayer->SendText("Unrecognised setting!", LTT_DEFAULT);
+	}
+
+	return true;
 }
 
 CLIENT_COMMAND(testburden, "", "", ADMIN_ACCESS)
@@ -1899,7 +2312,7 @@ CLIENT_COMMAND(setplayerother, "[wcid]", "Sets another Player Characters default
 	if (pPlayer->m_LastAssessed)
 	{
 		CWeenieObject *target = g_pWorld->FindObject(pPlayer->m_LastAssessed);
-		
+
 		if (target)
 		{
 			g_pWeenieFactory->ApplyWeenieDefaults(target, atoi(argv[0]));
@@ -1936,14 +2349,13 @@ CLIENT_COMMAND(setname, "[name]", "Changes the last assessed target's name.", AD
 	return false;
 }
 
-/*
 #ifndef PUBLIC_BUILD
 CLIENT_COMMAND(setmodel, "[monster]", "Changes your model to a monster.", ADMIN_ACCESS)
 {
 	pPlayer->SendText("Command disabled.", LTT_DEFAULT);
 	return false;
 
-	
+	/*
 	if (!SpawningEnabled(pPlayer))
 	{
 		return false;
@@ -1981,9 +2393,9 @@ CLIENT_COMMAND(setmodel, "[monster]", "Changes your model to a monster.", ADMIN_
 
 	pPlayer->UpdateEntity(pPlayer);
 	return false;
-	
-} 
-#endif */
+	*/
+}
+#endif
 
 /*
 CLIENT_COMMAND(invisible, "", "Go Invisible", BASIC_ACCESS)
@@ -2044,7 +2456,7 @@ CLIENT_COMMAND(exportrecipe, "<recipeid>", "Export recipe number", ADMIN_ACCESS)
 		pPlayer->SendText("No recipe ID given", LTT_DEFAULT);
 		return true;
 	}
-
+	
 	DWORD recipeId = stoi(argv[0], NULL, 10);
 
 	// Get CCraftOperation that aligns with recipeid
@@ -2103,7 +2515,7 @@ CLIENT_COMMAND(importrecipe, "<recipeid>", "Import a recipes", ADMIN_ACCESS)
 		json recipeData;
 		ifstream >> recipeData;
 		ifstream.close();
-
+		
 		CCraftOperation newcraft;
 		newcraft.UnPackJson(recipeData);
 		g_pPortalDataEx->_craftTableData._operations[recipeId] = newcraft;
@@ -2112,6 +2524,7 @@ CLIENT_COMMAND(importrecipe, "<recipeid>", "Import a recipes", ADMIN_ACCESS)
 	pPlayer->SendText(csprintf("RecipeID %d loaded and updated.", recipeId), LTT_DEFAULT);
 	return false;
 }
+
 
 CLIENT_COMMAND(dungeon, "<command>", "Dungeon commands.", BASIC_ACCESS)
 {
@@ -2451,15 +2864,9 @@ CLIENT_COMMAND(player, "<command>", "Player commands.", BASIC_ACCESS)
 			if (pPlayer->IsSentinel())
 			{
 				const char *info = csprintf(
-					"Player Info:\nGUID: 0x%08X (Account: %s IP: %s)\nName: %s\nLocation: %08X\nX: %.1f\nY: %.1f\nZ: %.1f",
-					pOther->GetID(),
-					pOther->GetClient()->GetAccount(),
-					inet_ntoa(pOther->GetClient()->GetHostAddress()->sin_addr),
-					pOther->GetName().c_str(), 
-					pOther->GetLandcell(),
-					pOther->m_Position.frame.m_origin.x, 
-					pOther->m_Position.frame.m_origin.y, 
-					pOther->m_Position.frame.m_origin.z);
+					"Player Info:\nGUID: 0x%08X\nName: %s\nLocation: %08X %.1f %.1f %.1f",
+					pOther->GetID(), pOther->GetName().c_str(), pOther->GetLandcell(),
+					pOther->m_Position.frame.m_origin.x, pOther->m_Position.frame.m_origin.y, pOther->m_Position.frame.m_origin.z);
 
 				pPlayer->SendText(info, LTT_DEFAULT);
 			}
@@ -2481,13 +2888,10 @@ CLIENT_COMMAND(player, "<command>", "Player commands.", BASIC_ACCESS)
 
 			if (player_client->GetAccessLevel() >= SENTINEL_ACCESS)
 			{
-				playerList += csprintf("\n%s (Account: %s IP: %s)\nX: %.1f\nY: %.1f\nZ: %.1f",
+				playerList += csprintf("\n%s (Account: %s IP: %s)",
 					entry.second->GetName().c_str(),
 					entry.second->GetClient()->GetAccount(),
-					inet_ntoa(entry.second->GetClient()->GetHostAddress()->sin_addr),
-					entry.second->m_Position.frame.m_origin.x,
-					entry.second->m_Position.frame.m_origin.y,
-					entry.second->m_Position.frame.m_origin.z);
+					inet_ntoa(entry.second->GetClient()->GetHostAddress()->sin_addr));
 			}
 			else
 			{
@@ -2831,7 +3235,7 @@ CLIENT_COMMAND(activeevents, "", "", ADMIN_ACCESS)
 {
 	std::string eventText = "Enabled events:";
 
-	for (auto &entry : g_pPortalDataEx->_gameEvents._gameEvents)
+	for (auto &entry : g_pGameEventManager->_gameEvents)
 	{
 		if (entry.second._eventState != GameEventState::Off_GameEventState)
 		{		
@@ -2840,6 +3244,58 @@ CLIENT_COMMAND(activeevents, "", "", ADMIN_ACCESS)
 		}
 	}
 
+	pPlayer->SendText(eventText.c_str(), LTT_DEFAULT);
+	return false;
+}
+
+CLIENT_COMMAND(startevent, "[event]", "Starts an event.", ADMIN_ACCESS)
+{
+	if (argc < 1)
+		return true;
+
+	auto &events = g_pGameEventManager->_gameEvents;
+
+	std::string eventText = "Event started.";
+
+	std::string normalizedEventName = g_pGameEventManager->NormalizeEventName(argv[0]);
+	
+	if (GameEventDef *eventDesc = events.lookup(normalizedEventName.c_str()))
+	{
+		if (eventDesc->_eventState != GameEventState::On_GameEventState)
+		{
+			eventDesc->_eventState = GameEventState::On_GameEventState;
+			g_pWorld->NotifyEventStarted(normalizedEventName.c_str());
+		}
+	}
+	else {
+		eventText = "Event already started.";
+	}
+	pPlayer->SendText(eventText.c_str(), LTT_DEFAULT);
+	return false;
+}
+
+CLIENT_COMMAND(stopevent, "[event]", "Stops an event.", ADMIN_ACCESS)
+{
+	if (argc < 1)
+		return true;
+
+	auto &events = g_pGameEventManager->_gameEvents;
+
+	std::string eventText = "Event stopped.";
+
+	std::string normalizedEventName = g_pGameEventManager->NormalizeEventName(argv[0]);
+
+	if (GameEventDef *eventDesc = events.lookup(normalizedEventName.c_str()))
+	{
+		if (eventDesc->_eventState != GameEventState::Off_GameEventState)
+		{
+			eventDesc->_eventState = GameEventState::Off_GameEventState;
+			g_pWorld->NotifyEventStopped(normalizedEventName.c_str());
+		}
+	}
+	else {
+		eventText = "Event not active.";
+	}
 	pPlayer->SendText(eventText.c_str(), LTT_DEFAULT);
 	return false;
 }
@@ -2977,23 +3433,7 @@ CLIENT_COMMAND(spawntreasure3, "<tier> <num> <cat>", "Spawn treasure of a specif
 	return false;
 }
 
-CLIENT_COMMAND(spawnsalvage, "<material> <amount> <workmanship> [numItems] [value]", "Spawn bag of salvage", ADMIN_ACCESS)
-{
-	if (argc < 3)
-		return true;
-	string sMat = argv[0];
-	MaterialType material = g_pTreasureFactory->TranslateMaterialStringToEnumValue(sMat);
-	int amount = atoi(argv[1]);
-	int ws = atoi(argv[2]);
-	int numberofitems = 10;
-	if (argc >= 4)
-		numberofitems = atoi(argv[3]);
-	int salvagevalue = 1000;
-	if (argc >= 5)
-		salvagevalue = atoi(argv[4]);
-	pPlayer->SpawnSalvageBagInContainer(material, amount, ws*numberofitems, salvagevalue, numberofitems);
-	return false;
-}
+
 CLIENT_COMMAND(spawnwcidinv, "<name> [amount] [ptid] [shade]", "Spawn by wcid into inventory.", ADMIN_ACCESS)
 {
 	if (g_pConfig->GetValue("weapons_testing", "0") == 0)
@@ -3075,6 +3515,128 @@ CLIENT_COMMAND(spawnwcidinv, "<name> [amount] [ptid] [shade]", "Spawn by wcid in
 
 	return false;
 }
+
+CLIENT_COMMAND(spawnwcidinvfresh, "<name> [amount] [ptid] [shade]", "Reload weenie and spawn by wcid into inventory.", ADMIN_ACCESS)
+{
+	if (g_pConfig->GetValue("weapons_testing", "0") == 0)
+	{
+		if (pPlayer->GetAccessLevel() < SENTINEL_ACCESS)
+		{
+			pPlayer->SendText("You do not have access to this command.", LTT_DEFAULT);
+			return false;
+		}
+	}
+
+	if (!SpawningEnabled(pPlayer))
+	{
+		return false;
+	}
+
+	if (argc < 1)
+		return true;
+
+	g_pWeenieFactory->RefreshLocalStorage();
+
+	CWeenieObject *weenieTemplate;
+
+	if (IsNumeric(argv[0]))
+	{
+		weenieTemplate = g_pWeenieFactory->CreateWeenieByClassID(atoi(argv[0]), NULL, false);
+	}
+	else if (IsHexNumeric(argv[0]))
+	{
+		weenieTemplate = g_pWeenieFactory->CreateWeenieByClassID(strtoul(argv[0] + 2, NULL, 16), NULL, false);
+	}
+	else
+	{
+		weenieTemplate = g_pWeenieFactory->CreateWeenieByName(argv[0], NULL, false);
+	}
+
+	if (!weenieTemplate)
+	{
+		pPlayer->SendText("Couldn't find that to spawn!", LTT_DEFAULT);
+		return false;
+	}
+
+	if (!pPlayer->IsAdmin() && atoi(g_pConfig->GetValue("weapons_testing", "0")) != 0)
+	{
+		if (weenieTemplate->m_Qualities.m_WeenieType != MeleeWeapon_WeenieType)
+		{
+			pPlayer->SendText("Only weapon spawning is enabled.", LTT_DEFAULT);
+			delete weenieTemplate;
+
+			return false;
+		}
+	}
+
+	int amount = 1;
+	if (argc >= 2)
+		amount = atoi(argv[1]);
+	if (argc >= 3)
+		weenieTemplate->m_Qualities.SetInt(PALETTE_TEMPLATE_INT, atoi(argv[1]));
+	if (argc >= 4)
+		weenieTemplate->m_Qualities.SetFloat(SHADE_FLOAT, atof(argv[2]));
+
+	if (!weenieTemplate->CanPickup())
+	{
+		pPlayer->SendText("That can't be spawned in a container.", LTT_DEFAULT);
+		delete weenieTemplate;
+
+		return false;
+	}
+
+	int maxStackSize = weenieTemplate->InqIntQuality(MAX_STACK_SIZE_INT, 1);
+	if (amount > maxStackSize * 100)
+	{
+		pPlayer->SendText("The amount requested is too large.", LTT_DEFAULT);
+		delete weenieTemplate;
+
+		return false;
+	}
+
+	pPlayer->SpawnCloneInContainer(weenieTemplate, amount);
+	delete weenieTemplate;
+
+	return false;
+}
+
+
+CLIENT_COMMAND(spawnjewelerytoinvbymatid, "<tier> <num> <mat>", "Spawn treasure by material", ADMIN_ACCESS)
+{
+	if (argc < 2)
+		return true;
+
+	int tier = atoi(argv[0]);
+	int num = atoi(argv[1]);
+	int mat = atoi(argv[2]);
+
+	if (pPlayer->GetAccessLevel() < SENTINEL_ACCESS)
+	{
+		pPlayer->SendText("You do not have access to this command.", LTT_DEFAULT);
+		return false;
+	}
+
+	for (int i = 0; i < num; i++)
+	{
+		CWeenieObject *treasure = g_pTreasureFactory->GenerateTreasure(atoi(argv[0]), eTreasureCategory::TreasureCategory_Jewelry);
+		treasure->m_Qualities.SetInt(MATERIAL_TYPE_INT, atoi(argv[2]));
+
+		if (treasure)
+		{
+			pPlayer->SpawnCloneInContainer(treasure, 1);
+			if (!g_pWorld->CreateEntity(treasure))
+			{
+				delete treasure;
+				return false;
+			}
+		}
+		else
+			continue;
+	}
+
+	return false;
+}
+
 
 CLIENT_COMMAND(spawnwcid, "<name> [ptid] [shade]", "Spawn by wcid.", ADMIN_ACCESS)
 {
@@ -3306,6 +3868,7 @@ void SpawnAllAppearancesForWeenie(CPlayerWeenie *pPlayer, DWORD wcid, bool bSpaw
 	}
 
 	DWORD clothing_did = 0;
+
 	if (!weenieDefs->m_Qualities.InqDataID(CLOTHINGBASE_DID, clothing_did))
 	{
 		if (bSpawnWithoutVariances)
@@ -3417,6 +3980,10 @@ CLIENT_COMMAND(spawnweenieswithsamemotiontable, "<name>", "Spawn all setups with
 	}
 
 	DWORD motion_table_did = 0;
+
+
+
+
 	if (!weenieDefs->m_Qualities.InqDataID(MOTION_TABLE_DID, motion_table_did))
 	{
 		pPlayer->SendText("Does not have a motion table.", LTT_DEFAULT);
@@ -3488,6 +4055,8 @@ CLIENT_COMMAND(spawnsimilarsetups, "<name> <todonly>", "Spawn all setups with mo
 	}
 
 	DWORD setup_did = 0;
+
+
 	if (!weenieDefs->m_Qualities.InqDataID(SETUP_DID, setup_did))
 	{
 		pPlayer->SendText("Does not have a setup.", LTT_DEFAULT);
@@ -3609,7 +4178,7 @@ CLIENT_COMMAND(barber, "", "", ADMIN_ACCESS)
 
 CLIENT_COMMAND(spawnfollow, "", "", ADMIN_ACCESS)
 {
-	
+
 	if (!pPlayer->m_dwLastSpawnedCreatureID)
 		return false;
 
@@ -3619,8 +4188,8 @@ CLIENT_COMMAND(spawnfollow, "", "", ADMIN_ACCESS)
 
 	MovementParameters params;
 	params.sticky = 1,
-	params.autonomous = 1;
-	
+		params.autonomous = 1;
+
 
 	// params.desired_heading = fmod(pObject->m_Position.frame.get_heading() + 90.0, 360.0);
 	pObject->MoveToObject(pPlayer->GetID(), &params);
@@ -4346,6 +4915,58 @@ CLIENT_COMMAND(givexpother, "[value]", "Gives you some XP for testing.", ADMIN_A
 	return false;
 }
 
+CLIENT_COMMAND(hover, "<on / off>", "Turns hovering on or off.", BASIC_ACCESS)
+{
+	if (pPlayer->InqIntQuality(HERITAGE_GROUP_INT, 0, true) != 9)
+	{
+		pPlayer->SendText("Command only available for Empyrean characters.", LTT_DEFAULT);
+		return false;
+	}
+
+	if (argc < 1)
+	{
+		pPlayer->SendText("Usage: /hover on | off", LTT_DEFAULT);
+		return false;
+	}
+
+	if (!_stricmp(argv[0], "on") || !_stricmp(argv[0], "1"))
+	{
+
+		pPlayer->SendText("Hovering on. You must relog for the change to take effect.", LTT_DEFAULT);
+		pPlayer->m_Qualities.SetDataID(MOTION_TABLE_DID, 0x9000207);
+	}
+	else if (!_stricmp(argv[0], "off") || !_stricmp(argv[0], "0"))
+	{
+		pPlayer->SendText("Hovering off. You must relog for the change to take effect.", LTT_DEFAULT);
+		pPlayer->m_Qualities.SetDataID(MOTION_TABLE_DID, 0x900020D);
+	}
+
+	return false;
+}
+
+CLIENT_COMMAND(movetome, "", "Brings an object to you.", ADMIN_ACCESS)
+{
+	CWeenieObject *pObject = g_pWorld->FindWithinPVS(pPlayer, pPlayer->m_LastAssessed);
+	if (pObject)
+	{
+		pObject->Movement_Teleport(pPlayer->GetPosition());
+	}
+	else
+	{
+		pPlayer->SendText("Please assess a valid object you wish to move!", LTT_DEFAULT);
+		return true;
+	}
+
+	return false;
+}
+
+CLIENT_COMMAND(challengeai, "", "Challenge an AI to a game of Chess.", BASIC_ACCESS)
+{
+	sChessManager->ChallengeAi(pPlayer);
+	return false;
+}
+
+
 const char* CommandBase::Info(CommandEntry* pCommand)
 {
 	const char* szName = pCommand->name;
@@ -4430,7 +5051,7 @@ bool CommandBase::Execute(char *command, CClient *client)
 		int access_level = client ? client->GetAccessLevel() : BASIC_ACCESS;
 
 		char *command_name = argv[0];
-		if (!stricmp(command_name, "help"))
+		if (!stricmp(command_name, "emuhelp"))
 		{
 			if (!client)
 				return true;

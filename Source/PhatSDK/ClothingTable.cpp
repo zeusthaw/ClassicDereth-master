@@ -389,8 +389,15 @@ DEFINE_PACK(CloSubpalEffect)
 DEFINE_UNPACK(CloSubpalEffect)
 {
 	numRanges = pReader->Read<DWORD>();
+	if (pReader->GetLastError())
+		return false;
 	rangeStart = new unsigned int[numRanges];
 	rangeLength = new unsigned int[numRanges];
+
+	DWORD requiredReaderLength = (numRanges * 8) + 4;
+
+	if (pReader->GetDataRemaining() < requiredReaderLength)
+		return false;
 
 	for (DWORD i = 0; i < numRanges; i++)
 	{

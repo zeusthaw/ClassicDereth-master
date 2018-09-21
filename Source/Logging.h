@@ -14,7 +14,7 @@ public:
 	void Write(const char *text);
 
 private:
-	FILE * m_File = NULL;
+	FILE *m_File = NULL;
 };
 
 class CLogger

@@ -25,6 +25,7 @@ public:
 	virtual void OnContainerClosed(CWeenieObject *other) override;
 	
 	virtual void SaveEx(class CWeenieSave &save) override;
+	void RemoveEx();
 	virtual void LoadEx(class CWeenieSave &save) override;
 	virtual bool ShouldSave() override;
 

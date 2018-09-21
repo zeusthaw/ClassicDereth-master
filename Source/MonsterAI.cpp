@@ -18,8 +18,8 @@ MonsterAIManager::MonsterAIManager(CMonsterWeenie *pWeenie, const Position &Home
 	_aiOptions = pWeenie->InqIntQuality(AI_OPTIONS_INT, 0, TRUE);
 	_cachedVisualAwarenessRange = m_pWeenie->InqFloatQuality(VISUAL_AWARENESS_RANGE_FLOAT, DEFAULT_AWARENESS_RANGE);
 
-	if (!m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
-		_meleeWeapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_MELEE);
+	if(!m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
+	_meleeWeapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_MELEE);
 	else {
 		_meleeWeapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED);
 	}
@@ -56,38 +56,38 @@ MonsterAIManager::MonsterAIManager(CMonsterWeenie *pWeenie, const Position &Home
 	if (pWeenie->m_Qualities._emote_table && pWeenie->m_Qualities._emote_table->_emote_table.lookup(Taunt_EmoteCategory))
 		_nextTaunt = Timer::cur_time + Random::GenUInt(10, 30); //We have taunts so schedule them.
 
-																// List of qualities that could be used to affect the AI behavior:
-																// AI_CP_THRESHOLD_INT
-																// AI_PP_THRESHOLD_INT
-																// AI_ADVANCEMENT_STRATEGY_INT
+	// List of qualities that could be used to affect the AI behavior:
+	// AI_CP_THRESHOLD_INT
+	// AI_PP_THRESHOLD_INT
+	// AI_ADVANCEMENT_STRATEGY_INT
 
-																// AI_ALLOWED_COMBAT_STYLE_INT
-																// COMBAT_TACTIC_INT
-																// TARGETING_TACTIC_INT
-																// HOMESICK_TARGETING_TACTIC_INT
+	// AI_ALLOWED_COMBAT_STYLE_INT
+	// COMBAT_TACTIC_INT
+	// TARGETING_TACTIC_INT
+	// HOMESICK_TARGETING_TACTIC_INT
 
-																// AI_OPTIONS_INT
-																// FRIEND_TYPE_INT
-																// FOE_TYPE_INT
+	// AI_OPTIONS_INT
+	// FRIEND_TYPE_INT
+	// FOE_TYPE_INT
 
-																// ATTACKER_AI_BOOL
-																// AI_USES_MANA_BOOL
-																// AI_USE_HUMAN_MAGIC_ANIMATIONS_BOOL
-																// AI_IMMOBILE_BOOL
-																// AI_ALLOW_TRADE_BOOL
-																// AI_ACCEPT_EVERYTHING_BOOL
-																// AI_USE_MAGIC_DELAY_FLOAT
+	// ATTACKER_AI_BOOL
+	// AI_USES_MANA_BOOL
+	// AI_USE_HUMAN_MAGIC_ANIMATIONS_BOOL
+	// AI_IMMOBILE_BOOL
+	// AI_ALLOW_TRADE_BOOL
+	// AI_ACCEPT_EVERYTHING_BOOL
+	// AI_USE_MAGIC_DELAY_FLOAT
 
-																// AI_ACQUIRE_HEALTH_FLOAT
-																// AI_ACQUIRE_STAMINA_FLOAT
-																// AI_ACQUIRE_MANA_FLOAT
+	// AI_ACQUIRE_HEALTH_FLOAT
+	// AI_ACQUIRE_STAMINA_FLOAT
+	// AI_ACQUIRE_MANA_FLOAT
 
-																// AI_COUNTERACT_ENCHANTMENT_FLOAT
-																// AI_DISPEL_ENCHANTMENT_FLOAT
+	// AI_COUNTERACT_ENCHANTMENT_FLOAT
+	// AI_DISPEL_ENCHANTMENT_FLOAT
 
-																// AI_TARGETED_DETECTION_RADIUS_FLOAT
+	// AI_TARGETED_DETECTION_RADIUS_FLOAT
 
-																// SetHomePosition(HomePos); don't use preset home position
+	// SetHomePosition(HomePos); don't use preset home position
 }
 
 MonsterAIManager::~MonsterAIManager()
@@ -249,7 +249,7 @@ bool MonsterAIManager::SeekTarget()
 			if (!weenie->_IsPlayer() && !monster_brawl) // only attack players
 				continue;
 
-			if (!weenie->IsAttackable())
+			if (!weenie->IsAttackable() && !m_pWeenie->CanTarget(weenie))
 				continue;
 
 			if (weenie->ImmuneToDamage(m_pWeenie)) // only attackable players (not dead, not in portal space, etc.
@@ -284,7 +284,7 @@ void MonsterAIManager::SetNewTarget(CWeenieObject *pTarget)
 	if (_missileWeapon != NULL)
 	{
 		double fTargetDist = m_pWeenie->DistanceTo(pTarget, true);
-		if (fTargetDist > 5 || (_meleeWeapon == NULL && !_hasUnarmedSkill))
+		if(fTargetDist > 5 || (_meleeWeapon == NULL && !_hasUnarmedSkill))
 			SwitchState(MissileModeAttack);
 		else
 			SwitchState(MeleeModeAttack);
@@ -302,7 +302,7 @@ CWeenieObject *MonsterAIManager::GetTargetWeenie()
 
 float MonsterAIManager::DistanceToHome()
 {
-
+	
 	if (!m_pWeenie)
 	{
 		return FLT_MAX;
@@ -343,18 +343,18 @@ bool MonsterAIManager::RollDiceCastSpell()
 
 		while (spellIterator != m_pWeenie->m_Qualities._spell_book->_spellbook.end())
 		{
-		float likelihood = spellIterator->second._casting_likelihood;
+			float likelihood = spellIterator->second._casting_likelihood;
 
-		if (dice <= likelihood)
-		{
-		return DoCastSpell(spellIterator->first);
-		}
+			if (dice <= likelihood)
+			{
+				return DoCastSpell(spellIterator->first);
+			}
 
-		dice -= likelihood;
-		spellIterator++;
+			dice -= likelihood;
+			spellIterator++;
 		}
 		*/
-
+		
 		auto spellIterator = m_pWeenie->m_Qualities._spell_book->_spellbook.begin();
 
 		while (spellIterator != m_pWeenie->m_Qualities._spell_book->_spellbook.end())
@@ -376,7 +376,7 @@ bool MonsterAIManager::RollDiceCastSpell()
 }
 
 bool MonsterAIManager::DoCastSpell(DWORD spell_id)
-{
+{	
 	CWeenieObject *pTarget = GetTargetWeenie();
 	m_pWeenie->MakeSpellcastingManager()->CreatureBeginCast(pTarget ? pTarget->GetID() : 0, spell_id);
 	return true;
@@ -416,67 +416,65 @@ void MonsterAIManager::GenerateRandomAttack(DWORD *motion, ATTACK_HEIGHT *height
 
 	if (m_pWeenie->_combatTable)
 	{
-		if (weapon == NULL)
-			if (!m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
-				weapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_MELEE);
-			else {
-				weapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED);
-			}
-			if (weapon)
+		if(weapon == NULL)
+		if (!m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED))
+			weapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_MELEE);
+		else {
+			weapon = m_pWeenie->GetWieldedCombat(COMBAT_USE_TWO_HANDED);
+		}
+		if (weapon)
+		{
+			AttackType attackType = (AttackType)weapon->InqIntQuality(ATTACK_TYPE_INT, 0);
+			DWORD style = m_pWeenie->get_minterp()->InqStyle();
+
+			if (attackType == (Thrust_AttackType | Slash_AttackType))
 			{
-				AttackType attackType = (AttackType)weapon->InqIntQuality(ATTACK_TYPE_INT, 0);
-				DWORD style = m_pWeenie->get_minterp()->InqStyle();
-
-				if (attackType == (Thrust_AttackType | Slash_AttackType))
-				{
-					if (*power >= 0.75f)
-						attackType = Slash_AttackType;
-					else
-						attackType = Thrust_AttackType;
-				}
-
-				CombatManeuver *combatManeuver = NULL;
-
-				for (DWORD i = 0; i < m_pWeenie->_combatTable->_num_combat_maneuvers; i++)
-				{
-					int m = Random::GenInt(0, m_pWeenie->_combatTable->_num_combat_maneuvers - 1);
-
-					if (m_pWeenie->_combatTable->_cmt[m].style == style && m_pWeenie->_combatTable->_cmt[m].attack_type == attackType)
-					{
-						combatManeuver = &m_pWeenie->_combatTable->_cmt[m];
-						break;
-					}
-				}
-
-				if (combatManeuver)
-				{
-					*motion = combatManeuver->motion;
-					*height = combatManeuver->attack_height;
-				}
+				if (*power >= 0.75f)
+					attackType = Slash_AttackType;
+				else
+					attackType = Thrust_AttackType;
 			}
-			else
+
+			CombatManeuver *combatManeuver = NULL;
+
+			for (DWORD i = 0; i < m_pWeenie->_combatTable->_num_combat_maneuvers; i++)
 			{
-				AttackType attackType;
+				int m = Random::GenInt(0, m_pWeenie->_combatTable->_num_combat_maneuvers - 1);
 
-				CombatManeuver *combatManeuver = NULL;
-
-				for (DWORD i = 0; i < m_pWeenie->_combatTable->_num_combat_maneuvers; i++)
+				if (m_pWeenie->_combatTable->_cmt[m].style == style && m_pWeenie->_combatTable->_cmt[m].attack_type == attackType)
 				{
-					int m = Random::GenInt(0, m_pWeenie->_combatTable->_num_combat_maneuvers - 1);
-
-					if (m_pWeenie->_combatTable->_cmt[m].style == Motion_HandCombat)
-					{
-						combatManeuver = &m_pWeenie->_combatTable->_cmt[m];
-						break;
-					}
-				}
-
-				if (combatManeuver)
-				{
-					*motion = combatManeuver->motion;
-					*height = combatManeuver->attack_height;
+					combatManeuver = &m_pWeenie->_combatTable->_cmt[m];
+					break;
 				}
 			}
+
+			if (combatManeuver)
+			{
+				*motion = combatManeuver->motion;
+				*height = combatManeuver->attack_height;
+			}
+		}
+		else
+		{
+			CombatManeuver *combatManeuver = NULL;
+
+			for (DWORD i = 0; i < m_pWeenie->_combatTable->_num_combat_maneuvers; i++)
+			{
+				int m = Random::GenInt(0, m_pWeenie->_combatTable->_num_combat_maneuvers - 1);
+
+				if (m_pWeenie->_combatTable->_cmt[m].style == Motion_HandCombat)
+				{
+					combatManeuver = &m_pWeenie->_combatTable->_cmt[m];
+					break;
+				}
+			}
+
+			if (combatManeuver)
+			{
+				*motion = combatManeuver->motion;
+				*height = combatManeuver->attack_height;
+			}
+		}
 	}
 
 	if (!*motion)
@@ -493,7 +491,7 @@ void MonsterAIManager::BeginReturningToSpawn()
 	params.can_walk = 0;
 
 	MovementStruct mvs;
-	mvs.type = MovementTypes::MoveToPosition;
+	mvs.type = MovementTypes::MoveToPosition;	
 	mvs.pos = m_HomePosition;
 	mvs.params = &params;
 
@@ -517,7 +515,7 @@ void MonsterAIManager::UpdateReturningToSpawn()
 		SwitchState(Idle);
 		return;
 	}
-
+	
 	if (m_fReturnTimeoutTime <= Timer::cur_time)
 	{
 		// teleport back to spawn
@@ -556,7 +554,7 @@ void MonsterAIManager::AlertIdleFriendsToAggro(CWeenieObject *pAttacker)
 
 	int ourType = m_pWeenie->InqIntQuality(CREATURE_TYPE_INT, 0);
 	int ourFriendType = m_pWeenie->InqIntQuality(FRIEND_TYPE_INT, 0);
-
+	
 	for (auto weenie : results)
 	{
 		if (weenie == m_pWeenie)
@@ -605,7 +603,7 @@ void MonsterAIManager::AlertIdleFriendsToAggro(CWeenieObject *pAttacker)
 
 void MonsterAIManager::OnResistSpell(CWeenieObject *attacker)
 {
-	if (attacker)
+	if(attacker)
 		m_pWeenie->ChanceExecuteEmoteSet(attacker->GetID(), ResistSpell_EmoteCategory);
 }
 
@@ -634,7 +632,7 @@ void MonsterAIManager::OnTookDamage(DamageEventData &damageData)
 
 	HandleAggro(source);
 
-	if (damageData.wasCrit)
+	if(damageData.wasCrit)
 		m_pWeenie->ChanceExecuteEmoteSet(source->GetID(), ReceiveCritical_EmoteCategory);
 
 	if (m_pWeenie->m_Qualities._emote_table && !m_pWeenie->IsExecutingEmote())
@@ -692,20 +690,20 @@ void MonsterAIManager::HandleAggro(CWeenieObject *pAttacker)
 		case Idle:
 		case ReturningToSpawn:
 		case SeekNewTarget:
-		{
-			if (IsValidTarget(pAttacker))
 			{
-				//if (m_pWeenie->DistanceTo(pAttacker, true) <= m_pWeenie->InqFloatQuality(VISUAL_AWARENESS_RANGE_FLOAT, DEFAULT_AWARENESS_RANGE))
-				//{
-				SetNewTarget(pAttacker);
-				//}
+				if (IsValidTarget(pAttacker))
+				{
+					//if (m_pWeenie->DistanceTo(pAttacker, true) <= m_pWeenie->InqFloatQuality(VISUAL_AWARENESS_RANGE_FLOAT, DEFAULT_AWARENESS_RANGE))
+					//{
+					SetNewTarget(pAttacker);
+					//}
 
-				m_pWeenie->ChanceExecuteEmoteSet(pAttacker->GetID(), Scream_EmoteCategory);
-				m_fAggroTime = Timer::cur_time + 10.0;
+					m_pWeenie->ChanceExecuteEmoteSet(pAttacker->GetID(), Scream_EmoteCategory);
+					m_fAggroTime = Timer::cur_time + 10.0;
+				}
+
+				break;
 			}
-
-			break;
-		}
 		}
 	}
 
@@ -778,7 +776,7 @@ void MonsterAIManager::UpdateMeleeModeAttack()
 	// dont chase any new target, even if attacked, outside home range
 
 	CWeenieObject *pTarget = GetTargetWeenie();
-	if (!pTarget || pTarget->IsDead() || !pTarget->IsAttackable() || pTarget->ImmuneToDamage(m_pWeenie) || m_pWeenie->DistanceTo(pTarget) >= m_fChaseRange)
+	if (!pTarget || pTarget->IsDead() || (!pTarget->IsAttackable() && !m_pWeenie->CanTarget(pTarget)) || pTarget->ImmuneToDamage(m_pWeenie) || m_pWeenie->DistanceTo(pTarget) >= m_fChaseRange)
 	{
 		if (ShouldSeekNewTarget())
 		{
@@ -852,7 +850,7 @@ void MonsterAIManager::BeginMissileModeAttack()
 		}
 		else if (_shield != NULL && _currentShield == NULL)
 		{
-			if (m_pWeenie->FinishMoveItemToWield(_shield, SHIELD_LOC)) //shields can be wielded with thrown weapons.
+			if(m_pWeenie->FinishMoveItemToWield(_shield, SHIELD_LOC)) //shields can be wielded with thrown weapons.
 				_currentShield = _shield;
 		}
 	}
@@ -899,7 +897,7 @@ void MonsterAIManager::UpdateMissileModeAttack()
 	// dont chase any new target, even if attacked, outside home range
 
 	CWeenieObject *pTarget = GetTargetWeenie();
-	if (!pTarget || pTarget->IsDead() || !pTarget->IsAttackable() || pTarget->ImmuneToDamage(m_pWeenie) || m_pWeenie->DistanceTo(pTarget) >= m_fChaseRange)
+	if (!pTarget || pTarget->IsDead() || (!pTarget->IsAttackable() && !m_pWeenie->CanTarget(pTarget)) || pTarget->ImmuneToDamage(m_pWeenie) || m_pWeenie->DistanceTo(pTarget) >= m_fChaseRange)
 	{
 		if (ShouldSeekNewTarget())
 		{

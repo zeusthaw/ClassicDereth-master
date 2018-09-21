@@ -27,7 +27,7 @@ CSpellProjectile::CSpellProjectile(const SpellCastData &scd, DWORD target_id)//,
 	m_fEffectMod = max(0, min(1.0, ((scd.power_level_of_power_component - 1.0) / 7.0)));
 
 	SetItemType(ITEM_TYPE::TYPE_SELF);
-
+	
 	m_Qualities.SetBool(STUCK_BOOL, TRUE);
 	m_Qualities.SetBool(ATTACKABLE_BOOL, TRUE);
 	m_Qualities.SetBool(UI_HIDDEN_BOOL, TRUE);

@@ -17,8 +17,6 @@
 #include "PhysicsPart.h"
 #include "Particles.h"
 #include "ObjectMaint.h"
-#include "easylogging++.h"
-#include "Logging.h"
 
 #if PHATSDK_RENDER_AVAILABLE
 #include "Render.h"
@@ -272,7 +270,7 @@ void CPhysicsObj::stick_to_object(DWORD target)
 		{
 			if (targetObj->parent)
 				targetObj = targetObj->parent;
-
+			
 			position_manager->StickTo(targetObj->id, targetObj->GetRadius(), targetObj->GetHeight());
 		}
 	}
@@ -702,7 +700,7 @@ void CPhysicsObj::UpdateObjectInternal(float quantum)
 				new_pos.frame.m_origin = m_Position.frame.m_origin;
 
 				set_frame(new_pos.frame); // set_initial_frame(&new_pos.frame);
-										  // diff = Vector(0, 0, 0);
+				// diff = Vector(0, 0, 0);
 				cached_velocity = Vector(0, 0, 0);
 			}
 			else
@@ -729,8 +727,8 @@ void CPhysicsObj::UpdateObjectInternal(float quantum)
 					/*
 					if (cell && !transit->sphere_path.curr_cell && weenie_obj && weenie_obj->_IsPlayer())
 					{
-					weenie_obj->SendText("FML", LTT_DEFAULT);
-					// DebugBreak();
+						weenie_obj->SendText("FML", LTT_DEFAULT);
+						// DebugBreak();
 					}
 					*/
 
@@ -743,8 +741,8 @@ void CPhysicsObj::UpdateObjectInternal(float quantum)
 					/*
 					if (transit && !transit->sphere_path.curr_cell)
 					{
-					g_pWorld->BroadcastGlobal(ServerText(csprintf("Prevented player %s from being portaled to Holt.", weenie_obj->GetName().c_str()), LTT_DEFAULT), PRIVATE_MSG);
-					weenie_obj->SendText(csprintf("Prevented player %s", LTT_DEFAULT);
+						g_pWorld->BroadcastGlobal(ServerText(csprintf("Prevented player %s from being portaled to Holt.", weenie_obj->GetName().c_str()), LTT_DEFAULT), PRIVATE_MSG);
+						weenie_obj->SendText(csprintf("Prevented player %s", LTT_DEFAULT);
 					}
 					*/
 
@@ -802,17 +800,17 @@ void CPhysicsObj::update_object()
 		/*
 		if (CPhysicsObj::player_object)
 		{
-		v2 = Position::get_offset(&CPhysicsObj::player_object->m_position, &quantum, &this->m_position);
-		v3 = (int)&v1->player_vector;
-		*(float *)v3 = v2->x;
-		*(float *)(v3 + 4) = v2->y;
-		*(float *)(v3 + 8) = v2->z;
-		v4 = sqrt(v1->player_vector.x * v1->player_vector.x + v1->player_vector.y * v1->player_vector.y + v1->player_vector.z * v1->player_vector.z);
-		v1->player_distance = *(float *)&v4;
-		if (v4 > 96.0 && CPhysicsObj::obj_maint->is_active)
-		v1->transient_state &= 0xFFFFFF7F;
-		else
-		CPhysicsObj::set_active(v1, 1);
+			v2 = Position::get_offset(&CPhysicsObj::player_object->m_position, &quantum, &this->m_position);
+			v3 = (int)&v1->player_vector;
+			*(float *)v3 = v2->x;
+			*(float *)(v3 + 4) = v2->y;
+			*(float *)(v3 + 8) = v2->z;
+			v4 = sqrt(v1->player_vector.x * v1->player_vector.x + v1->player_vector.y * v1->player_vector.y + v1->player_vector.z * v1->player_vector.z);
+			v1->player_distance = *(float *)&v4;
+			if (v4 > 96.0 && CPhysicsObj::obj_maint->is_active)
+				v1->transient_state &= 0xFFFFFF7F;
+			else
+				CPhysicsObj::set_active(v1, 1);
 		}
 		*/
 
@@ -914,11 +912,11 @@ void CPhysicsObj::MotionDone(DWORD motion, BOOL success)
 		movement_manager->MotionDone(motion, success);
 
 	/*
-	#if PHATSDK_IS_SERVER
+#if PHATSDK_IS_SERVER
 	if (weenie_obj)
-	weenie_obj->OnMotionDone(motion, success);
-	#endif
-	*/
+		weenie_obj->OnMotionDone(motion, success);
+#endif
+*/
 }
 
 CPhysicsObj *CPhysicsObj::makeObject(DWORD data_did, DWORD object_iid, BOOL bDynamic)
@@ -931,7 +929,7 @@ CPhysicsObj *CPhysicsObj::makeObject(DWORD data_did, DWORD object_iid, BOOL bDyn
 	if (!pObject->InitObjectBegin(object_iid, bDynamic))
 		goto bad_object;
 
-
+	
 	BOOL bCreateAtAll = FALSE;
 	BOOL bCreateParts = FALSE;
 
@@ -1031,7 +1029,7 @@ void CPhysicsObj::InitDefaults(CSetup *pSetup)
 		if (pSetup->default_script_id)
 			m_PhysicsState |= HAS_DEFAULT_SCRIPT_PS;
 
-		if (m_PhysicsState & (HAS_DEFAULT_ANIM_PS | HAS_DEFAULT_SCRIPT_PS))
+		if (m_PhysicsState & (HAS_DEFAULT_ANIM_PS| HAS_DEFAULT_SCRIPT_PS))
 			CPhysics::AddStaticAnimatingObject(this);
 	}
 }
@@ -1177,7 +1175,7 @@ void CPhysicsObj::enter_cell(CObjCell *pCell)
 
 	m_Position.objcell_id = pCell->id;
 	set_cell_id(pCell->id);
-
+	
 	cell = pCell;
 
 	if (part_array)
@@ -1440,7 +1438,7 @@ void CPhysicsObj::animate_static_object()
 
 	double CurrentTime = Timer::cur_time; // Timer__m_timeCurrent
 
-										  // Update physics timer.
+												 // Update physics timer.
 	PhysicsTimer::curr_time = CurrentTime;
 
 	// Time between last update.
@@ -1449,15 +1447,15 @@ void CPhysicsObj::animate_static_object()
 	/*
 	if (FrameTime < F_EPSILON)
 	{
-	// update_time = CurrentTime; seems bad
+		// update_time = CurrentTime; seems bad
 	}
 	else if (FrameTime < min_update_delay)
 	{
-	// Wait to update.. not quite there yet
+		// Wait to update.. not quite there yet
 	}
 	else if (FrameTime > HUGE_QUANTUM)
 	{
-	update_time = CurrentTime;
+		update_time = CurrentTime;
 	}
 	else
 	*/
@@ -1502,32 +1500,32 @@ void CPhysicsObj::UpdatePartsInternal()
 void CPhysicsObj::process_hooks()
 {
 	// UNFINISHED hooks
-
+	
 	/*
 	v1 = this;
 	v2 = this->hooks;
 	if (v2)
 	{
-	do
-	{
-	v3 = v2->next;
-	if (v2->vfptr->Execute(v2, v1))
-	{
-	v4 = v2->next;
-	if (v4)
-	v4->prev = v2->prev;
-	v5 = v2->prev;
-	if (v5)
-	v5->next = v2->next;
-	else
-	v1->hooks = v2->next;
-	v2->prev = 0;
-	v2->next = 0;
-	v2->vfptr = (PhysicsObjHookVtbl *)&PhysicsObjHook::`vftable';
-	operator delete(v2);
-	}
-	v2 = v3;
-	} while (v3);
+		do
+		{
+			v3 = v2->next;
+			if (v2->vfptr->Execute(v2, v1))
+			{
+				v4 = v2->next;
+				if (v4)
+					v4->prev = v2->prev;
+				v5 = v2->prev;
+				if (v5)
+					v5->next = v2->next;
+				else
+					v1->hooks = v2->next;
+				v2->prev = 0;
+				v2->next = 0;
+				v2->vfptr = (PhysicsObjHookVtbl *)&PhysicsObjHook::`vftable';
+					operator delete(v2);
+			}
+			v2 = v3;
+		} while (v3);
 	}
 	*/
 
@@ -1536,7 +1534,7 @@ void CPhysicsObj::process_hooks()
 		CAnimHook *pHook = anim_hooks.array_data[i];
 		pHook->Execute(this);
 	}
-
+	
 	// shrink.... missing
 	anim_hooks.num_used = 0;
 }
@@ -2163,7 +2161,7 @@ int CPhysicsObj::track_object_collision(const CPhysicsObj *object, int prev_has_
 	record.ethereal = object->m_PhysicsState & ETHEREAL_PS;
 	if (collision_table->clobber(&record, object->id))
 		return 0;
-
+	
 	return report_object_collision((CPhysicsObj *)object, prev_has_contact);
 }
 
@@ -2282,7 +2280,7 @@ int CPhysicsObj::report_object_collision(CPhysicsObj *object, int prev_has_conta
 		}
 
 		if (m_PhysicsState & MISSILE_PS)
-			m_PhysicsState &= ~(MISSILE_PS | ALIGNPATH_PS | PATHCLIPPED_PS);
+			m_PhysicsState &= ~(MISSILE_PS|ALIGNPATH_PS|PATHCLIPPED_PS);
 	}
 
 	if (object->m_PhysicsState & REPORT_COLLISIONS_PS && !(m_PhysicsState & IGNORE_COLLISIONS_PS) && object->weenie_obj)
@@ -2298,7 +2296,7 @@ int CPhysicsObj::report_object_collision(CPhysicsObj *object, int prev_has_conta
 		else
 		{
 			ObjCollisionProfile prof;
-
+			
 			object->build_collision_profile(
 				&prof,
 				this,
@@ -2897,7 +2895,7 @@ BOOL CPhysicsObj::set_parent(CPhysicsObj *obj, unsigned int part_index, Frame *f
 				change_cell(obj->cell);
 				obj->UpdateChild(this, part_index, frame);
 				recalc_cross_cells();
-			}
+			}			
 
 			return TRUE;
 		}
@@ -2995,7 +2993,7 @@ BOOL CPhysicsObj::add_child(CPhysicsObj *obj, unsigned int part_index, Frame *fr
 {
 	if (obj == this)
 		return FALSE;
-
+		
 	if (part_index == -1 || part_index < part_array->num_parts)
 	{
 		if (!children)
@@ -3004,7 +3002,7 @@ BOOL CPhysicsObj::add_child(CPhysicsObj *obj, unsigned int part_index, Frame *fr
 		children->add_child(obj, frame, part_index, 0);
 		return TRUE;
 	}
-
+	
 	return FALSE;
 }
 
@@ -3012,7 +3010,7 @@ void CPhysicsObj::RemovePartFromShadowCells(CPhysicsPart *part)
 {
 	if (cell)
 		part->pos.objcell_id = cell->GetID();
-
+	
 	for (DWORD i = 0; i < num_shadow_objects; i++)
 	{
 		if (shadow_objects.data[i].cell)
@@ -3037,7 +3035,7 @@ CPhysicsObj *CPhysicsObj::makeParticleObject(unsigned int num_parts, CSphere *so
 	CPhysicsObj *obj = new CPhysicsObj();
 
 	obj->id = 0;
-	obj->m_PhysicsState |= PARTICLE_EMITTER_PS | STATIC_PS;
+	obj->m_PhysicsState |= PARTICLE_EMITTER_PS| STATIC_PS;
 	obj->part_array = CPartArray::CreateParticle(obj, num_parts, sorting_sphere);
 
 	if (!obj->part_array)
@@ -3240,7 +3238,7 @@ double CPhysicsObj::get_target_quantum()
 {
 	if (target_manager && target_manager->target_info != 0)
 		return target_manager->target_info->quantum;
-
+	
 	return 0.0;
 }
 
@@ -3254,7 +3252,7 @@ void CPhysicsObj::add_voyeur(DWORD object_id, float radius, float quantum)
 {
 	if (!target_manager)
 		target_manager = new TargetManager(this);
-
+	
 	target_manager->AddVoyeur(object_id, radius, quantum);
 }
 
@@ -3351,7 +3349,7 @@ BOOL CPhysicsObj::HasAnims()
 {
 	if (part_array)
 		return part_array->HasAnims();
-
+	
 	return FALSE;
 }
 
@@ -3401,18 +3399,18 @@ double CPhysicsObj::GetAutonomyBlipDistance()
 	/*
 	if (CPhysicsObj::player_object)
 	{
-	if ((this->m_position.objcell_id & 0xFFFF) >= 0x100)
-	result = 25.0;
-	else
-	result = 100.0;
+		if ((this->m_position.objcell_id & 0xFFFF) >= 0x100)
+			result = 25.0;
+		else
+			result = 100.0;
 	}
 	else if ((this->m_position.objcell_id & 0xFFFF) >= 0x100)
 	{
-	result = 20.0;
+		result = 20.0;
 	}
 	else
 	{
-	result = 100.0;
+		result = 100.0;
 	}
 	return result;
 	*/

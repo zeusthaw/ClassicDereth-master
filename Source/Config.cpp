@@ -106,6 +106,7 @@ void CPhatACServerConfig::PostLoad()
 	m_WelcomeMessage = GetValue("welcome_message", "");
 
 	m_bFastTick = atoi(GetValue("fast_tick", "0")) != 0;
+	m_bUseIncrementalIDs = atoi(GetValue("use_incremental_ids", "1")) != 0;
 
 	m_bHardcoreMode = atoi(GetValue("hardcore_mode", "0")) != 0;
 	m_bHardcoreModePlayersOnly = atoi(GetValue("hardcore_mode_players_only", "0")) != 0;
@@ -155,17 +156,22 @@ void CPhatACServerConfig::PostLoad()
 
 	m_bShowLogins = atoi(GetValue("show_logins", "1")) != 0;
 	m_bSpeedHackKicking = atoi(GetValue("speed_hack_kicking", "1")) != 0;
+	m_fSpeedHackKickThreshold = max(0.0, atof(GetValue("speed_hack_kick_threshold", "1.2")));
+
 	m_bShowDeathMessagesGlobally = atoi(GetValue("show_death_messages_globally", "0")) != 0;
 	m_bShowPlayerDeathMessagesGlobally = atoi(GetValue("show_player_death_messages_globally", "0")) != 0;
 
 	m_HoltburgStartPosition = GetValue("holtburg_start_position", "");
 	m_YaraqStartPosition = GetValue("yaraq_start_position", "");
 	m_ShoushiStartPosition = GetValue("shoushi_start_position", "");
-	m_SanamarStartPosition = GetValue("samanar_start_position", "");
+	m_SanamarStartPosition = GetValue("sanamar_start_position", "");
 
 	m_PKRespiteTime = atoi(GetValue("pk_respite_time", "300"));
-
 	m_SalvageMult = max(0.0, atof(GetValue("Salvage_Multiplier", "1.0")));
+	m_bSpellPurgeOnLogin = atoi(GetValue("spell_purge_on_login", "0")) != 0;
+	m_bUpdateAllegianceData = atoi(GetValue("update_allegiance_blob", "0")) != 0;
+
+	m_bAllowGeneralChat = atoi(GetValue("allow_general_chat", "1")) != 0;
 }
 
 double CPhatACServerConfig::GetMultiplierForQuestTime(int questTime)

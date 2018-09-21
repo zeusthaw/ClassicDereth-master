@@ -37,7 +37,7 @@ void TargetManager::SetTargetQuantum(double new_quantum)
 
 		if (ptarget)
 		{
-			quantum = target_info->quantum;
+			target_info->quantum = new_quantum;
 			ptarget->add_voyeur(physobj->id, target_info->radius, quantum);
 		}
 	}
@@ -189,11 +189,19 @@ void TargetManager::HandleTargetting()
 
 			while (!iter.EndReached())
 			{
-				TargettedVoyeurInfo *pVoyeurInfo = iter.GetCurrentData();
-				
-				iter.Next();
+				try
+				{
 
-				CheckAndUpdateVoyeur(pVoyeurInfo);
+					TargettedVoyeurInfo *pVoyeurInfo = iter.GetCurrentData();
+
+					iter.Next();
+
+					CheckAndUpdateVoyeur(pVoyeurInfo);
+				}
+				catch (...)
+				{
+					SERVER_ERROR << "Error in targetting";
+				}
 			}
 		}
 
@@ -224,10 +232,17 @@ void TargetManager::NotifyVoyeurOfEvent(TargetStatus _event)
 
 		while (!iter.EndReached())
 		{
-			TargettedVoyeurInfo *pInfo = iter.GetCurrentData();
-			iter.Next();
+			try
+			{
+				TargettedVoyeurInfo *pInfo = iter.GetCurrentData();
+				iter.Next();
 
-			SendVoyeurUpdate(pInfo, &physobj->m_Position, _event);
+				SendVoyeurUpdate(pInfo, &physobj->m_Position, _event);
+			}
+			catch(...)
+			{
+				SERVER_ERROR << "Error in TargetManager.";
+			}
 		}
 	}
 }

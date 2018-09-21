@@ -9,7 +9,6 @@ enum eRandomFormula
 	equalDistribution,
 };
 
-
 void testRandomValueGenerator();
 
 int getRandomNumberWithFavoredValue(int minInclusive, int maxInclusive, double favorValue, double favorStrength);

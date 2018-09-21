@@ -59,8 +59,8 @@ public:
 	DECLARE_PACKABLE()
 	DECLARE_PACKABLE_JSON()
 
-	virtual DWORD GetMaxXp();
-	
+	virtual DWORD GetMaxXp() override;
+
 	DWORD _current = 0;
 };
 
@@ -344,7 +344,6 @@ struct EnchantedQualityDetails
 		enchantedValue *= valueDecreasingMultiplier;
 		enchantedValue += valueIncreasingAdditive;
 		enchantedValue += valueDecreasingAdditive;
-
 		enchantedValue = max(enchantedValue, 0.0);
 
 		CalculateIncreasingEnchantedValue();
@@ -356,7 +355,6 @@ struct EnchantedQualityDetails
 		enchantedValue_DecreasingOnly = rawValue;
 		enchantedValue_DecreasingOnly *= valueDecreasingMultiplier;
 		enchantedValue_DecreasingOnly += valueDecreasingAdditive;
-
 		enchantedValue_DecreasingOnly = max(enchantedValue_DecreasingOnly, 0.0);
 	}
 
@@ -365,7 +363,6 @@ struct EnchantedQualityDetails
 		enchantedValue_IncreasingOnly = rawValue;
 		enchantedValue_IncreasingOnly *= valueIncreasingMultiplier;
 		enchantedValue_IncreasingOnly += valueIncreasingAdditive;
-
 		enchantedValue_IncreasingOnly = max(enchantedValue_IncreasingOnly, 0.0);
 	}
 };

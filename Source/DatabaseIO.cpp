@@ -3,7 +3,6 @@
 #include "Database2.h"
 #include "DatabaseIO.h"
 #include "SHA512.h"
-#include "easylogging++.h"
 
 DWORD64 g_RandomAdminPassword = 0; // this is used for the admin login
 
@@ -14,7 +13,7 @@ CDatabaseIO::CDatabaseIO()
 
 CDatabaseIO::~CDatabaseIO()
 {
-	SafeDeleteArray(blob_query_buffer);
+	SafeDeleteArray (blob_query_buffer);
 }
 
 bool CDatabaseIO::VerifyAccount(const char *username, const char *password, AccountInformation_t *pAccountInfo, int *pError)
@@ -272,6 +271,84 @@ bool CDatabaseIO::SetCharacterInstanceTS(unsigned int weenie_id, unsigned int in
 	return g_pDB2->Query("UPDATE characters SET instance_ts = %u WHERE weenie_id = %u", instance_ts, weenie_id);
 }
 
+std::list< std::pair<unsigned int, unsigned int> >
+CDatabaseIO::GetUnusedIdRanges(unsigned int min_range, unsigned int max_range)
+{
+	std::list< std::pair<unsigned int, unsigned int> > result;
+
+	const char *szQuery =
+		"SELECT w.id + 1 AS l, (SELECT id FROM weenies WHERE id > w.id ORDER BY id LIMIT 1) AS u "
+		"FROM weenies w "
+		"LEFT JOIN weenies l ON l.id = w.id + 1 "
+		"WHERE w.id > %u AND w.id < %u AND l.id IS NULL "
+		"ORDER BY w.id "
+		"LIMIT 1000;";
+
+	if (g_pDBDynamicIDs->Query(szQuery, min_range, max_range))
+	{
+		CSQLResult *pRes = g_pDBDynamicIDs->GetResult();
+		if (pRes)
+		{
+			while (SQLResultRow_t row = pRes->FetchRow())
+			{
+				unsigned int lower = strtoul(row[0], NULL, 10);
+				unsigned int upper = max_range;
+				if (row[1])
+					upper = strtoul(row[1], NULL, 10);
+
+				result.push_back(std::pair<unsigned int, unsigned int>(lower, upper));
+			}
+
+			delete pRes;
+		}
+	}
+
+	return result;
+}
+
+bool CDatabaseIO::IDRangeTableExistsAndValid()
+{
+	bool retval = false;
+
+	if (g_pDB2->Query("SELECT unused FROM idranges WHERE unused > 2147999999 LIMIT 1"))
+	{
+		CSQLResult *pQueryResult = g_pDB2->GetResult();
+		if (pQueryResult)
+		{
+			delete pQueryResult;
+			retval = true;
+		}
+	}
+
+	return retval;
+}
+
+
+std::list<unsigned int> CDatabaseIO::GetNextIDRange(unsigned int rangeStart, unsigned int count)
+{
+	std::list< unsigned int> result;
+
+	const char *szQuery = "SELECT unused FROM idranges WHERE unused > %u limit %u;";
+
+	if (g_pDB2->Query(szQuery, rangeStart, count))
+	{
+		CSQLResult *pRes = g_pDB2->GetResult();
+		if (pRes)
+		{
+			while (SQLResultRow_t row = pRes->FetchRow())
+			{
+				unsigned int newId = strtoul(row[0], NULL, 10);
+
+				result.push_back(newId);
+			}
+
+			delete pRes;
+		}
+	}
+
+	return result;
+}
+
 unsigned int CDatabaseIO::GetHighestWeenieID(unsigned int min_range, unsigned int max_range)
 {
 	unsigned int result = min_range;
@@ -365,8 +442,8 @@ std::string CDatabaseIO::GetPlayerCharacterName(DWORD weenie_id)
 /*
 bool CDatabaseIO::CreateOrUpdateWeenie(unsigned int weenie_id, unsigned int top_level_object_id, unsigned int block_id, void *data, unsigned int data_length)
 {
-// synchronous, deprecated
-return CreateOrUpdateWeenie((MYSQL *)g_pDB2->GetInternalConnection(), weenie_id, top_level_object_id, block_id, data, data_length);
+	// synchronous, deprecated
+	return CreateOrUpdateWeenie((MYSQL *)g_pDB2->GetInternalConnection(), weenie_id, top_level_object_id, block_id, data, data_length);
 }
 */
 
@@ -390,7 +467,7 @@ bool CDatabaseIO::GetWeenie(unsigned int weenie_id, unsigned int *top_level_obje
 	MYSQL_STMT *statement = mysql_stmt_init(sql);
 
 	const char *query_string = csprintf("SELECT top_level_object_id, block_id, data FROM weenies WHERE id = %u", weenie_id);
-	mysql_stmt_prepare(statement, query_string, (unsigned long)strlen(query_string));
+	mysql_stmt_prepare(statement, query_string, (unsigned long) strlen(query_string));
 
 	MYSQL_BIND binding[3];
 	memset(binding, 0, sizeof(binding));
@@ -399,7 +476,7 @@ bool CDatabaseIO::GetWeenie(unsigned int weenie_id, unsigned int *top_level_obje
 	binding[0].buffer_length = sizeof(unsigned int);
 	binding[0].buffer_type = MYSQL_TYPE_LONG;
 	binding[0].is_unsigned = true;
-
+	
 	binding[1].buffer = block_id;
 	binding[1].buffer_length = sizeof(unsigned int);
 	binding[1].buffer_type = MYSQL_TYPE_LONG;
@@ -622,7 +699,7 @@ DWORD CDatabaseIO::GetNumPendingSaves(DWORD weenie_id)
 {
 	_pendingSavesLock.Lock();
 	std::unordered_map<DWORD, DWORD>::iterator i = _pendingSaves.find(weenie_id);
-
+	
 	DWORD numSaves = 0;
 	if (i != _pendingSaves.end())
 	{

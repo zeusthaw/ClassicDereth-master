@@ -7,6 +7,6 @@ public:
 	ServerCellManager();
 	virtual ~ServerCellManager();
 
-	class CObjCell *GetObjCell(DWORD cell_id);
+	class CObjCell *GetObjCell(DWORD cell_id, bool bDoPostLoad = true);
 };
 

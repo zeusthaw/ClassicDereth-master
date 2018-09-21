@@ -120,17 +120,18 @@ void WeenieLandCoverage::Reset()
 void WeenieLandCoverage::Initialize()
 {
 #ifndef QUICKSTART
-	LOG(Data, Normal, "Loading weenie spawns...\n");
+	WINLOG(Data, Normal, "Loading weenie spawns...\n");
+	SERVER_INFO << "Loading weenie spawns...";
 	LoadLocalStorage();
-	LOG(Data, Normal, "Loaded %d cells with spawns...\n", m_CreatureSpawns.size());
-
+	WINLOG(Data, Normal, "Loaded %d cells with spawns...\n", m_CreatureSpawns.size());
+	SERVER_INFO << "Loaded" << m_CreatureSpawns.size() << "cells with spawns...";
 	DWORD totalSpawns = 0;
 	for (auto spawn : m_CreatureSpawns)
 	{
 		totalSpawns += spawn.second.num_used;
 	}
 
-	LOG(Data, Normal, "Loaded %d spawns within them...\n", totalSpawns);
+	SERVER_INFO << "Loaded" << totalSpawns << "spawns within them...";;
 #endif
 }
 

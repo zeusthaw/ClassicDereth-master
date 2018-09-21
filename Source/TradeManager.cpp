@@ -27,7 +27,7 @@ TradeManager::TradeManager(CPlayerWeenie *initiator, CPlayerWeenie *partner)
 	openTradePartner.Write<DWORD>(initiator->GetID());
 	openTradePartner.Write<long>(0); // "some kind of stamp"?
 	partner->SendNetMessage(&openTradePartner, PRIVATE_MSG, TRUE, FALSE);
-
+	
 	// it's possible for users to have items in the trade window before starting so clear it
 	ResetTrade(initiator);
 }
@@ -58,7 +58,7 @@ void TradeManager::AddToTrade(CPlayerWeenie *playerFrom, DWORD item)
 
 	CWeenieObject *pItem = g_pWorld->FindWithinPVS(playerFrom, item);
 
-	if (!pItem || pItem->GetWorldTopLevelOwner() != playerFrom || pItem->IsAttunedOrContainsAttuned() || pItem->IsWielded())
+	if (!pItem || pItem->GetWorldTopLevelOwner() != playerFrom || pItem->IsAttunedOrContainsAttuned())
 	{
 		playerFrom->SendText("You cannot trade that item!", LTT_ERROR);
 		BinaryWriter cannotTrade;
@@ -223,7 +223,7 @@ bool TradeManager::OnTradeAccepted()
 
 		return true;
 	}
-
+	
 
 	// Unfortunately, you cannot un-accept a completed trade as the accepting client bugs out
 	CloseTrade(_initiator, 0);
@@ -311,7 +311,7 @@ void TradeManager::CheckDistance()
 	if (!CheckTrade())
 		return;
 
-	if (_initiator->DistanceTo(_partner, true) >= 1)
+	if ( _initiator->DistanceTo(_partner, true) >= 1 )
 	{
 		_initiator->SendText((_partner->GetName() + " is too far away to trade!").c_str(), LTT_ERROR);
 		_partner->SendText((_initiator->GetName() + " is too far away to trade!").c_str(), LTT_ERROR);

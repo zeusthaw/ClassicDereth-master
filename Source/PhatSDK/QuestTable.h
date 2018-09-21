@@ -52,12 +52,14 @@ public:
 	void PurgeQuests();
 	bool InqQuest(const char *questName);
 	unsigned int InqQuestSolves(const char *questName);
+	unsigned int InqQuestMax(const char *questName);
 	void SetQuestCompletions(const char *questName, int numCompletions);
 	void IncrementQuest(const char *questName);
 	void DecrementQuest(const char *questName);
 	bool UpdateQuest(const char *questName);
 	void StampQuest(const char *questName);
 	int InqTimeUntilOkayToComplete(const char *questName);
+	std::string QuestTable::Ktref(const char *questName);
 	QuestProfile *GetQuest(const char *questName);
 	PackableHashTable<std::string, QuestProfile, std::string> *GetQuestTable();
 

@@ -40,7 +40,10 @@ int CBindStone::DoUseResponse(CWeenieObject *player)
 		officerLevel = iterator->second;
 
 	if (allegianceNode->_monarchID == playerId || officerLevel >= eAllegianceOfficerLevel::Castellan_AllegianceOfficerLevel)
+	{
 		allegianceInfo->_info.m_BindPoint = m_Position;
+		g_pAllegianceManager->Save();
+	}
 	else
 		return WERROR_ALLEGIANCE_NOT_AUTHORIZED;
 

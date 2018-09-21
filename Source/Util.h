@@ -1,5 +1,6 @@
-
 #pragma once
+
+#include <mutex>
 
 namespace Random
 {
@@ -69,75 +70,35 @@ public:
 class CLockable
 {
 public:
-	CLockable()
-	{
-		InitializeCriticalSection(&_cs);
-	}
-
-	~CLockable()
-	{
-		DeleteCriticalSection(&_cs);
-	}
+	CLockable() = default;
+	virtual ~CLockable() = default;
 
 	inline void Lock()
 	{
-		EnterCriticalSection(&_cs);
+		mutex.lock();
 	}
 
 	inline void Unlock()
 	{
-		LeaveCriticalSection(&_cs);
+		mutex.unlock();
+	}
+
+	inline std::scoped_lock<std::recursive_mutex>& scope_lock()
+	{
+		return std::scoped_lock(mutex);
 	}
 
 private:
-	CRITICAL_SECTION _cs;
+	std::recursive_mutex mutex;
 };
 
 
 template <class T>
-class TLockable : public T
+class TLockable : public T, public CLockable
 {
 public:
-	TLockable()
-	{
-		InitializeCriticalSection(&_cs);
-	}
-
-	virtual ~TLockable()
-	{
-		DeleteCriticalSection(&_cs);
-	}
-
-	inline void Lock()
-	{
-		EnterCriticalSection(&_cs);
-	}
-
-	inline void Unlock()
-	{
-		LeaveCriticalSection(&_cs);
-	}
-
-private:
-	CRITICAL_SECTION _cs;
-};
-
-class CScopedLock
-{
-public:
-	inline CScopedLock(CLockable *lock)
-	{
-		_lock = lock;
-		_lock->Lock();
-	}
-
-	inline ~CScopedLock()
-	{
-		_lock->Unlock();
-	}
-
-private:
-	CLockable *_lock;
+	TLockable() = default;
+	virtual ~TLockable() = default;
 };
 
 class CClient;
@@ -148,9 +109,10 @@ char *DataToHexString(const void *input, unsigned int inputlen, char *output);
 bool LoadDataFromFile(const char *filepath, BYTE **data, DWORD *length);
 bool LoadDataFromPhatDataBin(DWORD data_id, BYTE **data, DWORD *length, DWORD magic1, DWORD magic2);
 bool LoadDataFromCompressedFile(const char *filepath, BYTE **data, DWORD *length, DWORD magic1, DWORD magic2);
-std::string TimeToString(int seconds);
 long FindNeedle(void *haystack, unsigned int haystacklength, void *needle, unsigned int needlelength);
+std::string TimeToString(int seconds);
 bool ReplaceString(std::string& str, const std::string& from, const std::string& to);
+std::string ReplaceInString(std::string subject, const std::string& search, const std::string& replace);
 
 extern void MsgBox(const char* format, ...);
 extern void MsgBox(UINT iType, const char* format, ...);

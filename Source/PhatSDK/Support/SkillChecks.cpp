@@ -32,17 +32,18 @@ int GetManaCost(int skill, int difficulty, int manaCost, int manaConversion)
 	double conversionFactor = min(1.0, (double)difficulty / (double)manaConversion);
 
 	int baseManaCost = round(conversionFactor * manaCost);
-
+	
 	if (conversionFactor < 1.0)
 	{
-	conversionFactor = Random::RollDice(0.0, conversionFactor);
+		conversionFactor = Random::RollDice(0.0, conversionFactor);
 
-	if (conversionFactor == 0.0)
-	{
-		return 1;
+		if (conversionFactor == 0.0)
+		{
+			return 1;
+		}
 	}
-	}
-	return (int)(manaCost * conversionFactor);
+
+	return (int)(baseManaCost * conversionFactor);
 }
 
 bool GenericSkillCheck(int offense, int defense)

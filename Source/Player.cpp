@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "WeenieObject.h"
 #include "PhysicsObj.h"
@@ -21,14 +20,18 @@
 #include "SpellcastingManager.h"
 #include "Corpse.h"
 #include "House.h"
-#include "Util.h"
 #include "easylogging++.h"
+#include "Util.h"
+#include "ChessManager.h"
+
+#include <chrono>
+#include <algorithm>
+#include <functional>
 
 
 #define PLAYER_SAVE_INTERVAL 180.0
 #define PLAYER_HEALTH_POLL_INTERVAL 5.0
 
-//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/0b2125d1d41cf582b274bf157485fcd5f1183170 //
 DEFINE_PACK(SalvageResult)
 {
 	pWriter->Write<DWORD>(material);
@@ -42,7 +45,6 @@ DEFINE_UNPACK(SalvageResult)
 
 	return false;
 }
-
 
 CPlayerWeenie::CPlayerWeenie(CClient *pClient, DWORD dwGUID, WORD instance_ts)
 {
@@ -77,19 +79,18 @@ CPlayerWeenie::CPlayerWeenie(CClient *pClient, DWORD dwGUID, WORD instance_ts)
 	m_LastAssessed = 0;
 
 	m_NextSave = Timer::cur_time + PLAYER_SAVE_INTERVAL;
-
-
 }
 
 CPlayerWeenie::~CPlayerWeenie()
 {
 	LeaveFellowship();
-
+	
 	if (m_pTradeManager)
-		{
+	{
 		m_pTradeManager->CloseTrade(this);
 		m_pTradeManager = NULL;
-		}
+	}
+
 	CClientEvents *pEvents;
 	if (m_pClient && (pEvents = m_pClient->GetEvents()))
 	{
@@ -123,11 +124,6 @@ void CPlayerWeenie::AddSpellByID(DWORD id)
 	SendNetMessage(AddSpellToSpellbook.GetData(), AddSpellToSpellbook.GetSize(), EVENT_MSG, true);
 }
 
-bool CPlayerWeenie::IsChunky()
-{
-	return GetAccessLevel() >= DONOR_ACCESS;
-}
-
 bool CPlayerWeenie::IsAdvocate()
 {
 	return GetAccessLevel() >= ADVOCATE_ACCESS;
@@ -147,7 +143,7 @@ int CPlayerWeenie::GetAccessLevel()
 {
 	if (!m_pClient)
 		return BASIC_ACCESS;
-	
+
 	return m_pClient->GetAccessLevel();
 }
 
@@ -164,10 +160,12 @@ void CPlayerWeenie::BeginLogout()
 
 	if (m_pTradeManager)
 	{
-			m_pTradeManager->CloseTrade(this);
-			m_pTradeManager = NULL;
+		m_pTradeManager->CloseTrade(this);
+		m_pTradeManager = NULL;
 	}
 
+	sChessManager->Quit(this);
+	
 	StopCompletely(0);
 }
 
@@ -228,7 +226,6 @@ void CPlayerWeenie::Tick()
 
 		_beginLogoutTime = Timer::cur_time + 999999;
 	}
-
 	if (IsLoggingOut() && _logoutTime <= Timer::cur_time)
 	{
 		// time to logout
@@ -238,6 +235,7 @@ void CPlayerWeenie::Tick()
 		}
 
 		MarkForDestroy();
+		_logoutTime = DBL_MAX;
 	}
 
 	if (IsRecalling() && _recallTime <= Timer::cur_time)
@@ -245,7 +243,6 @@ void CPlayerWeenie::Tick()
 		_recallTime = -1.0;
 		Movement_Teleport(_recallPos, false);
 	}
-
 
 	if (m_pTradeManager && m_fNextTradeCheck <= Timer::cur_time)
 	{
@@ -269,6 +266,7 @@ void CPlayerWeenie::Tick()
 
 	}
 }
+
 bool CPlayerWeenie::IsBusy()
 {
 	if (IsRecalling() || IsLoggingOut() || CWeenieObject::IsBusy())
@@ -337,9 +335,16 @@ void CPlayerWeenie::MakeAware(CWeenieObject *pEntity, bool bForceUpdate)
 	{
 		for (DWORD i = 0; i < pEntity->children->num_objects; i++)
 		{
-			BinaryWriter *CM = ((CWeenieObject *)pEntity->children->objects.array_data[i])->CreateMessage();
-			if (CM)
-				SendNetMessage(CM, OBJECT_MSG);
+			if (CPhysicsObj *pChild = pEntity->children->objects.array_data[i])
+			{
+				if (CWeenieObject *pChildWeenie = pChild->weenie_obj)
+				{
+					if (BinaryWriter *CM = pChildWeenie->CreateMessage())
+					{
+						SendNetMessage(CM, OBJECT_MSG);
+					}
+				}
+			}
 		}
 	}
 
@@ -355,7 +360,7 @@ void CPlayerWeenie::MakeAware(CWeenieObject *pEntity, bool bForceUpdate)
 		{
 			MakeAware(item);
 		}
-		
+
 		for (auto item : m_Packs)
 		{
 			MakeAware(item);
@@ -395,23 +400,24 @@ void CPlayerWeenie::ExitPortal()
 
 void CPlayerWeenie::SetLastHealthRequest(DWORD guid)
 {
-		m_LastHealthRequest = guid;
+	m_LastHealthRequest = guid;
 
-		m_NextHealthUpdate = Timer::cur_time + PLAYER_HEALTH_POLL_INTERVAL;
+	m_NextHealthUpdate = Timer::cur_time + PLAYER_HEALTH_POLL_INTERVAL;
 }
 
 void CPlayerWeenie::RemoveLastHealthRequest()
 {
-m_LastHealthRequest = 0;
+	m_LastHealthRequest = 0;
 
-// nothing targeted so we don't want to send messages
-m_NextHealthUpdate = Timer::cur_time + 86400.0;
+	// nothing targeted so we don't want to send messages
+	m_NextHealthUpdate = Timer::cur_time + 86400.0;
 }
 
 void CPlayerWeenie::RefreshTargetHealth()
 {
-m_NextHealthUpdate = 0;
+	m_NextHealthUpdate = 0;
 }
+
 void CPlayerWeenie::SetLastAssessed(DWORD guid)
 {
 	m_LastAssessed = guid;
@@ -446,6 +452,10 @@ void CPlayerWeenie::OnDeathAnimComplete()
 		{
 			//clear damage sources on death
 			m_aDamageSources.clear();
+			m_highestDamageSource = 0;
+			m_totalDamageTaken = 0;
+
+
 			//if (IsDead())
 			Revive();
 		}
@@ -532,7 +542,7 @@ void CPlayerWeenie::OnGivenXP(long long amount, bool allegianceXP)
 	if (m_Qualities.GetVitaeValue() < 1.0 && !allegianceXP)
 	{
 		DWORD64 vitae_pool = InqIntQuality(VITAE_CP_POOL_INT, 0) + min(amount, 1000000000);
-		float new_vitae = 1.0;		
+		float new_vitae = 1.0;
 		bool has_new_vitae = VitaeSystem::DetermineNewVitaeLevel(m_Qualities.GetVitaeValue(), InqIntQuality(DEATH_LEVEL_INT, 1), &vitae_pool, &new_vitae);
 
 		UpdateVitaePool(vitae_pool);
@@ -563,7 +573,23 @@ void CPlayerWeenie::OnGivenXP(long long amount, bool allegianceXP)
 	}
 }
 
-void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse)
+void addItemsToDropLists(PhysObjVector items, std::vector<CWeenieObject *> &removeList, std::vector<CWeenieObject *> &alwaysDropList, std::vector<CWeenieObject *> &allValidItems)
+{
+	for (auto item : items)
+	{
+		if (item->m_Qualities.id == W_COINSTACK_CLASS)
+			continue;
+		else if (item->IsDestroyedOnDeath())
+			removeList.push_back(item);
+		else if (item->IsDroppedOnDeath())
+			alwaysDropList.push_back(item);
+		else if (!item->IsBonded())
+			allValidItems.push_back(item);
+	}
+}
+
+//TODO Add nonwielded handling for level > 11 && level < 35
+void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse, DWORD killer_id)
 {
 	if (!pCorpse)
 		return;
@@ -572,12 +598,27 @@ void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse)
 		return;
 
 	int level = InqIntQuality(LEVEL_INT, 1);
-	int maxItemsToDrop = 12; // Limit the amount of items that can be dropped + random adjustment
-	int amountOfItemsToDrop = min(max(level / 10, 1), maxItemsToDrop);
-	if (level > 10)
-		amountOfItemsToDrop += Random::GenUInt(0, 2);
+	CWeenieObject *pKiller = g_pWorld->FindObject(killer_id);
+	int amountOfItemsToDrop = 0;
+	int augDropLess = InqIntQuality(AUGMENTATION_LESS_DEATH_ITEM_LOSS_INT, 0); // Take Death Item Augs into Consideration
+	if (level <= 10)
+	{
+		amountOfItemsToDrop = 0;
+	}
+	else if (level <= 20)
+	{
+		amountOfItemsToDrop = 1;
+	}
+	else
+	{
+		amountOfItemsToDrop = floor(level / 20) + Random::GenInt(0, 2);
+	}
 
-	pCorpse->_begin_destroy_at = Timer::cur_time + max((60.0 * 60 * level), 60 * 60); //override corpse decay time to 5 minutes per level with a minimum of 1 hour.
+	// either we can't find a killer (killed self?) or the killer is not a player
+	if (!pKiller || !pKiller->_IsPlayer())
+		amountOfItemsToDrop = max(0, (amountOfItemsToDrop - (augDropLess * 5)));
+
+	pCorpse->_begin_destroy_at = Timer::cur_time + max((60.0 * 5 * level), 60 * 60); //override corpse decay time to 5 minutes per level with a minimum of 1 hour.
 	pCorpse->_shouldSave = true;
 	pCorpse->m_bDontClear = true;
 
@@ -588,51 +629,19 @@ void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse)
 		pCorpse->SpawnInContainer(W_COINSTACK_CLASS, coinConsumed);
 	}
 
-
-	std::vector<CWeenieObject *> alwaysDropList;
 	std::vector<CWeenieObject *> removeList;
-
+	std::vector<CWeenieObject *> alwaysDropList;
 	std::vector<CWeenieObject *> allValidItems;
-	for (auto wielded : m_Wielded)
-	{
-		if (wielded->m_Qualities.id == W_COINSTACK_CLASS)
-			continue;
-		else if (wielded->IsDestroyedOnDeath())
-			removeList.push_back(wielded);
-		else if (wielded->IsDroppedOnDeath())
-			alwaysDropList.push_back(wielded);
-		else if(!wielded->IsBonded())
-			allValidItems.push_back(wielded);
-	}
 
-	for (auto item : m_Items)
-	{
-		if(item->m_Qualities.id == W_COINSTACK_CLASS)
-			continue;
-		else if (item->IsDestroyedOnDeath())
-			removeList.push_back(item);
-		else if (item->IsDroppedOnDeath())
-			alwaysDropList.push_back(item);
-		else if (!item->IsBonded())
-			allValidItems.push_back(item);	
-	}
+	addItemsToDropLists(m_Wielded, removeList, alwaysDropList, allValidItems);
+	addItemsToDropLists(m_Items, removeList, alwaysDropList, allValidItems);
 
 	for (auto packAsWeenie : m_Packs)
 	{
 		CContainerWeenie *pack = packAsWeenie->AsContainer();
 		if (pack)
 		{
-			for (auto item : pack->m_Items)
-			{
-				if (item->m_Qualities.id == W_COINSTACK_CLASS)
-					continue;
-				else if (item->IsDestroyedOnDeath())
-					removeList.push_back(item);
-				else if (item->IsDroppedOnDeath())
-					alwaysDropList.push_back(item);
-				else if (!item->IsBonded())
-					allValidItems.push_back(item);
-			}
+			addItemsToDropLists(pack->m_Items, removeList, alwaysDropList, allValidItems);
 		}
 	}
 
@@ -642,100 +651,114 @@ void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse)
 	for (auto item : alwaysDropList)
 		FinishMoveItemToContainer(item, pCorpse, 0, true, true);
 
-	std::map <ITEM_TYPE, std::multimap<int, CWeenieObject *>> itemValueByTypeMap;
 
-	std::map <ITEM_TYPE, int> itemDropCountByCategory;
-
+	// This section calculates the effective value for each item (halved for each previous dupe)
+	std::multimap <int, CWeenieObject *> itemValueList;
+	std::map<std::string, int> itemNameList;
+	std::string objName;
 	for (auto item : allValidItems)
 	{
-		ITEM_TYPE itemType = item->InqType();
-		int value = item->InqIntQuality(VALUE_INT, 0);
-		itemValueByTypeMap[itemType].insert(std::pair<int, CWeenieObject *>(value, item));
+		// if this item is stackable
+		if (item->m_Qualities.GetInt(MAX_STACK_SIZE_INT, 0))
+		{
+			int stack_sz = item->InqIntQuality(STACK_SIZE_INT, 0);
+			int value = item->InqIntQuality(STACK_UNIT_VALUE_INT, 0);
+
+			objName = item->InqStringQuality(NAME_STRING, objName);
+
+			// initialise to 0 (this will silently fail if it already exists)
+			itemNameList.insert(std::pair<std::string, int>(objName, 0));
+
+			// reduce value by half for all previous items with same name
+			value /= 1 << min(15, itemNameList[objName]); // 15 to prevent overflow
+
+			itemNameList[objName] += stack_sz;
+
+			for (int i = 0; i < stack_sz; i++)
+			{
+				itemValueList.insert(std::pair<int, CWeenieObject *>(value, item));
+
+				// reduce value by half again
+				value /= 2;
+			}
+		}
+		else // not a stack
+		{
+			int value = item->GetValue();
+
+			// from item->getName - if it has a material type then it's a randomly generated item and we don't want to add it to the dupe list
+			if (item->InqIntQuality(MATERIAL_TYPE_INT, 0))
+			{
+				objName = item->InqStringQuality(NAME_STRING, objName);
+
+				// initialise to 0 (this will silently fail if it already exists)
+				itemNameList.insert(std::pair<std::string, int>(objName, 0));
+
+				// reduce value by half for all previous items with same name
+				value /= 1 << itemNameList[objName];
+
+				itemNameList[objName]++;
+			}
+
+			itemValueList.insert(std::pair<int, CWeenieObject *>(value, item));
+		}
 	}
+
+	// cap the amount of items to drop to the number of items we can drop so the message properly ends with " and "
+	amountOfItemsToDrop = min(amountOfItemsToDrop, itemValueList.size());
+	int itemsLost = 0;
 
 	std::string itemsLostText;
-	int itemsLost = 0;
-	for (int i = 0; i < amountOfItemsToDrop; i++)
+	if (coinConsumed)
 	{
-		int highestValue = 0;
-		std::multimap<int, CWeenieObject *> *highestValueOwner = NULL;
-		for (auto iter = itemValueByTypeMap.begin(); iter != itemValueByTypeMap.end(); ++iter)
+		itemsLostText = csprintf("You've lost %s Pyreal%s", FormatNumberString(coinConsumed).c_str(), coinConsumed > 1 ? "s" : "");
+
+		// increment itemsLost so the next item starts with " and your " or ", your"
+		itemsLost++;
+		amountOfItemsToDrop++;
+	}
+	else
+	{
+		itemsLostText = "You've lost ";
+	}
+
+	// START item dropping BY VALUE
+	for (auto iter = itemValueList.rbegin(); iter != itemValueList.rend(); ++iter)
+	{
+		if (itemsLost >= amountOfItemsToDrop)
 		{
-			std::multimap<int, CWeenieObject *> *typeMap = &iter->second;
-			if (!typeMap->empty())
-			{
-				auto entry = (*typeMap->rbegin());
-				int modifiedValue = entry.first;
-				int categoryCount = itemDropCountByCategory[entry.second->InqType()];
-				if(categoryCount > 0)
-					modifiedValue = round((double)modifiedValue / (double)(categoryCount + 1) * Random::GenFloat(0.9, 1.1));
-				if (modifiedValue > highestValue)
-				{
-					highestValue = modifiedValue;
-					highestValueOwner = typeMap;
-				}
-			}
+			break;
 		}
 
-		if (highestValueOwner)
+		if (iter->second->InqIntQuality(STACK_SIZE_INT, 1) > 1)
 		{
-			CWeenieObject *itemToDrop = highestValueOwner->rbegin()->second;
-			highestValueOwner->erase(--highestValueOwner->end());
-
-			if (itemToDrop->InqIntQuality(STACK_SIZE_INT, 1) > 1)
-			{
-				//stackable items drop only a single unit, 
-				//this replicates retail where stacked items count as the value of the full stack but only a single unit will drop if it is selected.
-				itemToDrop->DecrementStackNum();
-				pCorpse->SpawnCloneInContainer(itemToDrop, 1);
-			}
-			else
-				FinishMoveItemToContainer(itemToDrop, pCorpse, 0, true, true);
-			itemsLost++;
-			itemDropCountByCategory[itemToDrop->InqType()]++;
-
-			if(amountOfItemsToDrop > 1 && i == amountOfItemsToDrop - 1)
-				itemsLostText.append(" and your ");
-			else if (!itemsLostText.empty())
-				itemsLostText.append(", your ");
-			else
-				itemsLostText.append("your ");
-			int stackSize = itemToDrop->InqIntQuality(STACK_SIZE_INT, 1);
-			//if (stackSize > 1)
-			//{
-			//	std::string pluralName = itemToDrop->GetPluralName();
-			//	if(pluralName.empty())
-			//		std::string pluralName = csprintf("%ss", itemToDrop->GetName().c_str());
-			//	itemsLostText.append(csprintf("%s %s", FormatNumberString(stackSize).c_str(), pluralName.c_str()));
-			//}
-			//else
-			itemsLostText.append(itemToDrop->GetName());
+			iter->second->DecrementStackNum();
+			pCorpse->SpawnCloneInContainer(iter->second, 1);
 		}
 		else
-			break; //we're out of items to drop!
+		{
+			FinishMoveItemToContainer(iter->second, pCorpse, 0, true, true);
+		}
+
+		itemsLost++;
+
+		if (amountOfItemsToDrop > 1 && itemsLost == amountOfItemsToDrop)
+			itemsLostText.append(" and your ");
+		else if (itemsLost > 1)
+			itemsLostText.append(", your ");
+		else
+			itemsLostText.append("your ");
+
+		itemsLostText.append(iter->second->GetName());
 	}
 
-	std::string text;
-	if (coinConsumed)
-		text = csprintf("You've lost %s Pyreal%s", FormatNumberString(coinConsumed).c_str(), coinConsumed > 1 ? "s" : "");
-	else
-		text = "You've lost ";
-
-	if (!itemsLostText.empty())
-	{
-		if(coinConsumed && itemsLost > 1)
-			text.append(", ");
-		else if(coinConsumed)
-			text.append(" and ");
-		text.append(itemsLostText);
-	}
-	text.append("!");
+	itemsLostText.append("!");
 
 	DEATH_LOG << InqStringQuality(NAME_STRING, "") << "-" << itemsLostText;
 	if (coinConsumed || itemsLost)
 		SendText(itemsLostText.c_str(), LTT_DEFAULT);
 
-	if (_pendingCorpse) //Absorbed from GDLE2 
+	if (_pendingCorpse)
 	{
 		//make the player corpse visible.
 		_pendingCorpse->m_Qualities.RemoveBool(VISIBILITY_BOOL);
@@ -746,14 +769,13 @@ void CPlayerWeenie::CalculateAndDropDeathItems(CCorpseWeenie *pCorpse)
 	}
 }
 
-
 void CPlayerWeenie::OnDeath(DWORD killer_id)
 {
 	_recallTime = -1.0; // cancel any portal recalls
 
 	m_bReviveAfterAnim = true;
 	CMonsterWeenie::OnDeath(killer_id);
-	
+
 	m_Qualities.SetFloat(DEATH_TIMESTAMP_FLOAT, Timer::cur_time);
 	NotifyFloatStatUpdated(DEATH_TIMESTAMP_FLOAT);
 
@@ -769,6 +791,9 @@ void CPlayerWeenie::OnDeath(DWORD killer_id)
 	UpdateVitaePool(0);
 	ReduceVitae(0.05f);
 	UpdateVitaeEnchantment();
+	ClearPKActivity();
+
+	bool isPkKill = false;
 
 	if (killer_id != GetID())
 	{
@@ -779,7 +804,8 @@ void CPlayerWeenie::OnDeath(DWORD killer_id)
 				m_Qualities.SetFloat(PK_TIMESTAMP_FLOAT, Timer::cur_time + g_pConfig->PKRespiteTime());
 				m_Qualities.SetInt(PLAYER_KILLER_STATUS_INT, PKStatusEnum::NPK_PKStatus);
 				NotifyIntStatUpdated(PLAYER_KILLER_STATUS_INT, false);
-
+				isPkKill = true;
+				NotifyWeenieError(WERROR_PK_SWITCH_RESPITE);
 				SendText("Bael'Zharon has granted you respite after your moment of weakness. You are temporarily no longer a player killer.", LTT_MAGIC);
 			}
 		}
@@ -787,10 +813,17 @@ void CPlayerWeenie::OnDeath(DWORD killer_id)
 
 	// create corpse but make it invisible.
 	_pendingCorpse = CreateCorpse(false);
-	_pendingCorpse->Save(); //Absorbed from GDLE2
 
 	if (_pendingCorpse)
-		CalculateAndDropDeathItems(_pendingCorpse);
+	{
+		if (isPkKill)
+		{
+			_pendingCorpse->m_Qualities.SetBool(PK_KILLER_BOOL, 1); // flag the corpse as one made by a PK
+			isPkKill = false;
+		}
+
+		CalculateAndDropDeathItems(_pendingCorpse, killer_id);
+	}
 
 	if (g_pConfig->HardcoreMode())
 	{
@@ -838,11 +871,10 @@ void CPlayerWeenie::OnMotionDone(DWORD motion, BOOL success)
 
 void CPlayerWeenie::OnRegen(STypeAttribute2nd currentAttrib, int newAmount)
 {
-		CMonsterWeenie::OnRegen(currentAttrib, newAmount);
+	CMonsterWeenie::OnRegen(currentAttrib, newAmount);
 
-		NotifyAttribute2ndStatUpdated(currentAttrib);
+	NotifyAttribute2ndStatUpdated(currentAttrib);
 }
-
 
 void CPlayerWeenie::NotifyAttackerEvent(const char *name, unsigned int dmgType, float healthPercent, unsigned int health, unsigned int crit, unsigned int attackConditions)
 {
@@ -941,8 +973,8 @@ bool CPlayerWeenie::ImmuneToDamage(CWeenieObject *other)
 			}
 			else
 			{
-				PKStatusEnum selfStatus = (PKStatusEnum) InqIntQuality(PLAYER_KILLER_STATUS_INT, PKStatusEnum::Undef_PKStatus);
-				PKStatusEnum otherStatus = (PKStatusEnum) other->InqIntQuality(PLAYER_KILLER_STATUS_INT, PKStatusEnum::Undef_PKStatus);
+				PKStatusEnum selfStatus = (PKStatusEnum)InqIntQuality(PLAYER_KILLER_STATUS_INT, PKStatusEnum::Undef_PKStatus);
+				PKStatusEnum otherStatus = (PKStatusEnum)other->InqIntQuality(PLAYER_KILLER_STATUS_INT, PKStatusEnum::Undef_PKStatus);
 
 				if (selfStatus == PKStatusEnum::Baelzharon_PKStatus || otherStatus == PKStatusEnum::Baelzharon_PKStatus)
 				{
@@ -973,7 +1005,6 @@ DWORD CPlayerWeenie::OnReceiveInventoryItem(CWeenieObject *source, CWeenieObject
 
 	if (AsPlayer() && item->IsCurrency(item->m_Qualities.id))
 		RecalculateCoinAmount(item->m_Qualities.id);
-
 
 	return result;
 }
@@ -1098,20 +1129,15 @@ void CPlayerWeenie::PreSpawnCreate()
 {
 }
 
-struct CompareManaNeeds : public std::binary_function<CWeenieObject*, CWeenieObject*, bool>
-	{
-	bool operator()(CWeenieObject* left, CWeenieObject* right)
-		 {
-				// comparator for making a min-heap based on remaining mana
-			return ((left->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - left->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE))
-				 > (right->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - right->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE)));
-		}
-	};
-
-int CPlayerWeenie::InqIntQuality(STypeInt key, int defaultValue, BOOL raw)
+struct CompareManaNeeds //: public std::function<CWeenieObject*, CWeenieObject*, bool>
 {
-	return 0;
-}
+	bool operator()(CWeenieObject* left, CWeenieObject* right)
+	{
+		// comparator for making a min-heap based on remaining mana
+		return ((left->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - left->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE))
+			> (right->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - right->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE)));
+	}
+};
 
 int CPlayerWeenie::UseEx(CWeenieObject *pTool, CWeenieObject *pTarget)
 {
@@ -1121,7 +1147,6 @@ int CPlayerWeenie::UseEx(CWeenieObject *pTool, CWeenieObject *pTarget)
 
 	return UseEx(false);
 }
-
 int CPlayerWeenie::UseEx(bool bConfirmed)
 {
 	// Load the saved crafting targets
@@ -1140,208 +1165,7 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 	{
 	case TYPE_MANASTONE:
 	{
-		// TODO: move this logic to ManaStone.cpp
-		int targetType = pTarget->InqIntQuality(ITEM_TYPE_INT, 0);
-		if (!(targetType & TYPE_ITEM) && !(targetType & TYPE_CREATURE)) {
-			SendText(csprintf("That's not a valid target for the %s", pTool->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-			break;
-		}
-
-		int manaStoneCurrentMana = pTool->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE);
-		double manaStoneDestroyChance = pTool->InqFloatQuality(MANA_STONE_DESTROY_CHANCE_FLOAT, -1, TRUE);
-		double manaStoneEfficiency = pTool->InqFloatQuality(ITEM_EFFICIENCY_FLOAT, -1, TRUE);
-		int targetCurrentMana = pTarget->InqIntQuality(ITEM_CUR_MANA_INT, -1, TRUE);
-		int targetMaxMana = pTarget->InqIntQuality(ITEM_MAX_MANA_INT, -1, TRUE);
-
-		if (manaStoneCurrentMana <= 0) {
-			if (targetType &TYPE_CREATURE) {
-				//player attempting to use an uncharged mana stone on themselves...what do we do
-				SendText("Despite your best efforts, you fail to destroy yourself.", LTT_DEFAULT); // TODO: better text
-				break;
-			}
-			if (targetCurrentMana <= 0) {
-				SendText(csprintf("The %s has no mana to drain.", pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-				break;
-			}
-
-			if (!pTarget->InqBoolQuality(RETAINED_BOOL, FALSE)) {
-				int drainedMana = round(targetCurrentMana * manaStoneEfficiency);
-				pTool->m_Qualities.SetInt(ITEM_CUR_MANA_INT, drainedMana);
-				pTool->m_Qualities.SetInt(UI_EFFECTS_INT, 1);
-				pTool->NotifyIntStatUpdated(ITEM_CUR_MANA_INT, false);
-				pTool->NotifyIntStatUpdated(UI_EFFECTS_INT, false);
-				pTarget->Remove();
-				RecalculateEncumbrance();
-
-				// The Mana Stone drains 4,434 points of mana from the Pocket Watch.
-				// The Pocket Watch is destroyed.
-				SendText(csprintf("The %s drains %s points of mana from the %s.\nThe %s is destroyed.", pTool->GetName().c_str(), FormatNumberString(drainedMana).c_str(), pTarget->GetName().c_str(), pTarget->GetName().c_str()), LTT_DEFAULT);
-			}
-			else {
-				SendText("Retained items can't be drained.", LTT_DEFAULT); //todo: made up message, confirm if it's correct
-				break;
-			}
-		}
-		else { // mana stone is being emptied, not filled
-			int remainingMana;
-			if (targetType & TYPE_CREATURE) { // manastone being emptied into the user
-				if (pTarget->id != id) {
-					// somehow not using on self. shouldn't be possible with the client. Made up message.
-					SendText(csprintf("You cannot use the %s on other creatures or players.", pTool->GetName().c_str()), LTT_DEFAULT);
-					break;
-				}
-				priority_queue<CWeenieObject*, vector<CWeenieObject*>, CompareManaNeeds > itemsNeedingMana, itemsStillNeedingMana; // MIN heaps sorted by mana deficit
-				for (auto wielded : m_Wielded)
-				{
-					int curMana = wielded->InqIntQuality(ITEM_CUR_MANA_INT, 0, TRUE);
-					int maxMana = wielded->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE);
-					int deficit = maxMana - curMana;
-					if (deficit > 0) {
-						itemsNeedingMana.push(wielded);
-					}
-				}
-				if (itemsNeedingMana.empty()) {
-					SendText("None of your items need mana", LTT_DEFAULT); // What's the correct text?
-					break;
-				}
-				int manaToDistribute = manaStoneCurrentMana;
-				int manaDistributed = 0;
-				std::set<CWeenieObject*> objectsReceivingMana; // for the chatmessage at the end
-
-				while (manaToDistribute > 0 && !(itemsNeedingMana.empty())) {
-					CWeenieObject* itemNeedingLeastMana = itemsNeedingMana.top();
-					int deficit = itemNeedingLeastMana->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - itemNeedingLeastMana->InqIntQuality(ITEM_CUR_MANA_INT, 0, TRUE);
-					unsigned int manaToApplyToEach = 0;
-
-					try
-					{
-						if (deficit * itemsNeedingMana.size() >= manaToDistribute) {
-							// applying smallest deficit to all items would require more mana than available for distribution
-							manaToApplyToEach = manaToDistribute / itemsNeedingMana.size();
-						}
-						else {
-							manaToApplyToEach = deficit;
-						}
-					}
-					catch (...)
-					{
-						SERVER_ERROR << "Error in UseEx for mana stones"; //Used in easy logging currently not ported over from GDLE
-					}
-
-					manaToApplyToEach = max(1, manaToApplyToEach); // for when manaToDistribute / itemsNeedingMana rounds down to 0, apply 1 mana until we're out
-
-					while (!itemsNeedingMana.empty()) {
-						CWeenieObject* item = itemsNeedingMana.top();
-						int itemMaxMana = item->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE);
-						itemsNeedingMana.pop();
-						if (manaToDistribute <= 0) {
-							// from when we rounded up manaToApplyToEach from 0 to 1, once we're out of mana we want to finish this while loop without applying any more mana to items
-							itemsStillNeedingMana.push(item);
-							continue;
-						}
-
-						unsigned int newManaAmount = item->InqIntQuality(ITEM_CUR_MANA_INT, 0, TRUE) + manaToApplyToEach;
-						manaToDistribute -= manaToApplyToEach;
-						manaDistributed += manaToApplyToEach;
-
-						if (newManaAmount < itemMaxMana) {
-							itemsStillNeedingMana.push(item);
-						}
-
-						if (manaToApplyToEach > 0) { // handle case when you use a stone that doesn't even have enough mana to give 1 to each deficit item
-							objectsReceivingMana.insert(item);
-						}
-
-						item->m_Qualities.SetInt(ITEM_CUR_MANA_INT, min(newManaAmount, itemMaxMana));
-						item->NotifyIntStatUpdated(ITEM_CUR_MANA_INT, false); // todo: is second positional arg correct?
-					}
-
-					itemsNeedingMana.swap(itemsStillNeedingMana);
-				}
-				remainingMana = manaToDistribute;
-				std::stringstream ss;
-				ss << csprintf("The %s gives %s points of mana to the following items: ", pTool->GetName().c_str(), FormatNumberString(manaDistributed).c_str());
-				std::set<CWeenieObject*>::iterator it = objectsReceivingMana.begin();
-				while (it != objectsReceivingMana.end()) {
-					if (it != objectsReceivingMana.begin()) {
-						ss << ", ";
-					}
-					CWeenieObject* item = *it;
-					ss << item->GetName();
-					it++;
-				}
-				SendText(ss.str().c_str(), LTT_DEFAULT);
-				int remainingDeficit = 0;
-				while (!itemsNeedingMana.empty()) {
-					remainingDeficit += (itemsNeedingMana.top()->InqIntQuality(ITEM_MAX_MANA_INT, 0, TRUE) - itemsNeedingMana.top()->InqIntQuality(ITEM_CUR_MANA_INT, 0, TRUE));
-					itemsNeedingMana.pop();
-				}
-				if (remainingDeficit == 0) {
-					SendText("Your items are fully charged.", LTT_DEFAULT);
-				}
-				else {
-					SendText(csprintf("You need %s more mana to fully charge your items.", FormatNumberString(remainingDeficit).c_str()), LTT_DEFAULT);
-				}
-			}
-			else { // manastone being emptied into an item
-
-				if (targetMaxMana <= 0)
-				{
-					SendText(csprintf("The %s does not require mana.", pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-					break;
-				}
-				else if (targetCurrentMana >= targetMaxMana)
-				{
-					SendText(csprintf("The %s is already fully charged.", pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-					break;
-				}
-				else
-				{
-					int manaNeeded = targetMaxMana - targetCurrentMana;
-
-
-					if (manaStoneCurrentMana >= manaNeeded)
-					{
-						pTarget->m_Qualities.SetInt(ITEM_CUR_MANA_INT, targetMaxMana);
-						pTarget->NotifyIntStatUpdated(ITEM_CUR_MANA_INT, false);
-
-						remainingMana = manaStoneCurrentMana - manaNeeded;
-
-						SendText(csprintf("The %s gives %s mana to the %s.", pTool->GetName().c_str(), FormatNumberString(manaNeeded).c_str(), pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-						SendText(csprintf("The %s is fully charged.", pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-					}
-					else
-					{
-						int newManaAmount = targetCurrentMana + manaStoneCurrentMana;
-						int manaStillNeeded = targetMaxMana - newManaAmount;
-						remainingMana = 0;
-
-						pTarget->m_Qualities.SetInt(ITEM_CUR_MANA_INT, newManaAmount);
-						pTarget->NotifyIntStatUpdated(ITEM_CUR_MANA_INT, false);
-
-						SendText(csprintf("The %s gives %s mana to the %s.", pTool->GetName().c_str(), FormatNumberString(manaStoneCurrentMana).c_str(), pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-						SendText(csprintf("You need %s more mana to fully charge the %s.", FormatNumberString(manaStillNeeded).c_str(), pTarget->GetName().c_str()), LTT_DEFAULT); //todo: made up message, confirm if it's correct
-					}
-				}
-			}
-
-			if (manaStoneDestroyChance >= 1.0 || Random::RollDice(0.0, 1.0) <= manaStoneDestroyChance) {
-				SendText(csprintf("The %s is destroyed.", pTool->GetName().c_str()), LTT_DEFAULT);
-				pTool->Remove();
-				RecalculateEncumbrance();
-			}
-			else {
-				pTool->m_Qualities.SetInt(ITEM_CUR_MANA_INT, remainingMana);
-				pTool->NotifyIntStatUpdated(ITEM_CUR_MANA_INT, false);
-
-				if (remainingMana == 0)
-				{
-					pTool->m_Qualities.SetInt(UI_EFFECTS_INT, 0);
-					pTool->NotifyIntStatUpdated(UI_EFFECTS_INT, false);
-				}
-			}
-		}
-
+		pTool->UseWith(this, pTarget);
 		break;
 	}
 	default:
@@ -1397,11 +1221,11 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				return WERROR_STAMINA_TOO_LOW;
 			}
 		}
-		else if (GetStamina() < 5) //I can't find a source but I'm pretty sure use actions always consumed some amount of stamina.
-		{
-			//SendText("You don't have enough stamina to do that.", LTT_CRAFT);
-			return WERROR_STAMINA_TOO_LOW;
-		}
+		//else if (GetStamina() < 5) //I can't find a source but I'm pretty sure use actions always consumed some amount of stamina.
+		//{
+		//	//SendText("You don't have enough stamina to do that.", LTT_CRAFT);
+		//	return WERROR_STAMINA_TOO_LOW;
+		//}
 
 		if (GetMana() < requiredMana)
 		{
@@ -1463,35 +1287,39 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				toolWorkmanship /= (double)pTool->InqIntQuality(NUM_ITEMS_IN_MATERIAL_INT, 1);
 			int amountOfTimesTinkered = pTarget->InqIntQuality(NUM_TIMES_TINKERED_INT, 0);
 
-			int salvageMod;
+			if (amountOfTimesTinkered > 9)  // Don't allow 10 tinked items to have any more tinkers/imbues (Ivory & Leather don't use this case)
+			{
+				return WERROR_NONE;   
+			}
 
+			int salvageMod;
+			
 			if (op->_SkillCheckFormulaType == 1)
 			{
 				salvageMod = GetMaterialMod(pTool->InqIntQuality(MATERIAL_TYPE_INT, 0));
 			}
 			else
 			{
-				//TODO:salvage mod needs to be grabbed from material type rather than a hard coded value
-				salvageMod = 20;
+				salvageMod = 20; // All imbue materials have mod of 20
 			}
 
 			int multiple = 1;
-			double difficulty = (1 + (amountOfTimesTinkered * 0.1));
+			double aDifficulty[10] = {1, 1.1, 1.3, 1.6, 2.0, 2.5, 3.0, 3.5, 4.0, 4.5}; // Attempt difficulty numbers from Endy's Tinker Calc 2.3.2
+			double difficulty = aDifficulty[amountOfTimesTinkered];
 
 			if (toolWorkmanship >= itemWorkmanship)
 			{
 				multiple = 2;
 			}
 
-			if (amountOfTimesTinkered > 2)
-			{
-				difficulty = amountOfTimesTinkered * 0.5;
-			}
 			successChance = GetSkillChance(skillLevel, ((int)floor(((5 * salvageMod) + (2 * itemWorkmanship * salvageMod) - (toolWorkmanship * multiple * salvageMod / 5)) * difficulty))); //Formulas from Endy's Tinkering Calculator
 
 			if (op->_SkillCheckFormulaType == 2) // imbue
 			{
 				successChance /= 3;
+				
+				if (m_Qualities.GetInt(AUGMENTATION_BONUS_IMBUE_CHANCE_INT, 0))
+					successChance += 0.05;
 			}
 			break;
 		}
@@ -1501,11 +1329,11 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 		}
 
 		// 0x80000000 : Use Crafting Chance of Success Dialog
-		if (_playerModule.options_ & 0x80000000 && !bConfirmed)
+		if (_playerModule.options_ & 0x80000000 && !bConfirmed )
 		{
 			std::ostringstream sstrMessage;
 			sstrMessage.precision(3);
-			sstrMessage << "You have a " << successChance * 100 << "% chance of using " << pTool->GetName() << " on " << pTarget->GetName() << ".";
+			sstrMessage << "You have a " << successChance*100 << "% chance of using " << pTool->GetName() << " on " << pTarget->GetName() << ".";
 
 
 			BinaryWriter confirmCrafting;
@@ -1539,7 +1367,7 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 			}
 
 			SendText(op->_successMessage.c_str(), LTT_CRAFT);
-
+			
 			// Broadcast messages for tinkering
 			switch (op->_SkillCheckFormulaType)
 			{
@@ -1558,10 +1386,10 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				{
 					g_pWorld->BroadcastLocal(GetLandcell(), text);
 				}
-				
+
 				IMBUE_LOG << "P:" << InqStringQuality(NAME_STRING, "") << " SL:" << skillLevel << " T:" << pTarget->InqStringQuality(NAME_STRING, "") << " TW:" << itemWorkmanship << " TT:" << amountOfTimesTinkered <<
-				" M:" << pTool->InqStringQuality(NAME_STRING, "") << " MW:" << toolWorkmanship << " %:" << successChance << " Roll:" << successRoll << " S/F:" << (successChance ? "TRUE" : "FALSE");
-				
+					" M:" << pTool->InqStringQuality(NAME_STRING, "") << " MW:" << toolWorkmanship << " %:" << successChance << " Roll:" << successRoll;
+
 				break;
 			}
 			}
@@ -1570,9 +1398,6 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 			PerformUseModifications(1, op, pTool, pTarget, newItem);
 			PerformUseModifications(2, op, pTool, pTarget, newItem);
 			PerformUseModifications(3, op, pTool, pTarget, newItem);
-
-			if (requiredStamina == 0)
-				AdjustStamina(-5); //if we don't have any stamina usage specified let's use 5.
 
 			if (op->_successConsumeTargetChance == 1.0 || Random::RollDice(0.0, 1.0) <= op->_successConsumeTargetChance)
 			{
@@ -1625,10 +1450,8 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 					g_pWorld->BroadcastLocal(GetLandcell(), text);
 				}
 
-				
 				IMBUE_LOG << "P:" << InqStringQuality(NAME_STRING, "") << " SL:" << skillLevel << " T:" << pTarget->InqStringQuality(NAME_STRING, "") << " TW:" << itemWorkmanship << " TT:" << amountOfTimesTinkered <<
-				" M:" << pTool->InqStringQuality(NAME_STRING, "") << " MW:" << toolWorkmanship << " %:" << successChance << " Roll:" << successRoll << " S/F:" << (successChance ? "TRUE" : "FALSE");
-				
+					" M:" << pTool->InqStringQuality(NAME_STRING, "") << " MW:" << toolWorkmanship << " %:" << successChance << " Roll:" << successRoll;
 
 				break;
 			}
@@ -1638,9 +1461,6 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 			PerformUseModifications(5, op, pTool, pTarget, newItem);
 			PerformUseModifications(6, op, pTool, pTarget, newItem);
 			PerformUseModifications(7, op, pTool, pTarget, newItem);
-
-			if (requiredStamina == 0)
-				AdjustStamina(-5); //if we don't have any stamina usage specified let's use 5.
 
 			if (op->_failureConsumeTargetChance == 1.0 || Random::RollDice(0.0, 1.0) <= op->_failureConsumeTargetChance)
 			{
@@ -1681,7 +1501,7 @@ int CPlayerWeenie::GetMaterialMod(int materialInt)
 	}
 	case Ebony_MaterialType:
 	case Teak_MaterialType:
-	case Steel_MaterialType:
+	case Steel_MaterialType :
 	case Satin_MaterialType:
 	case Porcelain_MaterialType:
 	case Mahogany_MaterialType:
@@ -1721,6 +1541,12 @@ int CPlayerWeenie::GetMaterialMod(int materialInt)
 	default:
 		return 20; // Imbue material
 	}
+}
+
+std::string CPlayerWeenie::ToUpperCase(string tName)
+{
+	transform(tName.begin(), tName.end(), tName.begin(), ::toupper);
+	return tName;
 }
 
 bool CPlayerWeenie::CheckUseRequirements(int index, CCraftOperation *op, CWeenieObject *pTool, CWeenieObject *pTarget)
@@ -2073,6 +1899,8 @@ bool CPlayerWeenie::CheckUseRequirements(int index, CCraftOperation *op, CWeenie
 		for each (TYPERequirement<STypeDID, DWORD> dIDRequirement in op->_requirements[index]._didRequirement)
 		{
 			DWORD value = 0;
+
+
 			bool exists = requirementTarget->m_Qualities.InqDataID(dIDRequirement._stat, value);
 
 			switch (dIDRequirement._operationType)
@@ -2235,6 +2063,7 @@ bool CPlayerWeenie::CheckUseRequirements(int index, CCraftOperation *op, CWeenie
 
 void CPlayerWeenie::PerformUseModificationScript(DWORD scriptId, CCraftOperation *op, CWeenieObject *pTool, CWeenieObject *pTarget, CWeenieObject *pCreatedItem)
 {
+	double currentVar = pTarget->InqFloatQuality(DAMAGE_VARIANCE_FLOAT, 0, TRUE);
 	switch (scriptId)
 	{
 	case 0x3800000f: //flag stamp failure
@@ -2289,7 +2118,7 @@ void CPlayerWeenie::PerformUseModificationScript(DWORD scriptId, CCraftOperation
 		pTarget->m_Qualities.SetInt(NUM_TIMES_TINKERED_INT, pTarget->InqIntQuality(NUM_TIMES_TINKERED_INT, 0, TRUE) + 1);
 		break;
 	case 0x3800001c: //granite
-		pTarget->m_Qualities.SetFloat(DAMAGE_VARIANCE_FLOAT, max(pTarget->InqFloatQuality(DAMAGE_VARIANCE_FLOAT, 0, TRUE) - 0.20, 0.0));
+		pTarget->m_Qualities.SetFloat(DAMAGE_VARIANCE_FLOAT, max(currentVar - (currentVar / 5), 0.0));
 		pTarget->m_Qualities.SetInt(NUM_TIMES_TINKERED_INT, pTarget->InqIntQuality(NUM_TIMES_TINKERED_INT, 0, TRUE) + 1);
 		break;
 	case 0x3800001d: //oak
@@ -2548,7 +2377,7 @@ void CPlayerWeenie::PerformUseModifications(int index, CCraftOperation *op, CWee
 					value = 0;
 				break;
 			case 3: //copy value from modificationSource to target
-				if(modificationSource)
+				if (modificationSource)
 					value = modificationSource->InqIntQuality(intMod._stat, 0);
 				break;
 			case 4: //copy value from modificationSource to created item
@@ -2908,7 +2737,7 @@ void CPlayerWeenie::PerformUseModifications(int index, CCraftOperation *op, CWee
 					default:
 						value = modificationSource->InqIIDQuality(iidMod._stat, 0);
 						break;
-					}					
+					}
 				}
 				break;
 			case 4: //copy value from modificationSource to created item
@@ -2969,7 +2798,7 @@ void CPlayerWeenie::PerformUseModifications(int index, CCraftOperation *op, CWee
 						if (pPaletteTemplate->iconID)
 						{
 							pTarget->m_Qualities.SetDataID(ICON_DID, pPaletteTemplate->iconID);
-							pTarget->NotifyDIDStatUpdated(ICON_DID);
+							pTarget->NotifyDIDStatUpdated(ICON_DID, false);
 						}
 					}
 					ClothingTable::Release(clothingTable);
@@ -3139,9 +2968,10 @@ struct SalvageInfo
 	int totalValue = 0;
 	int totalWorkmanship = 0;
 
+	//int itemsSalvagedCount = 0;
+	//Discrete/Continous vars into the structure of salvageMap
 	int itemsSalvagedCountCont = 0;
 	int itemsSalvagedCountDiscrete = 0;
-
 };
 
 void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
@@ -3161,29 +2991,27 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 	}
 
 	float SalvageMult = (g_pConfig->SalvageMultiplier());
+	//SALVAGING SKILL DETERMINES SALVAGE AMOUNT
+	DWORD salvagingSkillValue;
+	InqSkill(STypeSkill::SALVAGING_SKILL, salvagingSkillValue, false);
 
-	DWORD highestSalvagingSkillValue;
-	InqSkill(STypeSkill::ARMOR_APPRAISAL_SKILL, highestSalvagingSkillValue, false);
+	DWORD highestTinkeringSkillValue;
+	DWORD tinkeringSkills[4];
+	InqSkill(STypeSkill::ARMOR_APPRAISAL_SKILL, tinkeringSkills[0], false);
+	InqSkill(STypeSkill::WEAPON_APPRAISAL_SKILL, tinkeringSkills[1], false);
+	InqSkill(STypeSkill::MAGIC_ITEM_APPRAISAL_SKILL, tinkeringSkills[2], false);
+	InqSkill(STypeSkill::ITEM_APPRAISAL_SKILL, tinkeringSkills[3], false);
 
-	DWORD candidateSkill;
-	InqSkill(STypeSkill::WEAPON_APPRAISAL_SKILL, candidateSkill, false);
-	if (candidateSkill > highestSalvagingSkillValue)
-		highestSalvagingSkillValue = candidateSkill;
-	InqSkill(STypeSkill::MAGIC_ITEM_APPRAISAL_SKILL, candidateSkill, false);
-	if (candidateSkill > highestSalvagingSkillValue)
-		highestSalvagingSkillValue = candidateSkill;
-	InqSkill(STypeSkill::ITEM_APPRAISAL_SKILL, candidateSkill, false);
-	if (candidateSkill > highestSalvagingSkillValue)
-		highestSalvagingSkillValue = candidateSkill;
+	highestTinkeringSkillValue = max(max(max(tinkeringSkills[0], tinkeringSkills[1]), tinkeringSkills[2]), tinkeringSkills[3]);
+
+	int numAugs = max(0, min(4, InqIntQuality(AUGMENTATION_BONUS_SALVAGE_INT, 0)));
 
 	std::map<MaterialType, SalvageInfo> salvageMap;
 	std::list<CWeenieObject *> itemsToDestroy;
 
-	//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/0b2125d1d41cf582b274bf157485fcd5f1183170 //
 	//Lists for the success message
 	PackableList<SalvageResult> salvageResults;
 	PackableList<DWORD> notSalvagable;
-
 
 	for (auto itemId : items)
 	{
@@ -3216,28 +3044,50 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 		}
 
 		itemsToDestroy.push_back(pItem);
+		/*keep Discrete and Continous .itemsSalvaged
+		Discrete for immediate calculations, Continous for reference sake and foolish number porn*/
 		if (itemType == ITEM_TYPE::TYPE_TINKERING_MATERIAL)
 		{
-			salvageMap[material].itemsSalvagedCountCont += pItem->InqIntQuality(NUM_ITEMS_IN_MATERIAL_INT, 1);
 			salvageMap[material].amount += pItem->InqIntQuality(STRUCTURE_INT, 1);
 			salvageMap[material].totalValue += itemValue;
-			salvageMap[material].totalWorkmanship += workmanship;
+			salvageMap[material].itemsSalvagedCountCont += pItem->InqIntQuality(NUM_ITEMS_IN_MATERIAL_INT, 1);
+			//salvageMap[material].itemsSalvagedCountDiscrete++;
 		}
 		else
 		{
-			double multiplier = GetSkillChance(highestSalvagingSkillValue, 100);
-			int salvageAmount = (int)round(max(workmanship * multiplier, 1)) * SalvageMult;  //made up formula. Added Config Multiplier for Salvage -Zeus
-			int salvageValue = (int)round(max(itemValue * 0.75 * multiplier, 1)); //made up formula.
+			int salvagingAmount = CalculateSalvageAmount(salvagingSkillValue, workmanship, numAugs);
 
-			salvageMap[material].itemsSalvagedCountCont++;
-			salvageMap[material].amount += salvageAmount;
+			// tinkering can at best return the workmanship as the amount
+			int tinkeringAmount = min(CalculateSalvageAmount(highestTinkeringSkillValue, workmanship, 0), workmanship);
+
+			// We choose the one that gives best results
+			int salvageAmount = max(salvagingAmount, tinkeringAmount);
+
+			// formula taken from http://asheron.wikia.com/wiki/Salvaging/Value_Pre2013
+			int salvageValue = itemValue * ( salvagingSkillValue / 387.0 ) *(1 + numAugs * 0.25) *SalvageMult;
 			salvageMap[material].totalValue += salvageValue;
-			salvageMap[material].totalWorkmanship += workmanship;
+			salvageMap[material].amount += salvageAmount;
+			salvageMap[material].itemsSalvagedCountCont++;
 		}
+		salvageMap[material].totalWorkmanship += workmanship;
 	}
 
 	if (itemsToDestroy.empty())
 		return;
+
+	// Check if we have enough pack space first!
+	int numBags = 0;
+	for (auto salvageEntry : salvageMap)
+	{
+		SalvageInfo salvageInfo = salvageEntry.second;
+		numBags += ceil(salvageInfo.amount / 100.0);
+	}
+	if (numBags > Container_GetNumFreeMainPackSlots())
+	{
+		SendText("Not enough pack space!", LTT_ERROR);
+		return;
+	}
+
 
 	for (auto item : itemsToDestroy)
 		item->Remove();
@@ -3246,35 +3096,31 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 	{
 		MaterialType material = salvageEntry.first;
 		SalvageInfo salvageInfo = salvageEntry.second;
-
 		int valuePerUnit = salvageInfo.totalValue / salvageInfo.amount;
-		int fullBags = floor(salvageInfo.amount / 100.0);
-		int partialBagAmount = salvageInfo.amount % 100;
 
-		for (int i = 0; i < fullBags; i++)
+		double workmanship = salvageInfo.totalWorkmanship/(double)salvageInfo.itemsSalvagedCountCont;
+		int fullBagItems = ceil(salvageInfo.itemsSalvagedCountCont / (salvageInfo.amount / 100.0));
+
+		int remainingAmount = salvageInfo.amount;
+		int remainingItems = salvageInfo.itemsSalvagedCountCont;
+
+		while (remainingAmount > 0)
 		{
-			SpawnSalvageBagInContainer(material, 100, salvageInfo.totalWorkmanship, valuePerUnit * 100, salvageInfo.itemsSalvagedCountCont);
+			int amount = min(remainingAmount, 100);
+			int numItems = min(max(1, remainingItems), fullBagItems);
+			SpawnSalvageBagInContainer(material, amount, floor(numItems * workmanship), min(valuePerUnit * amount, 75000), numItems);
 
-			//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/0b2125d1d41cf582b274bf157485fcd5f1183170 //
 			SalvageResult salvageResult;
 			salvageResult.material = material;
-			salvageResult.units = 100;
-			salvageResult.workmanship = salvageInfo.totalWorkmanship / (double)salvageInfo.itemsSalvagedCountCont;
+			salvageResult.units = amount;
+			salvageResult.workmanship = floor(numItems * workmanship)/(double)numItems;
 			salvageResults.push_back(salvageResult);
-		}
 
-		if(partialBagAmount > 0)
-		{
-			SpawnSalvageBagInContainer(material, partialBagAmount, salvageInfo.totalWorkmanship, valuePerUnit * partialBagAmount, salvageInfo.itemsSalvagedCountCont);
-			//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/0b2125d1d41cf582b274bf157485fcd5f1183170 //
-			SalvageResult salvageResult;
-			salvageResult.material = material;
-			salvageResult.units = partialBagAmount;
-			salvageResult.workmanship = salvageInfo.totalWorkmanship / (double)salvageInfo.itemsSalvagedCountCont;
-			salvageResults.push_back(salvageResult);
+			remainingAmount -= 100;
+			remainingItems -= fullBagItems;
 		}
 	}
-	//Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/0b2125d1d41cf582b274bf157485fcd5f1183170 //
+
 	BinaryWriter salvageMsg;
 	salvageMsg.Write<DWORD>(0x02B4);
 	salvageMsg.Write<DWORD>(0x28);		// SkillID: Salvaging
@@ -3283,7 +3129,14 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 	salvageMsg.Write<int>(0);			// int: Aug bonus - not implemented?
 
 	SendNetMessage(&salvageMsg, PRIVATE_MSG, TRUE, FALSE);
+}
 
+
+// See http://web.archive.org/web/20170130213649/http://www.thejackcat.com/AC/Shopping/Crafts/Salvage_old.htm
+// and http://web.archive.org/web/20170130194012/http://www.thejackcat.com/AC/Shopping/Crafts/Salvage.htm
+int CPlayerWeenie::CalculateSalvageAmount(int salvagingSkill, int workmanship, int numAugs)
+{
+	return 1 + floor( salvagingSkill/195.0 * workmanship * (1 + 0.25*numAugs) );
 }
 
 bool CPlayerWeenie::SpawnSalvageBagInContainer(MaterialType material, int amount, int workmanship, int value, int numItems)
@@ -3293,7 +3146,7 @@ bool CPlayerWeenie::SpawnSalvageBagInContainer(MaterialType material, int amount
 		return false;
 
 	CWeenieObject *weenie = g_pWeenieFactory->CreateWeenieByClassID(salvageWcid, NULL, false);
-	weenie->m_Qualities.SetString(NAME_STRING, "Salvage"); //modern client prepends the salvage type automatically so we need to adapt to this.
+	weenie->m_Qualities.SetString(NAME_STRING, csprintf("Salvage (%s)", FormatNumberString(amount).c_str())); //modern client prepends the salvage type automatically so we need to adapt to this.
 
 	if (!weenie)
 		return false;
@@ -3302,39 +3155,57 @@ bool CPlayerWeenie::SpawnSalvageBagInContainer(MaterialType material, int amount
 	weenie->m_Qualities.SetInt(VALUE_INT, value);
 	weenie->m_Qualities.SetInt(STRUCTURE_INT, amount);
 	weenie->m_Qualities.SetInt(NUM_ITEMS_IN_MATERIAL_INT, numItems);
+	//weenie->m_Qualities.SetFloat(SalvageWorkmanship, )
+
+	//Which one of these is Vtank missing to make it not calculate the real workmanship
+	//none. it has them all. where is SalvageWorkmanship double being calculated
+
+	//NumberItemsSalvagedFrom = 170, // 0x000000AA
+	//SalvageWorkmanship = 167772169, // 0x0A000009
+	//	Divide SalvageWorkmanship by NumberItemsSalvagedFrom
 
 	return SpawnInContainer(weenie);
 }
 
 void CPlayerWeenie::SetLoginPlayerQualities()
 {
-		//Temporary as a way to fix existing characters
-		if (m_Qualities._skillStatsTable)
-		 {
+	//Temporary as a way to fix existing characters
+	if (m_Qualities._skillStatsTable)
+	{
 		for (PackableHashTableWithJson<STypeSkill, Skill>::iterator entry = m_Qualities._skillStatsTable->begin(); entry != m_Qualities._skillStatsTable->end(); entry++)
-			 {
+		{
 			Skill skill = entry->second;
 			if (skill._sac == SKILL_ADVANCEMENT_CLASS::SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
-				 m_Qualities.SetSkillLevel(entry->first, 10);
+				m_Qualities.SetSkillLevel(entry->first, 10);
 			else if (skill._sac == SKILL_ADVANCEMENT_CLASS::TRAINED_SKILL_ADVANCEMENT_CLASS)
-				 m_Qualities.SetSkillLevel(entry->first, 5);
+				m_Qualities.SetSkillLevel(entry->first, 5);
 			else
-				 m_Qualities.SetSkillLevel(entry->first, 0);
-			}
+				m_Qualities.SetSkillLevel(entry->first, 0);
 		}
+	}
 
-		if (m_Qualities.GetIID(CONTAINER_IID, 0))
-		{
-			m_Qualities.RemoveInstanceID(CONTAINER_IID);
-		}
+	if (m_Qualities.GetIID(CONTAINER_IID, 0))
+	{
+		m_Qualities.RemoveInstanceID(CONTAINER_IID);
+	}
 
+	//set scale on Lugian and Empyrean characters and Setup DID on Olthoi
+	if (m_Qualities.GetInt(HERITAGE_GROUP_INT, 1) == Lugian_HeritageGroup)
+		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1.3);
+
+	if (m_Qualities.GetInt(HERITAGE_GROUP_INT, 1) == Empyrean_HeritageGroup)
+		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1.2);
+
+	//End of temporary code
 
 	g_pAllegianceManager->SetWeenieAllegianceQualities(this);
-	m_Qualities.SetFloat(LOGIN_TIMESTAMP_FLOAT, Timer::cur_time);
+	auto loginTime = chrono::system_clock::to_time_t(chrono::system_clock::now());
+	m_Qualities.SetFloat(LOGIN_TIMESTAMP_FLOAT, loginTime);
+	m_Qualities.SetInt(LOGIN_TIMESTAMP_INT, loginTime);
 
 	// Position startPos = Position(0xDB75003B, Vector(186.000000f, 65.000000f, 36.088333f), Quaternion(1.000000, 0.000000, 0.000000, 0.000000));
 	// Position startPos = Position(0xA9B4001F, Vector(87.750603f, 147.722321f, 66.005005f), Quaternion(0.011819f, 0.000000, 0.000000, -0.999930f));
-	
+
 	// Your location is: 0xC98C0028 [113.665604 190.259003 22.004999] -0.707107 0.000000 0.000000 -0.707107 Rithwic
 	// Position startPos = Position(0xC98C0028, Vector(113.665604f, 190.259003f, 22.004999f), Quaternion(-0.707107f, 0.000000, 0.000000, -0.707107f));
 	// SetInitialPosition(startPos);
@@ -3376,7 +3247,7 @@ void CPlayerWeenie::SetLoginPlayerQualities()
 		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1);
 		m_Qualities.SetInt(ALLEGIANCE_RANK_INT, 10);
 		m_Qualities.SetInt(ALLEGIANCE_FOLLOWERS_INT, 500);
-		
+
 	}
 
 
@@ -3467,14 +3338,18 @@ void CPlayerWeenie::HandleItemManaRequest(DWORD itemId)
 
 void CPlayerWeenie::UpdateModuleFromClient(PlayerModule &module)
 {
-	bool bOldShowHelm = ShowHelm();
+	_playerModule.options_ = module.options_;
+	_playerModule.options2_ = module.options2_;
+	_playerModule.spell_filters_ = module.spell_filters_;
 
-	_playerModule = module;
+	for (DWORD i = 0; i < 8; i++)
+		_playerModule.favorite_spells_[i] = module.favorite_spells_[i];
 
-	if (bOldShowHelm != ShowHelm())
-	{
-		UpdateModel();
-	}
+	CloneMemberPointerData<ShortCutManager>(_playerModule.shortcuts_, module.shortcuts_);
+	CloneMemberPointerData<PackableHashTable<DWORD, long>>(_playerModule.desired_comps_, module.desired_comps_);
+	CloneMemberPointerData<GenericQualitiesData>(_playerModule.m_pPlayerOptionsData, module.m_pPlayerOptionsData);
+
+	UpdateModel();
 }
 
 void CPlayerWeenie::LoadEx(CWeenieSave &save)
@@ -3553,16 +3428,35 @@ void CPlayerWeenie::EraseQuest(const char *questName)
 	_questTable.RemoveQuest(questName);
 }
 
+void CPlayerWeenie::SetQuestCompletions(const char *questName, int numCompletions)
+{
+	_questTable.SetQuestCompletions(questName, numCompletions);
+}
+
+std::string CPlayerWeenie::Ktref(const char *questName)
+{
+	return _questTable.Ktref(questName);
+}
+
+unsigned int CPlayerWeenie::InqQuestMax(const char *questName)
+{
+	return _questTable.InqQuestMax(questName);
+}
+
 CWandSpellUseEvent::CWandSpellUseEvent(DWORD wandId, DWORD targetId)
 {
 	_wandId = wandId;
 	_targetId = targetId;
 }
 
-
-
 void CWandSpellUseEvent::OnReadyToUse()
 {
+	if (_manager->_next_allowed_use > Timer::cur_time)
+	{	
+		Cancel();
+		return;
+	}
+
 	CWeenieObject *wand = g_pWorld->FindObject(_wandId);
 	if (!wand)
 	{
@@ -3571,7 +3465,7 @@ void CWandSpellUseEvent::OnReadyToUse()
 	}
 
 	_spellId = wand->InqDIDQuality(SPELL_DID, 0);
-	if(!_spellId)
+	if (!_spellId)
 	{
 		Cancel();
 		return;
@@ -3581,7 +3475,7 @@ void CWandSpellUseEvent::OnReadyToUse()
 	DWORD skillValue;
 	if (skill != 0 && _weenie->InqSkill(skill, skillValue, false))
 	{
-		if(skillValue < wand->InqIntQuality(ITEM_SKILL_LEVEL_LIMIT_INT, 0))
+		if (skillValue < wand->InqIntQuality(ITEM_SKILL_LEVEL_LIMIT_INT, 0))
 		{
 			SkillTable *pSkillTable = SkillSystem::GetSkillTable();
 			const SkillBase *pSkillBase = pSkillTable->GetSkillBase(skill);
@@ -3625,6 +3519,9 @@ void CWandSpellUseEvent::OnReadyToUse()
 		_newManaValue = itemCurrentMana - manaCost;
 	}
 
+	_weenie->MakeSpellcastingManager()->m_bCasting = true;
+	_weenie->m_SpellcastingManager->m_SpellCastData.caster_id = _wandId;
+
 	if (motion)
 		ExecuteUseAnimation(motion);
 	else
@@ -3647,18 +3544,35 @@ void CWandSpellUseEvent::OnUseAnimSuccess(DWORD motion)
 
 	_weenie->MakeSpellcastingManager()->CastSpellInstant(_targetId, _spellId);
 	_weenie->DoForcedStopCompletely();
+	_manager->_next_allowed_use = Timer::cur_time + 2.0;
 	Done();
 }
+
+void CWandSpellUseEvent::Cancel(DWORD error)
+{
+	_weenie->MakeSpellcastingManager()->m_bCasting = false;
+
+	CUseEventData::Cancel(error);
+}
+
+void CWandSpellUseEvent::Done(DWORD error)
+{
+	_weenie->MakeSpellcastingManager()->m_bCasting = false;
+
+	CUseEventData::Done(error);
+}
+
 
 void CLifestoneRecallUseEvent::OnReadyToUse()
 {
 	_weenie->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 	ExecuteUseAnimation(Motion_LifestoneRecall);
-	_weenie->SendText(csprintf("%s is recalling to the lifestone.", _weenie->GetName().c_str()), LTT_RECALL);
+	g_pWorld->BroadcastLocal(_weenie->GetLandcell(), csprintf("%s is recalling to the lifestone.", _weenie->GetName().c_str()));
 }
 
 void CLifestoneRecallUseEvent::OnUseAnimSuccess(DWORD motion)
 {
+	_weenie->AdjustMana(_weenie->GetMana() * -0.5);
 	_weenie->TeleportToLifestone();
 	Done();
 }
@@ -3667,7 +3581,7 @@ void CHouseRecallUseEvent::OnReadyToUse()
 {
 	_weenie->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 	ExecuteUseAnimation(Motion_HouseRecall);
-	_weenie->SendText(csprintf("%s is recalling home.", _weenie->GetName().c_str()), LTT_RECALL);
+	g_pWorld->BroadcastLocal(_weenie->GetLandcell(), csprintf("%s is recalling home.", _weenie->GetName().c_str()));
 }
 
 void CHouseRecallUseEvent::OnUseAnimSuccess(DWORD motion)
@@ -3680,7 +3594,7 @@ void CMansionRecallUseEvent::OnReadyToUse()
 {
 	_weenie->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 	ExecuteUseAnimation(Motion_HouseRecall);
-	_weenie->SendText(csprintf("%s is recalling to the Allegiance housing.", _weenie->GetName().c_str()), LTT_RECALL);
+	g_pWorld->BroadcastLocal(_weenie->GetLandcell(), csprintf("%s is recalling to the Allegiance housing.", _weenie->GetName().c_str()));
 }
 
 void CMansionRecallUseEvent::OnUseAnimSuccess(DWORD motion)
@@ -3693,7 +3607,7 @@ void CMarketplaceRecallUseEvent::OnReadyToUse()
 {
 	_weenie->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 	ExecuteUseAnimation(Motion_MarketplaceRecall);
-	_weenie->SendText(csprintf("%s is going to the Marketplace.", _weenie->GetName().c_str()), LTT_RECALL);
+	g_pWorld->BroadcastLocal(_weenie->GetLandcell(), csprintf("%s is going to the Marketplace.", _weenie->GetName().c_str()));
 }
 
 void CMarketplaceRecallUseEvent::OnUseAnimSuccess(DWORD motion)
@@ -3712,7 +3626,7 @@ void CAllegianceHometownRecallUseEvent::OnReadyToUse()
 {
 	_weenie->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
 	ExecuteUseAnimation(Motion_AllegianceHometownRecall);
-	_weenie->SendText(csprintf("%s is going to the Allegiance hometown.", _weenie->GetName().c_str()), LTT_RECALL);
+	g_pWorld->BroadcastLocal(_weenie->GetLandcell(), csprintf("%s is going to the Allegiance hometown.", _weenie->GetName().c_str()));
 }
 
 void CAllegianceHometownRecallUseEvent::OnUseAnimSuccess(DWORD motion)
@@ -3737,23 +3651,34 @@ void CPlayerWeenie::OnTeleported()
 
 DWORD CPlayerWeenie::GetAccountHouseId()
 {
-	DWORD currentCharacterId = GetID();
-	for (auto &character : GetClient()->GetCharacters())
+	if (GetClient())
 	{
-		if (character.weenie_id == currentCharacterId)
+		for (auto &character : GetClient()->GetCharacters())
 		{
-			if (DWORD houseID = InqDIDQuality(HOUSEID_DID, 0))
-				return houseID;
-		}
-		else
-		{
-			CWeenieObject *otherCharacter = CWeenieObject::Load(character.weenie_id);
-			if (DWORD houseID = otherCharacter->InqDIDQuality(HOUSEID_DID, 0))
+			if (character.weenie_id == id)
 			{
-				delete otherCharacter;
-				return houseID;
+				if (DWORD houseID = InqDIDQuality(HOUSEID_DID, 0))
+					return houseID;
 			}
-			delete otherCharacter;
+			else
+			{
+				CWeenieObject *otherCharacter = CWeenieObject::Load(character.weenie_id);
+
+				if (!otherCharacter)
+				{
+					WINLOG(Temp, Normal, "Failed to Load Character id: %u", character.weenie_id, " in GetAccountHouseID()");
+					SERVER_ERROR << "Failed to Load Character id: %u" << character.weenie_id << " in GetAccountHouseID()";
+				}
+				else
+				{
+					if (DWORD houseID = otherCharacter->InqDIDQuality(HOUSEID_DID, 0))
+					{
+						delete otherCharacter;
+						return houseID;
+					}
+					delete otherCharacter;
+				}
+			}
 		}
 	}
 
@@ -3762,25 +3687,27 @@ DWORD CPlayerWeenie::GetAccountHouseId()
 
 TradeManager* CPlayerWeenie::GetTradeManager()
 {
-		return m_pTradeManager;
+	return m_pTradeManager;
 }
 
 void CPlayerWeenie::SetTradeManager(TradeManager * tradeManager)
 {
-		m_pTradeManager = tradeManager;
+	m_pTradeManager = tradeManager;
 }
+
 void CPlayerWeenie::ReleaseContainedItemRecursive(CWeenieObject *item)
 {
-		CContainerWeenie::ReleaseContainedItemRecursive(item);
+	CContainerWeenie::ReleaseContainedItemRecursive(item);
 }
+
 void CPlayerWeenie::ChangeCombatMode(COMBAT_MODE mode, bool playerRequested)
 {
-		CMonsterWeenie::ChangeCombatMode(mode, playerRequested);
+	CMonsterWeenie::ChangeCombatMode(mode, playerRequested);
 
-		if (m_pTradeManager && mode != NONCOMBAT_COMBAT_MODE)
-		{
-				m_pTradeManager->CloseTrade(this, 2); // EnteredCombat
-		}
+	if (m_pTradeManager && mode != NONCOMBAT_COMBAT_MODE)
+	{
+		m_pTradeManager->CloseTrade(this, 2); // EnteredCombat
+	}
 }
 
 void CPlayerWeenie::AddCorpsePermission(CPlayerWeenie * target)
@@ -3931,5 +3858,5 @@ void CPlayerWeenie::UpdatePKActivity()
 	m_iPKActivity = Timer::cur_time + 20;
 
 	//Set LAST_PK_ATTACK_TIMESTAMP_FLOAT for use in CACQualities::JumpStaminaCost as m_iPKActivity is not available.
-	m_Qualities.SetFloat(LAST_PK_ATTACK_TIMESTAMP_FLOAT, (double)m_iPKActivity);
+	m_Qualities.SetFloat(LAST_PK_ATTACK_TIMESTAMP_FLOAT, (double) m_iPKActivity);
 }
