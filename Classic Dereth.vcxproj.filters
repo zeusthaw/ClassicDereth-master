@@ -393,6 +393,7 @@
     <ClInclude Include="..\..\..\..\..\Downloads\gdlenhanced-AdminDBtool\Source\easylogging++.h" />
     <ClInclude Include="Source\easylogging++.h" />
     <ClInclude Include="Source\RecipeFactory.h" />
+    <ClInclude Include="Source\PhatSDK\Header.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource\PhatAC.rc" />

@@ -32,7 +32,6 @@ public:
 	void BeginLogout();
 	void OnLogoutCompleted();
 	void ExitWorld();
-	// Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/3cf018646aa989931b63beb0781d4e1a62339746 //
 	void ForceLogout();
 
 	void ActionComplete(int error = WERROR_NONE);
@@ -81,7 +80,7 @@ public:
 	// Allegiance functionality
 	void TrySwearAllegiance(DWORD target);
 	void TryBreakAllegiance(DWORD target);
-	void SetRequestAllegianceUpdate(int on);
+	void SetRequestAllegianceUpdate(bool on);
 	void SendAllegianceUpdate();
 	void SendAllegianceMOTD();
 	void AllegianceInfoRequest(const std::string &target);
@@ -103,14 +102,14 @@ public:
 	void HouseMansionRecall();
 
 	void HouseRequestAccessList();
-	
+
 	void HouseAddPersonToAccessList(std::string name);
 	void HouseRemovePersonFromAccessList(std::string name);
 	void HouseAddOrRemovePersonToStorageList(std::string name, bool isAdd);
 
 	void HouseAddOrRemoveAllegianceToAccessList(bool isAdd);
 	void HouseAddOrRemoveAllegianceToStorageList(bool isAdd);
-	
+
 	void HouseToggleOpenAccess(bool newSetting);
 	void HouseToggleOpenStorageAccess();
 
@@ -121,7 +120,7 @@ public:
 	void NoLongerViewingContents(DWORD container_id);
 
 private:
-	CClient *m_pClient;
+	CClient * m_pClient;
 
 	CPlayerWeenie *m_pPlayer;
 

@@ -19,15 +19,18 @@
 #include "Player.h"
 #include "ChatMsgs.h"
 #include "Movement.h"
+#include "EmoteManager.h"
 #include "MovementManager.h"
 #include "Vendor.h"
 #include "AllegianceManager.h"
 #include "House.h"
 #include "SpellcastingManager.h"
 #include "TradeManager.h"
+//#include "ChessManager.h"
 #include <chrono>
 
 #include "Config.h"
+#include "Messages.h"
 
 CClientEvents::CClientEvents(CClient *parent)
 {
@@ -63,8 +66,35 @@ CPlayerWeenie *CClientEvents::GetPlayer()
 	return m_pPlayer;
 }
 
+std::string GetAgeString(int age)
+{
+	int mo = age / 2629800; // seconds in a month
+	int leftover = age % 2629800;
+	int d = leftover / 86400; // seconds in a day
+	leftover %= 86400;
+	int h = leftover / 3600; // seconds in an hour
+	leftover %= 3600;
+	int m = leftover / 60; // seconds in a minute
+	leftover %= 60;
+	int s = leftover;
+	std::string out = "You have played for ";
+	if (mo)
+		out += csprintf("%dmo ", mo);
+	if (d)
+		out += csprintf("%dd ", d);
+	if (h)
+		out += csprintf("%dh ", h);
+	if (m)
+		out += csprintf("%dm ", m);
+	out += csprintf("%ds.", s);
+	return out;
+}
+
 void CClientEvents::ExitWorld()
 {
+	auto t = chrono::system_clock::to_time_t(chrono::system_clock::now());
+	m_pPlayer->m_Qualities.SetInt(LOGOFF_TIMESTAMP_INT, t);
+
 	DetachPlayer();
 	m_pClient->ExitWorld();
 }
@@ -73,6 +103,19 @@ void CClientEvents::Think()
 {
 	if (m_pPlayer)
 	{
+		// update in-game age
+		int time_now = chrono::system_clock::to_time_t(chrono::system_clock::now());
+
+		if (time_now > (last_age_update + 15))
+		{
+			int age = m_pPlayer->m_Qualities.GetInt(AGE_INT, 0);
+			int time_diff = time_now - last_age_update;
+			age += time_diff;
+			m_pPlayer->m_Qualities.SetInt(AGE_INT, age);
+			m_pPlayer->NotifyIntStatUpdated(AGE_INT);
+			last_age_update = time_now;
+		}
+
 		if (m_bSendAllegianceUpdates)
 		{
 			if (m_fNextAllegianceUpdate <= g_pGlobals->Time())
@@ -104,7 +147,6 @@ void CClientEvents::BeginLogout()
 	}
 }
 
-// Merged from GDLE2 Team https://gitlab.com/Scribble/gdlenhanced/commit/3cf018646aa989931b63beb0781d4e1a62339746 //
 void CClientEvents::ForceLogout()
 {
 	if (m_pPlayer && !m_pPlayer->IsLoggingOut())
@@ -112,7 +154,6 @@ void CClientEvents::ForceLogout()
 		m_pPlayer->BeginLogout();
 	}
 }
-
 
 void CClientEvents::OnLogoutCompleted()
 {
@@ -169,9 +210,8 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 
 	m_pPlayer->SetLoginPlayerQualities(); // overrides
 	m_pPlayer->RecalculateEncumbrance();
-	m_pPlayer->RecalculateCoinAmount(W_COINSTACK_CLASS);
 	m_pPlayer->LoginCharacter();
-	
+
 	last_age_update = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
 	// give characters created before creation timestamp was being set a timestamp and DOB from their DB date_created
@@ -196,7 +236,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		m_pPlayer->m_Qualities.SetFloat(GLOBAL_XP_MOD_FLOAT, 1.0);
 		m_pPlayer->NotifyFloatStatUpdated(GLOBAL_XP_MOD_FLOAT);
 	}
-
 
 	last_age_update = chrono::system_clock::to_time_t(chrono::system_clock::now());
 
@@ -252,7 +291,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		}
 	}
 
-	for (auto wielded : m_pPlayer->m_Wielded) 
+	for (auto wielded : m_pPlayer->m_Wielded)
 	{
 
 		// Updates shields to have SHIELD_VALUE_INT
@@ -267,276 +306,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		{
 			wielded->m_Qualities.RemoveDataID(SPELL_DID);
 			wielded->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
-		}
-
-
-
-
-
-		//Elemental Yumi Bow Fix
-		DWORD yumiSlash;
-		DWORD yumiPierce;
-		DWORD yumiBludge;
-		DWORD yumiAcid;
-		DWORD yumiElectric;
-		DWORD yumiFrost;
-		DWORD yumiFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiSlash) && yumiSlash == 33559028)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiPierce) && yumiPierce == 33559027)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiBludge) && yumiBludge == 33559030)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiAcid) && yumiAcid == 33559029)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiElectric) && yumiElectric == 33559031)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFrost) && yumiFrost == 33559026)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFlame) && yumiFlame == 33559025)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-		//Compound Bow Fix
-		DWORD compoundBow;
-		DWORD compoundBowSlash;
-		DWORD compoundBowPierce;
-		DWORD compoundBowBludge;
-		DWORD compoundBowAcid;
-		DWORD compoundBowElectric;
-		DWORD compoundBowFrost;
-		DWORD compoundBowFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBow) && compoundBow == 0x0200144E)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Compound Bow");//Re-Write the name to match Item//
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowSlash) && compoundBowSlash == 0x02001488)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slicing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowPierce) && compoundBowPierce == 0x0200148A)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AD);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowBludge) && compoundBowBludge == 0x02001489)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B1);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smashing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowAcid) && compoundBowAcid == 0x02001475)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AE);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Corrosive Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowElectric) && compoundBowElectric == 0x02001472)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AF);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Sparking Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFrost) && compoundBowFrost == 0x02001473)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AA);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Chilling Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFlame) && compoundBowFlame == 0x02001474)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B0);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Searing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-
-		//Spadone Fix
-		DWORD spadonePhysical;
-		DWORD spadoneElectric;
-		DWORD spadoneAcid;
-		DWORD spadoneFrost;
-		DWORD spadoneFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadonePhysical) && spadonePhysical == 0x0200130B)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Spadone");//Re-Write the name to match Item//
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneElectric) && spadoneElectric == 0x02001892)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Electric Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneAcid) && spadoneAcid == 0x02001891)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Acid Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFrost) && spadoneFrost == 0x02001890)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Frost Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFlame) && spadoneFlame == 0x0200188F)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Flame Spadone");//Re-Write the name to match Item//
-		}
-
-		//  Elemental Staff Fix  //
-		int staffSlash;
-		int staffPierce;
-		int staffBludge;
-		int staffAcid;
-		int staffElectric;
-		int staffFrost;
-		int staffFlame;
-
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffSlash) && staffSlash == SLASH_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slashing Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x02001850);
-
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffPierce) && staffPierce == PIERCE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184F);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffBludge) && staffBludge == BLUDGEON_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Bludgeoning Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184B);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffAcid) && staffAcid == ACID_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Acid Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184A);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffElectric) && staffElectric == ELECTRIC_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Electric Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184C);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFrost) && staffFrost == COLD_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Frost Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184E);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFlame) && staffFlame == FIRE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Fire Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184D);
 		}
 
 	}
@@ -556,273 +325,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 			item->m_Qualities.RemoveDataID(SPELL_DID);
 			item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
 		}
-
-
-		//Elemental Yumi Bow Fix
-		DWORD yumiSlash;
-		DWORD yumiPierce;
-		DWORD yumiBludge;
-		DWORD yumiAcid;
-		DWORD yumiElectric;
-		DWORD yumiFrost;
-		DWORD yumiFlame;
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiSlash) && yumiSlash == 33559028)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiPierce) && yumiPierce == 33559027)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiBludge) && yumiBludge == 33559030)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiAcid) && yumiAcid == 33559029)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiElectric) && yumiElectric == 33559031)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiFrost) && yumiFrost == 33559026)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, yumiFlame) && yumiFlame == 33559025)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-		//Compound Bow Fix
-		DWORD compoundBow;
-		DWORD compoundBowSlash;
-		DWORD compoundBowPierce;
-		DWORD compoundBowBludge;
-		DWORD compoundBowAcid;
-		DWORD compoundBowElectric;
-		DWORD compoundBowFrost;
-		DWORD compoundBowFlame;
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBow) && compoundBow == 0x0200144E)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Compound Bow");//Re-Write the name to match Item//
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowSlash) && compoundBowSlash == 0x02001488)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Slicing Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowPierce) && compoundBowPierce == 0x0200148A)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AD);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Piercing Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowBludge) && compoundBowBludge == 0x02001489)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060B1);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Smashing Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowAcid) && compoundBowAcid == 0x02001475)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AE);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Corrosive Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowElectric) && compoundBowElectric == 0x02001472)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AF);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Sparking Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowFrost) && compoundBowFrost == 0x02001473)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060AA);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Chilling Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowFlame) && compoundBowFlame == 0x02001474)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x0060060B0);//Compound Bow Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Searing Compound Bow");//Re-Write the name to match Item//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			item->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-		//Spadone Fix//
-		DWORD spadonePhysical; 
-		DWORD spadoneElectric; 
-		DWORD spadoneAcid;  
-		DWORD spadoneFrost;
-		DWORD spadoneFlame;
-		if (item->m_Qualities.InqDataID(SETUP_DID, spadonePhysical) && spadonePhysical == 0x0200130B)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Spadone");//Re-Write the name to match Item//
-
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, spadoneElectric) && spadoneElectric == 0x02001892)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
-			item->m_Qualities.SetString(NAME_STRING, "Electric Spadone");//Re-Write the name to match Item//
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, spadoneAcid) && spadoneAcid == 0x02001891)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Acid Spadone");//Re-Write the name to match Item//
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, spadoneFrost) && spadoneFrost == 0x02001890)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Frost Spadone");//Re-Write the name to match Item//
-		}
-		if (item->m_Qualities.InqDataID(SETUP_DID, spadoneFlame) && spadoneFlame == 0x0200188F)
-		{
-			item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Flame Spadone");//Re-Write the name to match Item//
-		}
-
-		//  Elemental Staff Fix  //
-		int staffSlash;
-		int staffPierce;
-		int staffBludge;
-		int staffAcid;
-		int staffElectric;
-		int staffFrost;
-		int staffFlame;
-
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffSlash) && staffSlash == SLASH_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Slashing Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x02001850);
-
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffPierce) && staffPierce == PIERCE_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Piercing Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184F);
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffBludge) && staffBludge == BLUDGEON_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Bludgeoning Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184B);
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffAcid) && staffAcid == ACID_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Acid Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184A);
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffElectric) && staffElectric == ELECTRIC_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Electric Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184C);
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFrost) && staffFrost == COLD_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Frost Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184E);
-		}
-		if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFlame) && staffFlame == FIRE_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-			item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			item->m_Qualities.SetString(NAME_STRING, "Fire Staff");//Re-Write the name to match Item//
-			item->m_Qualities.SetDataID(SETUP_DID, 0x0200184D);
-		}
-
 	}
 
 	for (auto pack : m_pPlayer->m_Packs)
@@ -847,389 +349,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 					item->m_Qualities.RemoveDataID(SPELL_DID);
 					item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
 				}
-
-				//Elemental Yumi XBow Fix
-				DWORD yumiXSlash;
-				DWORD yumiXPierce;
-				DWORD yumiXBludge;
-				DWORD yumiXAcid;
-				DWORD yumiXElectric;
-				DWORD yumiXFrost;
-				DWORD yumiXFlame;
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXSlash) && yumiXSlash == 33559028)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXPierce) && yumiXPierce == 33559027)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXBludge) && yumiXBludge == 33559030)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXAcid) && yumiXAcid == 33559029)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXElectric) && yumiXElectric == 33559031)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXFrost) && yumiXFrost == 33559026)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiXFlame) && yumiXFlame == 33559025)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-				}
-
-				//Elemental Yumi Bow Fix
-				DWORD yumiSlash;
-				DWORD yumiPierce;
-				DWORD yumiBludge;
-				DWORD yumiAcid;
-				DWORD yumiElectric;
-				DWORD yumiFrost;
-				DWORD yumiFlame;
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiSlash) && yumiSlash == 33559028)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiPierce) && yumiPierce == 33559027)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiBludge) && yumiBludge == 33559030)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiAcid) && yumiAcid == 33559029)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiElectric) && yumiElectric == 33559031)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiFrost) && yumiFrost == 33559026)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, yumiFlame) && yumiFlame == 33559025)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-				}
-
-				//Compound Bow Fix
-				DWORD compoundBow;
-				DWORD compoundBowSlash;
-				DWORD compoundBowPierce;
-				DWORD compoundBowBludge;
-				DWORD compoundBowAcid;
-				DWORD compoundBowElectric;
-				DWORD compoundBowFrost;
-				DWORD compoundBowFlame;
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBow) && compoundBow == 0x0200144E)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Compound Bow");//Re-Write the name to match Item//
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowSlash) && compoundBowSlash == 0x02001488)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Slicing Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowPierce) && compoundBowPierce == 0x0200148A)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AD);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Piercing Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowBludge) && compoundBowBludge == 0x02001489)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060B1);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Smashing Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowAcid) && compoundBowAcid == 0x02001475)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AE);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Corrosive Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowElectric) && compoundBowElectric == 0x02001472)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AF);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Sparking Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowFrost) && compoundBowFrost == 0x02001473)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060AA);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Chilling Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, compoundBowFlame) && compoundBowFlame == 0x02001474)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x0060060B0);//Compound Bow Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Searing Compound Bow");//Re-Write the name to match Item//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-				}
-
-				/*Claw Fix
-				DWORD clawPhysical;
-				DWORD clawElectric;
-				DWORD clawAcid;
-				DWORD clawFire;
-				DWORD clawFrost;
-				if (item->m_Qualities.InqDataID(SETUP_DID, clawPhysical) && clawPhysical == 0x02001448)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//TOD Claw Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Claw");//Re-Write the name to match Item//
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, clawElectric) && clawElectric == 0x0200145A)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//TOD Claw Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Lightning Claw");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, clawAcid) && clawAcid == 0x02001891)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//TOD Claw Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Acid Claw");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, clawFire) && clawFire == 0x0200145C)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//TOD Claw Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Flame Claw");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, clawFrost) && clawFrost == 0x0200145B)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//TOD Claw Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Frost Claw");//Re-Write the name to match Item//
-				}
-				*/
-
-				//Spadone Fix
-				DWORD spadonePhysical;
-				DWORD spadoneElectric;
-				DWORD spadoneAcid;
-				DWORD spadoneFrost;
-				DWORD spadoneFlame;
-				if (item->m_Qualities.InqDataID(SETUP_DID, spadonePhysical) && spadonePhysical == 0x0200130B)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Spadone");//Re-Write the name to match Item//
-
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, spadoneElectric) && spadoneElectric == 0x02001892)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
-					item->m_Qualities.SetString(NAME_STRING, "Electric Spadone");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, spadoneAcid) && spadoneAcid == 0x02001891)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Acid Spadone");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, spadoneFrost) && spadoneFrost == 0x02001890)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Frost Spadone");//Re-Write the name to match Item//
-				}
-				if (item->m_Qualities.InqDataID(SETUP_DID, spadoneFlame) && spadoneFlame == 0x0200188F)
-				{
-					item->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Flame Spadone");//Re-Write the name to match Item//
-				}
-
-				//  Elemental Staff Fix  //
-				int staffSlash;
-				int staffPierce;
-				int staffBludge;
-				int staffAcid;
-				int staffElectric;
-				int staffFrost;
-				int staffFlame;
-
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffSlash) && staffSlash == SLASH_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Slashing Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x02001850);
-
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffPierce) && staffPierce == PIERCE_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Piercing Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184F);
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffBludge) && staffBludge == BLUDGEON_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Bludgeoning Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184B);
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffAcid) && staffAcid == ACID_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Acid Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184A);
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffElectric) && staffElectric == ELECTRIC_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Electric Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184C);
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFrost) && staffFrost == COLD_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Frost Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184E);
-				}
-				if (item->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFlame) && staffFlame == FIRE_DAMAGE_TYPE && item->InqStringQuality(NAME_STRING, "") == "Staff")
-				{
-					//item->m_Qualities.SetDataID(ICON_DID, 0x6006852);//Elemental Staff Icon//
-					item->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-					item->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-					item->m_Qualities.SetString(NAME_STRING, "Fire Staff");//Re-Write the name to match Item//
-					item->m_Qualities.SetDataID(SETUP_DID, 0x0200184D);
-				}
-
 			}
 		}
 	}
@@ -1257,15 +376,15 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 	if (m_pPlayer->m_Qualities.GetInt(HERITAGE_GROUP_INT, 0) == Empyrean_HeritageGroup && m_pPlayer->m_Qualities.GetDID(MOTION_TABLE_DID, 0x9000001) == 0x9000001)
 		m_pPlayer->m_Qualities.SetDataID(MOTION_TABLE_DID, 0x9000207);
 
-	m_pPlayer->SendText("Classic Dereth:E Now Enhanced with Source Edits provided by the GDLE Team!" SERVER_VERSION_NUMBER_STRING " " SERVER_VERSION_STRING, LTT_DEFAULT);
-	m_pPlayer->SendText("GDLE is Maintained by, ChosenOne, LikeableLime, Scribble and the GDLE Dev Team. Contact them at https://discord.gg/WzGX348", LTT_DEFAULT);
-	m_pPlayer->SendText("Powered by GamesDeadLol(GDL). Not an official Asheron's Call server.", LTT_DEFAULT);
-	SendAllegianceMOTD();
+	m_pPlayer->SendText("GDLEnhanced " SERVER_VERSION_NUMBER_STRING " " SERVER_VERSION_STRING, LTT_DEFAULT);
+	m_pPlayer->SendText("Maintained by the GDLE Development Team. Contact us at https://discord.gg/WzGX348", LTT_DEFAULT);
+	m_pPlayer->SendText("Powered by GamesDeadLol. Not an official Asheron's Call server.", LTT_DEFAULT);
+	//SendAllegianceMOTD();
 
 	/*
 	if (*g_pConfig->WelcomeMessage() != 0)
 	{
-		m_pPlayer->SendText(g_pConfig->WelcomeMessage(), LTT_DEFAULT);
+	m_pPlayer->SendText(g_pConfig->WelcomeMessage(), LTT_DEFAULT);
 	}
 	*/
 
@@ -1314,7 +433,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 					if (item->m_Qualities.InqInt(ITEM_SKILL_LEVEL_LIMIT_INT, difficulty, TRUE, FALSE) && item->m_Qualities.InqDataID(ITEM_SKILL_LIMIT_DID, skillActivationTypeDID))
 					{
 						STypeSkill skillActivationType = SkillTable::OldToNewSkill((STypeSkill)skillActivationTypeDID);
-
 
 						DWORD skillLevel = 0;
 						if (!m_pPlayer->m_Qualities.InqSkill(skillActivationType, skillLevel, FALSE) || (int)skillLevel < difficulty)
@@ -1369,7 +487,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 			}
 		}
 	}
-
 	m_pPlayer->DebugValidate();
 
 	return;
@@ -1382,32 +499,33 @@ void CClientEvents::SendText(const char *szText, long lColor)
 
 void CClientEvents::Attack(DWORD target, DWORD height, float power)
 {
+
 	if (height <= 0 || height >= ATTACK_HEIGHT::NUM_ATTACK_HEIGHTS)
 	{
-		SERVER_WARN << "Bad melee attack height %u sent by player 0x%08X\n", height, m_pPlayer->GetID();
+		SERVER_WARN << "Bad melee attack height" << height << "sent by player" << m_pPlayer->GetID();
 		return;
 	}
 
 	if (power < 0.0f || power > 1.0f)
 	{
-		SERVER_WARN << "Bad melee attack power %f sent by player 0x%08X\n", power, m_pPlayer->GetID();
+		SERVER_WARN << "Bad melee attack power" << power << "sent by player" << m_pPlayer->GetID();
 		return;
 	}
 
-	m_pPlayer->TryMeleeAttack(target, (ATTACK_HEIGHT) height, power);
+	m_pPlayer->TryMeleeAttack(target, (ATTACK_HEIGHT)height, power);
 }
 
 void CClientEvents::MissileAttack(DWORD target, DWORD height, float power)
 {
 	if (height <= 0 || height >= ATTACK_HEIGHT::NUM_ATTACK_HEIGHTS)
 	{
-		SERVER_WARN << "Bad missile attack height %u sent by player 0x%08X\n", height, m_pPlayer->GetID();
+		SERVER_WARN << "Bad missile attack height" << height << "sent by player" << m_pPlayer->GetID();
 		return;
 	}
 
 	if (power < 0.0f || power > 1.0f)
 	{
-		SERVER_WARN << "Bad missile attack power %f sent by player 0x%08X\n", power, m_pPlayer->GetID();
+		SERVER_WARN << "Bad missile attack power" << power << "sent by player" << m_pPlayer->GetID();
 		return;
 	}
 
@@ -1429,15 +547,22 @@ void CClientEvents::SendTellByGUID(const char* szText, DWORD dwGUID)
 	/*
 	if (dwGUID == m_pPlayer->GetID())
 	{
-		m_pPlayer->SendNetMessage(ServerText("You really need some new friends..", 1), PRIVATE_MSG, FALSE);
-		return;
+	m_pPlayer->SendNetMessage(ServerText("You really need some new friends..", 1), PRIVATE_MSG, FALSE);
+	return;
 	}
 	*/
 
 	CPlayerWeenie *pTarget;
 
 	if (!(pTarget = g_pWorld->FindPlayer(dwGUID)))
+	{
+		CWeenieObject *target = g_pWorld->FindObject(dwGUID);
+
+		if (target && !target->m_Qualities._emote_table->_emote_table.empty())
+			target->MakeEmoteManager()->ChanceExecuteEmoteSet(ReceiveTalkDirect_EmoteCategory, szText, m_pPlayer->GetID());
+
 		return;
+	}
 
 	if (pTarget->GetID() != m_pPlayer->GetID())
 	{
@@ -1447,6 +572,7 @@ void CClientEvents::SendTellByGUID(const char* szText, DWORD dwGUID)
 	}
 
 	pTarget->SendNetMessage(DirectChat(szText, m_pPlayer->GetName().c_str(), m_pPlayer->GetID(), pTarget->GetID(), 3), PRIVATE_MSG, TRUE);
+
 }
 
 void CClientEvents::SendTellByName(const char* szText, const char* szName)
@@ -1493,9 +619,9 @@ void CClientEvents::ClientText(const char *szText)
 	std::string filteredText = m_pClient->GetAccessLevel() >= SENTINEL_ACCESS ? szText : FilterBadChatCharacters(szText);
 	szText = filteredText.c_str(); // hacky
 
-	if (szText[0] == '!' || szText[0] == '@' || szText[0] == '/')
+	if (szText[0] == '@' || szText[0] == '/')
 	{
-		CommandBase::Execute((char *) (++szText), m_pClient);
+		CommandBase::Execute((char *)(++szText), m_pClient);
 	}
 	else
 	{
@@ -1525,7 +651,7 @@ void CClientEvents::ActionText(const char *text)
 {
 	if (strlen(text) > 300)
 		return;
-	
+
 	while (text[0] == ' ') //Skip leading spaces.
 		text++;
 	if (text[0] == '\0') //Make sure the text isn't blank
@@ -1548,15 +674,15 @@ void CClientEvents::ChannelText(DWORD channel_id, const char *text)
 	switch (channel_id)
 	{
 	case Fellow_ChannelID:
-		{
-			std::string fellowName;
-			if (!m_pPlayer->m_Qualities.InqString(FELLOWSHIP_STRING, fellowName))
-				return;
+	{
+		std::string fellowName;
+		if (!m_pPlayer->m_Qualities.InqString(FELLOWSHIP_STRING, fellowName))
+			return;
 
-			g_pFellowshipManager->Chat(fellowName, m_pPlayer->GetID(), text);
-			CHAT_LOG << m_pPlayer->GetName().c_str() << "says (fellowship)," << text;
-			break;
-		}
+		g_pFellowshipManager->Chat(fellowName, m_pPlayer->GetID(), text);
+		CHAT_LOG << m_pPlayer->GetName().c_str() << "says (fellowship)," << text;
+		break;
+	}
 
 	case Patron_ChannelID:
 		g_pAllegianceManager->ChatPatron(m_pPlayer->GetID(), text);
@@ -1589,6 +715,7 @@ void CClientEvents::RequestHealthUpdate(DWORD dwGUID)
 		if (pEntity->IsCreature())
 		{
 			m_pPlayer->SetLastHealthRequest(pEntity->GetID());
+
 			m_pClient->SendNetMessage(HealthUpdate((CMonsterWeenie *)pEntity), PRIVATE_MSG, TRUE, TRUE);
 		}
 	}
@@ -1677,8 +804,8 @@ void CClientEvents::Identify(DWORD target_id)
 
 	if (!pTarget)
 	{
-		// used to check for vendor items, temporary, should be changed
-		pTarget = g_pWorld->FindObject(target_id);
+	// used to check for vendor items, temporary, should be changed
+	pTarget = g_pWorld->FindObject(target_id);
 	}
 	*/
 
@@ -1693,12 +820,12 @@ void CClientEvents::Identify(DWORD target_id)
 	{
 		pTarget->TryIdentify(m_pPlayer);
 		m_pPlayer->SetLastAssessed(pTarget->GetID());
-	}	
+	}
 
 	_next_allowed_identify = Timer::cur_time + 0.5;
 }
 
-void CClientEvents::SpendAttributeXP(STypeAttribute key, DWORD amount)
+void CClientEvents::SpendAttributeXP(STypeAttribute key, DWORD exp)
 {
 	// TODO use attribute map
 	if (key < 1 || key > 6)
@@ -1708,20 +835,35 @@ void CClientEvents::SpendAttributeXP(STypeAttribute key, DWORD amount)
 
 	__int64 unassignedExp = 0;
 	m_pPlayer->m_Qualities.InqInt64(AVAILABLE_EXPERIENCE_INT64, unassignedExp);
-	if ((unsigned __int64)unassignedExp < (unsigned __int64)amount)
+	if ((unsigned __int64)unassignedExp < (unsigned __int64)exp)
 	{
 		// Not enough experience
 		return;
 	}
 
-	m_pPlayer->GiveAttributeXP(key, amount);
-	m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)amount);
+	Attribute attr;
+	if (!m_pPlayer->m_Qualities.InqAttribute(key, attr))
+	{
+		// Doesn't have the attribute
+		return;
+	}
 
-	m_pPlayer->NotifyAttributeStatUpdated(key);
-	m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	const DWORD amountNeededForMaxXp = attr.GetXpNeededForMaxXp();
+
+	exp = min(exp, amountNeededForMaxXp);
+
+	if (exp > 0)
+	{
+		m_pPlayer->GiveAttributeXP(key, exp);
+		m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)exp);
+
+		m_pPlayer->NotifyAttributeStatUpdated(key);
+		m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	}
+
 }
 
-void CClientEvents::SpendAttribute2ndXP(STypeAttribute2nd key, DWORD amount)
+void CClientEvents::SpendAttribute2ndXP(STypeAttribute2nd key, DWORD exp)
 {
 	// TODO use vital map
 	if (key != 1 && key != 3 && key != 5)
@@ -1731,16 +873,32 @@ void CClientEvents::SpendAttribute2ndXP(STypeAttribute2nd key, DWORD amount)
 
 	__int64 unassignedExp = 0;
 	m_pPlayer->m_Qualities.InqInt64(AVAILABLE_EXPERIENCE_INT64, unassignedExp);
-	if ((unsigned __int64)unassignedExp < (unsigned __int64)amount)
+	if ((unsigned __int64)unassignedExp < (unsigned __int64)exp)
 	{
 		// Not enough experience
 		return;
 	}
 
-	m_pPlayer->GiveAttribute2ndXP(key, amount);
+	SecondaryAttribute attr;
+	if (!m_pPlayer->m_Qualities.InqAttribute2nd(key, attr))
+	{
+		// Doesn't have the secondary attribute
+		return;
+	}
 
-	m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)amount);
-	m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	const DWORD amountNeededForMaxXp = attr.GetXpNeededForMaxXp();
+
+	// If the exp is more than is needed to reach max, it is limited to the amount needed to reach max
+	// This is done as the client may send more than the amount needed if it is desynced
+	exp = min(exp, amountNeededForMaxXp);
+
+	if (exp > 0)
+	{
+		m_pPlayer->GiveAttribute2ndXP(key, exp);
+		m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)exp);
+		m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	}
+
 }
 
 void CClientEvents::SpendSkillXP(STypeSkill key, DWORD exp)
@@ -1762,10 +920,22 @@ void CClientEvents::SpendSkillXP(STypeSkill key, DWORD exp)
 		return;
 	}
 
-	m_pPlayer->GiveSkillXP(key, exp);
+	const DWORD amountNeededForMaxXp = skill.GetXpNeededForMaxXp();
 
-	m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)exp);
-	m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	// If the exp is more than is needed to reach max, it is limited to the amount needed to reach max
+	// This is done as the client may send more than the amount needed if it is desynced
+	exp = min(exp, amountNeededForMaxXp);
+
+
+	if (exp > 0)
+	{
+		// Only give the skill exp if it's not maxed
+		m_pPlayer->GiveSkillXP(key, exp);
+
+		m_pPlayer->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, (unsigned __int64)unassignedExp - (unsigned __int64)exp);
+		m_pPlayer->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+	}
+
 }
 
 void CClientEvents::SpendSkillCredits(STypeSkill key, DWORD credits)
@@ -1796,6 +966,8 @@ void CClientEvents::SpendSkillCredits(STypeSkill key, DWORD credits)
 	}
 
 	m_pPlayer->GiveSkillAdvancementClass(key, TRAINED_SKILL_ADVANCEMENT_CLASS);
+	m_pPlayer->m_Qualities.SetSkillLevel(key, 5);
+	m_pPlayer->NotifySkillStatUpdated(key);
 
 	m_pPlayer->m_Qualities.SetInt(AVAILABLE_SKILL_CREDITS_INT, unassignedCredits - costToRaise);
 	m_pPlayer->NotifyIntStatUpdated(AVAILABLE_SKILL_CREDITS_INT);
@@ -1803,6 +975,12 @@ void CClientEvents::SpendSkillCredits(STypeSkill key, DWORD credits)
 
 void CClientEvents::LifestoneRecall()
 {
+	if (m_pPlayer->CheckPKActivity())
+	{
+		m_pPlayer->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+		return;
+	}
+
 	Position lifestone;
 	if (m_pPlayer->m_Qualities.InqPosition(SANCTUARY_POSITION, lifestone) && lifestone.objcell_id)
 	{
@@ -1819,6 +997,12 @@ void CClientEvents::LifestoneRecall()
 
 void CClientEvents::MarketplaceRecall()
 {
+	if (m_pPlayer->CheckPKActivity())
+	{
+		m_pPlayer->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+		return;
+	}
+
 	if (!m_pPlayer->IsBusyOrInAction())
 	{
 		m_pPlayer->ExecuteUseEvent(new CMarketplaceRecallUseEvent());
@@ -1992,20 +1176,14 @@ void CClientEvents::SendAllegianceMOTD()
 	m_pPlayer->SendText(csprintf("\"%s\" -- %s", info->_info.m_motd.c_str(), info->_info.m_motdSetBy.c_str()), LTT_DEFAULT);
 }
 
-void CClientEvents::SetRequestAllegianceUpdate(int on)
+void CClientEvents::SetRequestAllegianceUpdate(bool on)
 {
 	m_bSendAllegianceUpdates = on;
 }
 
 void CClientEvents::TryBreakAllegiance(DWORD target)
 {
-	int error = g_pAllegianceManager->TryBreakAllegiance(m_pPlayer, target);
-	m_pPlayer->NotifyWeenieError(error);
-
-	if (error == WERROR_NONE)
-	{
-		SendAllegianceUpdate();
-	}
+	g_pAllegianceManager->TryBreakAllegiance(m_pPlayer, target);
 }
 
 void CClientEvents::TrySwearAllegiance(DWORD target)
@@ -2016,14 +1194,8 @@ void CClientEvents::TrySwearAllegiance(DWORD target)
 		m_pPlayer->NotifyWeenieError(WERROR_NO_OBJECT);
 		return;
 	}
-	
-	int error = g_pAllegianceManager->TrySwearAllegiance(m_pPlayer, targetWeenie);	
-	m_pPlayer->NotifyWeenieError(error);
 
-	if (error == WERROR_NONE)
-	{
-		SendAllegianceUpdate();
-	}
+	g_pAllegianceManager->TrySwearAllegiance(m_pPlayer, targetWeenie);
 }
 
 void CClientEvents::AllegianceInfoRequest(const std::string &target)
@@ -2089,6 +1261,12 @@ void CClientEvents::TrySetAllegianceMOTD(const std::string &text)
 
 void CClientEvents::AllegianceHometownRecall()
 {
+	if (m_pPlayer->CheckPKActivity())
+	{
+		m_pPlayer->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+		return;
+	}
+
 	AllegianceTreeNode *allegianceNode = g_pAllegianceManager->GetTreeNode(m_pPlayer->GetID());
 
 	if (!allegianceNode)
@@ -2102,7 +1280,9 @@ void CClientEvents::AllegianceHometownRecall()
 	if (allegianceInfo && allegianceInfo->_info.m_BindPoint.objcell_id)
 	{
 		if (!m_pPlayer->IsBusyOrInAction())
+		{
 			m_pPlayer->ExecuteUseEvent(new CAllegianceHometownRecallUseEvent());
+		}
 	}
 	else
 		m_pPlayer->NotifyWeenieError(WERROR_ALLEGIANCE_HOMETOWN_NOT_SET);
@@ -2156,11 +1336,17 @@ void CClientEvents::HouseAbandon()
 
 void CClientEvents::HouseRecall()
 {
+	if (m_pPlayer->CheckPKActivity())
+	{
+		m_pPlayer->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+		return;
+	}
+
 	DWORD houseId = m_pPlayer->GetAccountHouseId();
 	if (houseId)
 	{
 		CHouseData *houseData = g_pHouseManager->GetHouseData(houseId);
-		if (houseData->_ownerAccount == m_pPlayer->GetClient()->GetAccountInfo().id)
+		if (m_pPlayer->GetClient() && houseData->_ownerAccount == m_pPlayer->GetClient()->GetAccountInfo().id)
 		{
 			if (!m_pPlayer->IsBusyOrInAction())
 				m_pPlayer->ExecuteUseEvent(new CHouseRecallUseEvent());
@@ -2174,6 +1360,12 @@ void CClientEvents::HouseRecall()
 
 void CClientEvents::HouseMansionRecall()
 {
+	if (m_pPlayer->CheckPKActivity())
+	{
+		m_pPlayer->SendText("You have been involved in Player Killer combat too recently!", LTT_MAGIC);
+		return;
+	}
+
 	AllegianceTreeNode *allegianceNode = g_pAllegianceManager->GetTreeNode(m_pPlayer->GetID());
 
 	if (!allegianceNode)
@@ -2207,7 +1399,7 @@ void CClientEvents::HouseMansionRecall()
 		}
 	}
 
-	if(allegianceNode->_patronID)
+	if (allegianceNode->_patronID)
 		m_pClient->SendNetMessage(ServerText("Your monarch does not own a mansion or villa!", 7), PRIVATE_MSG);
 	else
 		m_pClient->SendNetMessage(ServerText("You do not own a mansion or villa!", 7), PRIVATE_MSG);
@@ -2604,7 +1796,7 @@ void CClientEvents::HouseClearStorageAccess()
 }
 
 void CClientEvents::NoLongerViewingContents(DWORD container_id)
-{	
+{
 	if (CWeenieObject *remoteContainerObj = g_pWorld->FindObject(container_id))
 	{
 		if (CContainerWeenie *remoteContainer = remoteContainerObj->AsContainer())
@@ -2617,11 +1809,11 @@ void CClientEvents::NoLongerViewingContents(DWORD container_id)
 void CClientEvents::ChangePlayerOption(PlayerOptions option, bool value)
 {
 	auto changeCharOption = [&](DWORD optionBit)
-		{
-			m_pPlayer->_playerModule.options_ &= ~optionBit;
-			if (value)
-				m_pPlayer->_playerModule.options_ |= optionBit;
-		};
+	{
+		m_pPlayer->_playerModule.options_ &= ~optionBit;
+		if (value)
+			m_pPlayer->_playerModule.options_ |= optionBit;
+	};
 
 	auto changeCharOption2 = [&](DWORD optionBit)
 	{
@@ -2651,7 +1843,7 @@ void CClientEvents::ChangePlayerOption(PlayerOptions option, bool value)
 	case DisableMostWeatherEffects_PlayerOption:
 		changeCharOption(DisableMostWeatherEffects_CharacterOption);
 		break;
-		 
+
 	case PersistentAtDay_PlayerOption:
 		changeCharOption2(PersistentAtDay_CharacterOptions2);
 		break;
@@ -2899,11 +2091,6 @@ bool CClientEvents::CheckForChatSpam()
 // This is it!
 void CClientEvents::ProcessEvent(BinaryReader *pReader)
 {
-	if (!m_pPlayer)
-	{
-		return;
-	}
-
 	DWORD dwSequence = pReader->ReadDWORD();
 	DWORD dwEvent = pReader->ReadDWORD();
 	if (pReader->GetLastError()) return;
@@ -2914,1274 +2101,1680 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 
 	switch (dwEvent)
 	{
-		case 0x0005: // Change player option
-			{
-				DWORD option = pReader->ReadDWORD();
-				DWORD value = pReader->ReadDWORD();
-				if (pReader->GetLastError())
-					break;
-
-				ChangePlayerOption((PlayerOptions)option, value ? true : false);
-				break;
-			}
-		case 0x0008: // Melee Attack
-			{
-				DWORD dwTarget = pReader->ReadDWORD();
-				DWORD dwHeight = pReader->ReadDWORD();
-				float flPower = pReader->ReadFloat();
-				if (pReader->GetLastError()) break;
-
-				Attack(dwTarget, dwHeight, flPower);
-				break;
-			}
-		case 0x000A: // Missile Attack
-			{
-				DWORD target = pReader->ReadDWORD();
-				DWORD height = pReader->ReadDWORD();
-				float power = pReader->ReadFloat();
-				if (pReader->GetLastError()) break;
-
-				MissileAttack(target, height, power);
-				break;
-			}
-		case 0x0015: //Client Text
-			{
-				char *szText = pReader->ReadString();
-				if (pReader->GetLastError()) break;
-
-				ClientText(szText);
-				break;
-			}
-		case 0x0019: //Store Item
-			{
-				DWORD dwItemID = pReader->ReadDWORD();
-				DWORD dwContainer = pReader->ReadDWORD();
-				DWORD dwSlot = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				m_pPlayer->MoveItemToContainer(dwItemID, dwContainer, (char)dwSlot);
-				break;
-			}
-		case 0x001A: //Equip Item
-			{
-				DWORD dwItemID = pReader->ReadDWORD();
-				DWORD dwCoverage = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				m_pPlayer->MoveItemToWield(dwItemID, dwCoverage);
-				break;
-			}
-		case 0x001B: //Drop Item
-			{
-				DWORD dwItemID = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				m_pPlayer->MoveItemTo3D(dwItemID);
-				break;
-			}
-		case 0x001D: // Swear Allegiance request
-			{
-				DWORD target = pReader->Read<DWORD>();
-				if (pReader->GetLastError()) break;
-
-				TrySwearAllegiance(target);
-				break;
-			}
-		case 0x001E: // Break Allegiance request
-			{
-				DWORD target = pReader->Read<DWORD>();
-				if (pReader->GetLastError())
-					break;
-
-				TryBreakAllegiance(target);
-				break;
-			}
-		case 0x001F: // Allegiance Update request
-			{
-				int on = pReader->Read<int>();
-				if (pReader->GetLastError()) break;
-
-				SetRequestAllegianceUpdate(on);
-				break;
-			}
-		case 0x0275: // confirmation response		cas
-			{
-				DWORD confirmType = pReader->ReadDWORD();
-				int context = pReader->ReadInt32();
-				bool accepted = pReader->ReadInt32();
-				
-					switch (confirmType)
-					{
-					case 0x05: // crafting
-						if (accepted)
-							{
-							m_pPlayer->UseEx(true);
-							}
-						break;
-						}
-				
-					break;
-				}
-		case 0x027D: // ust salvage request
-		{
-			DWORD toolId = pReader->ReadDWORD();
-
-			PackableList<DWORD> items;
-			items.UnPack(pReader);
-
-			if (pReader->GetLastError())
-				break;
-
-			if (items.size() <= 300) //just some sanity checking: 102 items in main pack + (24 * 7) items in subpacks = 270 items. 300 just to be safe.
-				m_pPlayer->PerformSalvaging(toolId, items);
+	case CHANGE_PLAYER_OPTION: // Change player option
+	{
+		DWORD option = pReader->ReadDWORD();
+		DWORD value = pReader->ReadDWORD();
+		if (pReader->GetLastError())
 			break;
-		}
-		case 0x0032: //Send Tell by GUID
-			{
-				char *text = pReader->ReadString();
-				DWORD GUID = pReader->ReadDWORD();
 
-				if (pReader->GetLastError())
-					break;
+		ChangePlayerOption((PlayerOptions)option, value ? true : false);
+		break;
+	}
+	case MELEE_ATTACK: // Melee Attack
+	{
+		DWORD dwTarget = pReader->ReadDWORD();
+		DWORD dwHeight = pReader->ReadDWORD();
+		float flPower = pReader->ReadFloat();
+		if (pReader->GetLastError()) break;
 
-				if (CheckForChatSpam())
-				{
-					std::string filteredText = FilterBadChatCharacters(text);
-					SendTellByGUID(filteredText.c_str(), GUID);
-				}
+		Attack(dwTarget, dwHeight, flPower);
+		break;
+	}
+	case MISSILE_ATTACK: // Missile Attack
+	{
+		DWORD target = pReader->ReadDWORD();
+		DWORD height = pReader->ReadDWORD();
+		float power = pReader->ReadFloat();
+		if (pReader->GetLastError()) break;
 
-				break;
-			}
-		case 0x0035: //Use Item Ex
-			{
-				DWORD dwSourceID = pReader->ReadDWORD();
-				DWORD dwDestID = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
+		MissileAttack(target, height, power);
+		break;
+	}
+	case SET_AFK_MODE:
+	{
+		// Read: bool afk - Whether user is afk
+		break;
+	}
+	case SET_AFK_MESSAGE:
+	{
+		// Read: string message
+		break;
+	}
+	case TEXT_CLIENT: //Client Text
+	{
+		char *szText = pReader->ReadString();
+		if (pReader->GetLastError()) break;
 
-				UseItemEx(dwSourceID, dwDestID);
-				break;
-			}
-		case 0x0036: //Use Object
-			{
-				DWORD dwEID = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
+		ClientText(szText);
+		break;
+	}
+	case REMOVE_FRIEND:
+	{
+		// Read: DWORD friendID
+		break;
+	}
+	case ADD_FRIEND:
+	{
+		// Read: string friendName
+		break;
+	}
+	case STORE_ITEM: //Store Item
+	{
+		DWORD dwItemID = pReader->ReadDWORD();
+		DWORD dwContainer = pReader->ReadDWORD();
+		DWORD dwSlot = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
 
-				UseObject(dwEID);
-				break;
-			}
-		case 0x0044: // spend XP on vitals
-			{
-				DWORD dwAttribute2nd = pReader->ReadDWORD();
-				DWORD dwXP = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
+		m_pPlayer->MoveItemToContainer(dwItemID, dwContainer, (char)dwSlot);
+		break;
+	}
+	case EQUIP_ITEM: //Equip Item
+	{
+		DWORD dwItemID = pReader->ReadDWORD();
+		DWORD dwCoverage = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
 
-				SpendAttribute2ndXP((STypeAttribute2nd)dwAttribute2nd, dwXP);
-				break;
-			}
-		case 0x0045: // spend XP on attributes
-			{
-				DWORD dwAttribute = pReader->ReadDWORD();
-				DWORD dwXP = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
+		m_pPlayer->MoveItemToWield(dwItemID, dwCoverage);
+		break;
+	}
+	case DROP_ITEM: //Drop Item
+	{
+		DWORD dwItemID = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
 
-				SpendAttributeXP((STypeAttribute)dwAttribute, dwXP);
-				break;
-			}
-		case 0x0046: // spend XP on skills
-			{
-				DWORD dwSkill = pReader->ReadDWORD();
-				DWORD dwXP = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
+		m_pPlayer->MoveItemTo3D(dwItemID);
+		break;
+	}
+	case ALLEGIANCE_SWEAR: // Swear Allegiance request
+	{
+		MAllegianceSwear_001D msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_BREAK: // Break Allegiance request
+	{
+		MAllegianceBreak_001E msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_SEND_UPDATES: // Allegiance Update request
+	{
+		MAllegianceUpdate_001F msg(m_pClient);
+		msg.Parse(pReader);
+		break;
+	}
+	case CLEAR_FRIENDS:
+	{
+		// Nothing to read
+		break;
+	}
+	case RECALL_PKL_ARENA:
+	{
+		// Nothing to read
+		break;
+	}
+	case RECALL_PK_ARENA:
+	{
+		// Nothing to read
+		break;
+	}
+	case SET_DISPLAY_TITLE:
+	{
+		// Read: uint titleID
+		break;
+	}
+	case CONFIRMATION_RESPONSE: // confirmation response
+	{
+		// ConfirmationTypes: SwearAllegiance 1, AlterSkill 2, AlterAttribute 3, Fellowship 4, Craft 5, Augmentation 6, YesNo 7
+		DWORD confirmType = pReader->ReadDWORD();
+		int context = pReader->ReadInt32();
+		bool accepted = pReader->ReadInt32();
 
-				SpendSkillXP((STypeSkill)dwSkill, dwXP);
-				break;
-			}
-		case 0x0047: // spend credits to train skill
-			{
-				DWORD dwSkill = pReader->ReadDWORD();
-				DWORD dwCredits = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				SpendSkillCredits((STypeSkill)dwSkill, dwCredits);
-				break;
-			}
-		case 0x0048: // cast untargeted spell
-			{
-				DWORD spell_id = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				m_pPlayer->TryCastSpell(m_pPlayer->GetID() /*0*/, spell_id);
-				break;
-			}
-		case 0x004A: // cast targeted spell
-			{
-				DWORD target = pReader->ReadDWORD();
-				DWORD spell_id = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				m_pPlayer->TryCastSpell(target, spell_id);
-				break;
-			}
-		case 0x0053: // Evt_Combat__ChangeCombatMode_ID "Change Combat Mode"
-			{
-				DWORD mode = pReader->ReadDWORD();
-				if (pReader->GetLastError()) break;
-
-				ChangeCombatStance((COMBAT_MODE)mode);
-				break;
-			}
-		case 0x0054: // Evt_Inventory__StackableMerge
-			{
-				DWORD merge_from_id = pReader->Read<DWORD>();
-				DWORD merge_to_id = pReader->Read<DWORD>();
-				DWORD amount = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->MergeItem(merge_from_id, merge_to_id, amount);
-				break;
-			}
-		case 0x0055: // Evt_Inventory__StackableSplitToContainer
-			{
-				DWORD stack_id = pReader->Read<DWORD>();
-				DWORD container_id = pReader->Read<DWORD>();
-				DWORD place = pReader->Read<DWORD>();
-				DWORD amount = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->SplitItemToContainer(stack_id, container_id, place, amount);
-				break;
-			}
-		case 0x0056: // Evt_Inventory__StackableSplitTo3D
-			{
-				DWORD stack_id = pReader->Read<DWORD>();
-				DWORD amount = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->SplitItemto3D(stack_id, amount);
-				break;
-			}
-		case 0x019B: // Evt_Inventory__StackableSplitToWield
-			{				
-				DWORD stack_id = pReader->Read<DWORD>();
-				DWORD loc = pReader->Read<DWORD>();
-				DWORD amount = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->SplitItemToWield(stack_id, loc, amount);
-				break;
-			}
-		case 0x005D: //Send Tell by Name
+		switch (confirmType)
 		{
-			char* szText = pReader->ReadString();
-			char* szName = pReader->ReadString();
-			if (pReader->GetLastError()) break;
-
-			if (CheckForChatSpam())
+		case 0x05: // crafting
+			if (accepted)
 			{
-				std::string filteredText = FilterBadChatCharacters(szText);
-				SendTellByName(filteredText.c_str(), szName);
-			}
-
-			break;
-		}
-		case 0x005F: // Buy from Vendor
-			{
-				DWORD vendorID = pReader->Read<DWORD>();
-				DWORD numItems = pReader->Read<DWORD>();
-				if (numItems >= 300)
-					break;
-
-				bool error = false;
-				std::list<ItemProfile *> items;
-				
-				for (DWORD i = 0; i < numItems; i++)
-				{
-					ItemProfile *item = new ItemProfile();
-					error = item->UnPack(pReader);
-					items.push_back(item);
-
-					if (error || pReader->GetLastError())
-						break;
-				}
-
-				if (!error && !pReader->GetLastError())
-				{
-					TryBuyItems(vendorID, items);
-				}
-
-				for (auto item : items)
-				{
-					delete item;
-				}
-
-				break;
-			}
-		case 0x0060: // Buy from Vendor
-			{
-				DWORD vendorID = pReader->Read<DWORD>();
-				DWORD numItems = pReader->Read<DWORD>();
-				if (numItems >= 300)
-					break;
-
-				bool error = false;
-				std::list<ItemProfile *> items;
-
-				for (DWORD i = 0; i < numItems; i++)
-				{
-					ItemProfile *item = new ItemProfile();
-					error = item->UnPack(pReader);
-					items.push_back(item);
-
-					if (error || pReader->GetLastError())
-						break;
-				}
-
-				if (!error && !pReader->GetLastError())
-				{
-					TrySellItems(vendorID, items);
-				}
-
-				for (auto item : items)
-				{
-					delete item;
-					
-				}
-
-				break;
-			}
-		case 0x0063: // Lifestone Recall
-		{
-			LifestoneRecall();
-			break;
-		}
-		case 0x00A1: // "Login Complete"
-		{
-			ExitPortal();
-			break;
-		}
-		case 0x00A2: // "Create Fellowship"
-		{
-			std::string name = pReader->ReadString();
-			int shareXP = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			TryFellowshipCreate(name, shareXP);
-			break;
-		}
-		case 0x00A3: // "Quit Fellowship"
-		{
-			int disband = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			TryFellowshipQuit(disband);
-			break;
-		}
-		case 0x00A4: // "Fellowship Dismiss"
-		{
-			DWORD dismissed = pReader->Read<DWORD>();
-			if (pReader->GetLastError()) break;
-
-			TryFellowshipDismiss(dismissed);
-			break;
-		}
-		case 0x00A5: // "Fellowship Recruit"
-		{
-			DWORD target = pReader->Read<DWORD>();
-
-			if (pReader->GetLastError())
-				break;
-
-			TryFellowshipRecruit(target);
-			break;
-		}
-		case 0x00A6: // "Fellowship Update"
-		{
-			int on = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			TryFellowshipUpdate(on);
-			break;
-		}
-		case 0x00CD: // Put object in container
-			{
-				DWORD target_id = pReader->Read<DWORD>();
-				DWORD object_id = pReader->Read<DWORD>();
-				DWORD amount = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->GiveItem(target_id, object_id, amount);
-				break;
-			}		
-		case 0x00BF: // "Inscribe"
-			{
-				DWORD target_id = pReader->Read<DWORD>();
-				std::string msg = pReader->ReadString();
-
-				if (pReader->GetLastError())
-					break;
-
-				TryInscribeItem(target_id, msg);
-				break;
-			}
-		case 0x00C8: // Identify
-		{
-			DWORD target_id = pReader->ReadDWORD();
-
-			if (pReader->GetLastError())
-				break;
-
-			Identify(target_id);
-			break;
-		}
-		case 0x00D6: // Advocate teleport (triggered by having an admin flag set, clicking the mini-map)
-		{
-			if (m_pPlayer->GetAccessLevel() < ADVOCATE_ACCESS)
-				break;
-
-			// Starts with string (was empty when I tested)
-			pReader->ReadString();
-
-			// Then position (target)
-			Position position;
-			position.UnPack(pReader);
-
-			if (pReader->GetLastError())
-				break;
-
-			m_pPlayer->Movement_Teleport(position);
-			break;
-		}
-		case 0x0147: // Channel Text
-		{
-			DWORD channel_id = pReader->ReadDWORD();
-			char *msg = pReader->ReadString();
-
-			if (pReader->GetLastError())
-				break;
-
-			if (CheckForChatSpam())
-			{
-				std::string filteredText = FilterBadChatCharacters(msg);
-				ChannelText(channel_id, filteredText.c_str());
-			}
-
-			break;
-		}
-		case 0x0195: // No longer viewing contents
-			{
-				DWORD container_id = pReader->Read<DWORD>();
-				if (pReader->GetLastError())
-					break;
-
-				NoLongerViewingContents(container_id);
-				break;
-			}
-		case 0x019C: // Add item to shortcut bar
-			{
-				ShortCutData data;
-				data.UnPack(pReader);
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->_playerModule.AddShortCut(data);
-				break;
-			}
-		case 0x019D: // Add item to shortcut bar
-			{
-				int index = pReader->Read<int>();
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->_playerModule.RemoveShortCut(index);
-				break;
-			}
-		case 0x01A1:
-			{
-				PlayerModule module;
-				if (!module.UnPack(pReader) || pReader->GetLastError())
-					break;
-
-				m_pPlayer->UpdateModuleFromClient(module);
-				break;
-			}
-		case 0x01B7: // Cancel attack
-		{
-			// TODO
-			m_pPlayer->TryCancelAttack();
-			break;
-		}
-		case 0x01BF: // Request health update
-		{
-			DWORD target_id = pReader->ReadDWORD();
-
-			if (pReader->GetLastError())
-				break;
-
-			RequestHealthUpdate(target_id);
-			break;
-		}
-		case 0x01DF: // Indirect Text (@me)
-		{
-			char *msg = pReader->ReadString();
-
-			if (pReader->GetLastError())
-				break;
-
-			if (CheckForChatSpam())
-			{
-				std::string filteredText = FilterBadChatCharacters(msg);
-				EmoteText(filteredText.c_str());
-			}
-
-			break;
-		}
-		case 0x01E1: // Emote Text (*laugh* sends 'laughs')
-		{
-			char *msg = pReader->ReadString();
-
-			if (pReader->GetLastError())
-				break;
-
-			if (CheckForChatSpam())
-			{
-				std::string filteredText = FilterBadChatCharacters(msg);
-				ActionText(filteredText.c_str());
-			}
-
-			break;
-		}
-		case 0x01E3: // Add item to spell bar
-			{
-				DWORD spellID = pReader->Read<DWORD>();
-				int index = pReader->Read<int>();
-				int spellBar = pReader->Read<int>();
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->_playerModule.AddSpellFavorite(spellID, index, spellBar);
-				break;
-			}
-		case 0x01E4: // Remove item from spell bar
-			{
-				DWORD spellID = pReader->Read<DWORD>();
-				int spellBar = pReader->Read<int>();
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->_playerModule.RemoveSpellFavorite(spellID, spellBar);
-				break;
-			}
-		case 0x01E9: // Ping
-		{
-			Ping();
-			break;
-		}
-		case 0x1F6: // Open Trade Negotiations
-		{
-			if (m_pPlayer->GetTradeManager() != NULL)
-			{
-				//already trading
-				return;
-			}
-
-			CPlayerWeenie *pOther = g_pWorld->FindWithinPVS(m_pPlayer, pReader->Read<DWORD>())->AsPlayer();
-
-			if (!pOther)
-			{
-				// cannot open trade
-				m_pPlayer->SendText("Unable to open trade.", LTT_ERROR);
-			}
-			else if (pOther->_playerModule.options_ & 0x20000)
-			{
-				SendText((pOther->GetName() + " has disabled trading.").c_str(), LTT_ERROR);
-			}
-			else if (pOther->IsBusyOrInAction())
-			{
-				SendText((pOther->GetName() + " is busy.").c_str(), LTT_ERROR);
-			}
-			else if (pOther->GetTradeManager() != NULL)
-			{
-				SendText((pOther->GetName() + " is already trading with someone else!").c_str(), LTT_ERROR);
-			}
-			else if (m_pPlayer->DistanceTo(pOther, true) > 1)
-			{
-				SendText((pOther->GetName() + " is too far away!").c_str(), LTT_ERROR);
-			}
-			else
-			{
-				TradeManager *tm = TradeManager::RegisterTrade(m_pPlayer, pOther);
-
-				m_pPlayer->SetTradeManager(tm);
-				pOther->SetTradeManager(tm);
+				m_pPlayer->UseEx(true);
 			}
 			break;
-		}
-		case 0x1F7: // Close Trade Negotiations
-		{
-			TradeManager* tm = m_pPlayer->GetTradeManager();
-			if (tm)
-			{
-				tm->CloseTrade(m_pPlayer);
-				return;
-			}
-			break;
-		}
-		case 0x1F8: // AddToTrade
-		{
-			TradeManager* tm = m_pPlayer->GetTradeManager();
-			if (tm)
-			{
-				DWORD item = pReader->Read<DWORD>();
+		case 0x07:
+			CWeenieObject * target = g_pWorld->FindObject(context);
 
-				tm->AddToTrade(m_pPlayer, item);
-			}
-			break;
-		}
-		case 0x1FA: // Accept trade
-		{
-			TradeManager* tm = m_pPlayer->GetTradeManager();
-			if (tm)
+			if (target)
 			{
-				tm->AcceptTrade(m_pPlayer);
+				target->MakeEmoteManager()->ConfirmationResponse(accepted, m_pPlayer->id);
 			}
-			break;
-		}
-		case 0x1FB: // Decline trade
-		{
-			TradeManager* tm = m_pPlayer->GetTradeManager();
-			if (tm)
-			{
-				tm->DeclineTrade(m_pPlayer);
-			}
-			break;
-		}
-		case 0x204: // Reset trade
-		{
-			TradeManager* tm = m_pPlayer->GetTradeManager();
-			if (tm)
-			{
-				tm->ResetTrade(m_pPlayer);
-			}
-			break;
+
 		}
 
-		case 0x021C: //House_BuyHouse 
-			{
-				DWORD slumlord = pReader->Read<DWORD>();
-			
-				// TODO sanity check on the number of items here
-				PackableList<DWORD> items;
-				items.UnPack(pReader);
+		break;
+	}
+	case UST_SALVAGE_REQUEST: // ust salvage request
+	{
+		DWORD toolId = pReader->ReadDWORD();
 
-				if (pReader->GetLastError())
-					break;
+		PackableList<DWORD> items;
+		items.UnPack(pReader);
 
-				HouseBuy(slumlord, items);
+		if (pReader->GetLastError())
+			break;
+
+		if (items.size() <= 300) //just some sanity checking: 102 items in main pack + (24 * 7) items in subpacks = 270 items. 300 just to be safe.
+			m_pPlayer->PerformSalvaging(toolId, items);
+		break;
+	}
+	case ALLEGIANCE_QUERY_NAME:
+	{
+		MAllegianceNameQuery_0030 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_CLEAR_NAME:
+	{
+		MAllegianceNameClear_0031 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case SEND_TELL_BY_GUID: //Send Tell by GUID
+	{
+		char *text = pReader->ReadString();
+		DWORD GUID = pReader->ReadDWORD();
+
+		if (pReader->GetLastError())
+			break;
+
+		if (CheckForChatSpam())
+		{
+			std::string filteredText = FilterBadChatCharacters(text);
+			SendTellByGUID(filteredText.c_str(), GUID);
+		}
+
+		break;
+	}
+	case ALLEGIANCE_SET_NAME:
+	{
+		MAllegianceNameSet_0033 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case USE_ITEM_EX: //Use Item Ex
+	{
+		DWORD dwSourceID = pReader->ReadDWORD();
+		DWORD dwDestID = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+		UseItemEx(dwSourceID, dwDestID);
+		break;
+	}
+	case USE_OBJECT: //Use Object
+	{
+		DWORD dwEID = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+		UseObject(dwEID);
+		break;
+	}
+	case ALLEGIANCE_SET_OFFICER:
+	{
+		MAllegianceOfficerSet_003B msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_SET_OFFICER_TITLE:
+	{
+		MAllegianceOfficerTitleSet_003C msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_LIST_OFFICER_TITLES:
+	{
+		MAllegianceOfficerTitlesList_003D msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_CLEAR_OFFICER_TITLES:
+	{
+		MAllegianceOfficerTitlesClear_003E msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_LOCK_ACTION:
+	{
+		// Read: AllegianceLockAction action - LockedOff 1, LockedOn 2, ToggleLocked 3, CheckLocked 4, DisplayBypass 5, ClearBypass 6
+		break;
+	}
+	case ALLEGIANCE_APPROVED_VASSAL:
+	{
+		MAllegianceApprovedVassalSet_0040 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_CHAT_GAG:
+	{
+		// Read: string charName, bool on - player being gagged, whether gag is on
+		break;
+	}
+	case ALLEGIANCE_HOUSE_ACTION:
+	{
+		// Read: AllegianceHouseAction action - Help 1, GuestOpen 2, GuestClosed 3, StorageOpen 4, StorageClosed 5
+		break;
+	}
+	case SPEND_XP_VITALS: // spend XP on vitals
+	{
+		DWORD dwAttribute2nd = pReader->ReadDWORD();
+		DWORD dwXP = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		SpendAttribute2ndXP((STypeAttribute2nd)dwAttribute2nd, dwXP);
+		break;
+	}
+	case SPEND_XP_ATTRIBUTES: // spend XP on attributes
+	{
+		DWORD dwAttribute = pReader->ReadDWORD();
+		DWORD dwXP = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		SpendAttributeXP((STypeAttribute)dwAttribute, dwXP);
+		break;
+	}
+	case SPEND_XP_SKILLS: // spend XP on skills
+	{
+		DWORD dwSkill = pReader->ReadDWORD();
+		DWORD dwXP = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		SpendSkillXP((STypeSkill)dwSkill, dwXP);
+		break;
+	}
+	case SPEND_SKILL_CREDITS: // spend credits to train skill
+	{
+		DWORD dwSkill = pReader->ReadDWORD();
+		DWORD dwCredits = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		SpendSkillCredits((STypeSkill)dwSkill, dwCredits);
+		break;
+	}
+	case CAST_UNTARGETED_SPELL: // cast untargeted spell
+	{
+		DWORD spell_id = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		m_pPlayer->TryCastSpell(m_pPlayer->GetID() /*0*/, spell_id);
+		break;
+	}
+	case CAST_TARGETED_SPELL: // cast targeted spell
+	{
+		DWORD target = pReader->ReadDWORD();
+		DWORD spell_id = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		m_pPlayer->TryCastSpell(target, spell_id);
+		break;
+	}
+	case CHANGE_COMBAT_STANCE: // Evt_Combat__ChangeCombatMode_ID "Change Combat Mode"
+	{
+		DWORD mode = pReader->ReadDWORD();
+		if (pReader->GetLastError()) break;
+
+		ChangeCombatStance((COMBAT_MODE)mode);
+		break;
+	}
+	case STACKABLE_MERGE: // Evt_Inventory__StackableMerge
+	{
+		DWORD merge_from_id = pReader->Read<DWORD>();
+		DWORD merge_to_id = pReader->Read<DWORD>();
+		DWORD amount = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->MergeItem(merge_from_id, merge_to_id, amount);
+		break;
+	}
+	case STACKABLE_SPLIT_TO_CONTAINER: // Evt_Inventory__StackableSplitToContainer
+	{
+		DWORD stack_id = pReader->Read<DWORD>();
+		DWORD container_id = pReader->Read<DWORD>();
+		DWORD place = pReader->Read<DWORD>();
+		DWORD amount = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->SplitItemToContainer(stack_id, container_id, place, amount);
+		break;
+	}
+	case STACKABLE_SPLIT_TO_3D: // Evt_Inventory__StackableSplitTo3D
+	{
+		DWORD stack_id = pReader->Read<DWORD>();
+		DWORD amount = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->SplitItemto3D(stack_id, amount);
+		break;
+	}
+	case STACKABLE_SPLIT_TO_WIELD: // Evt_Inventory__StackableSplitToWield
+	{
+		DWORD stack_id = pReader->Read<DWORD>();
+		DWORD loc = pReader->Read<DWORD>();
+		DWORD amount = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->SplitItemToWield(stack_id, loc, amount);
+		break;
+	}
+	case SQUELCH_CHARACTER_MODIFY:
+	{
+		// Read: bool add, DWORD characterID, string characterName, ChatMessageType msgType
+		//		0 = unsquelch, 1 = squelch, ChatMessageType = enum LogTextType
+		break;
+	}
+	case SQUELCH_ACCOUNT_MODIFY:
+	{
+		// Read: bool add, string characterName
+		break;
+	}
+	case SQUELCH_GLOBAL_MODIFY:
+	{
+		// Read: bool add, ChatMessageType msgType
+		break;
+	}
+	case SEND_TELL_BY_NAME: //Send Tell by Name
+	{
+		char* szText = pReader->ReadString();
+		char* szName = pReader->ReadString();
+		if (pReader->GetLastError()) break;
+
+		if (CheckForChatSpam())
+		{
+			std::string filteredText = FilterBadChatCharacters(szText);
+			SendTellByName(filteredText.c_str(), szName);
+		}
+		break;
+	}
+	case BUY_FROM_VENDOR: // Buy from Vendor
+	{
+		DWORD vendorID = pReader->Read<DWORD>();
+		DWORD numItems = pReader->Read<DWORD>();
+		if (numItems >= 300)
+			break;
+
+		bool error = false;
+		std::list<ItemProfile *> items;
+
+		for (DWORD i = 0; i < numItems; i++)
+		{
+			ItemProfile *item = new ItemProfile();
+			error = item->UnPack(pReader);
+			items.push_back(item);
+
+			if (error || pReader->GetLastError())
 				break;
-			}
-		case 0x021F: //House_AbandonHouse 
-		{
-			HouseAbandon();
-			break;
 		}
-		case 0x21E: //House_QueryHouse 
+
+		if (!error && !pReader->GetLastError())
 		{
-			HouseRequestData();
-			break;
+			TryBuyItems(vendorID, items);
 		}
-		case 0x0221: //House_RentHouse 
-			{
-				DWORD slumlord = pReader->Read<DWORD>();
 
-				// TODO sanity check on the number of items here
-				PackableList<DWORD> items;
-				items.UnPack(pReader);
+		for (auto item : items)
+		{
+			delete item;
+		}
 
-				if (pReader->GetLastError())
-					break;
+		break;
+	}
+	case SELL_TO_VENDOR: // Sell to Vendor
+	{
+		DWORD vendorID = pReader->Read<DWORD>();
+		DWORD numItems = pReader->Read<DWORD>();
+		if (numItems >= 300)
+			break;
 
-				//HouseRent(slumlord, items);
+		bool error = false;
+		std::list<ItemProfile *> items;
+
+		for (DWORD i = 0; i < numItems; i++)
+		{
+			ItemProfile *item = new ItemProfile();
+			error = item->UnPack(pReader);
+			items.push_back(item);
+
+			if (error || pReader->GetLastError())
 				break;
-			}
-		case 0x0245: //House_AddPermanentGuest 
-		{
-			std::string name = pReader->ReadString();
-
-			if (pReader->GetLastError())
-				break;
-
-			HouseAddPersonToAccessList(name);
-			break;
 		}
-		case 0x0246: //House_RemovePermanentGuest
+
+		if (!error && !pReader->GetLastError())
 		{
-			std::string name = pReader->ReadString();
-
-			if (pReader->GetLastError())
-				break;
-
-			HouseRemovePersonFromAccessList(name);
-			break;
+			TrySellItems(vendorID, items);
 		}
-		case 0x0247: //House_SetOpenHouseStatus
+
+		for (auto item : items)
 		{
-			int newSetting = pReader->Read<int>();
+			delete item;
 
-			if (pReader->GetLastError())
-				break;
-
-			HouseToggleOpenAccess(newSetting > 0);
-			break;
 		}
-		case 0x0249: //House_ChangeStoragePermission
-		{
-			std::string name = pReader->ReadString();
-			int isAdd = pReader->Read<int>();
 
-			if (pReader->GetLastError())
-				break;
+		break;
+	}
+	case RECALL_LIFESTONE: // Lifestone Recall
+	{
+		LifestoneRecall();
+		break;
+	}
+	case LOGIN_COMPLETE: // "Login Complete"
+	{
+		ExitPortal();
+		break;
+	}
+	case FELLOW_CREATE: // "Create Fellowship"
+	{
+		std::string name = pReader->ReadString();
+		int shareXP = pReader->Read<int>();
 
-			HouseAddOrRemovePersonToStorageList(name, isAdd > 0);
+		if (pReader->GetLastError())
 			break;
+
+		TryFellowshipCreate(name, shareXP);
+		break;
+	}
+	case FELLOW_QUIT: // "Quit Fellowship"
+	{
+		int disband = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryFellowshipQuit(disband);
+		break;
+	}
+	case FELLOW_DISMISS: // "Fellowship Dismiss"
+	{
+		DWORD dismissed = pReader->Read<DWORD>();
+		if (pReader->GetLastError()) break;
+
+		TryFellowshipDismiss(dismissed);
+		break;
+	}
+	case FELLOW_RECRUIT: // "Fellowship Recruit"
+	{
+		DWORD target = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryFellowshipRecruit(target);
+		break;
+	}
+	case FELLOW_UPDATE: // "Fellowship Update"
+	{
+		int on = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryFellowshipUpdate(on);
+		break;
+	}
+	case BOOK_ADD_PAGE:
+	{
+		// Read: DWORD objectID - ID of book
+		break;
+	}
+	case BOOK_MODIFY_PAGE:
+	{
+		// Read: DWORD objectID, int pageNum, string pageText
+		break;
+	}
+	case BOOK_DATA: // Request update to book data (seems to be after failed add page)
+	{
+		// Read: DWORD objectID - ID of book
+		break;
+	}
+	case BOOK_DELETE_PAGE:
+	{
+		// Read: DWORD objectID, int pageNum
+		break;
+	}
+	case BOOK_PAGE_DATA: // Requests data of a page of a book
+	{
+		// Read: DWORD objectID, int pageNum
+		break;
+	}
+	case GIVE_OBJECT: // Give an item to someone
+	{
+		DWORD target_id = pReader->Read<DWORD>();
+		DWORD object_id = pReader->Read<DWORD>();
+		DWORD amount = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->GiveItem(target_id, object_id, amount);
+		break;
+	}
+	case INSCRIBE: // "Inscribe"
+	{
+		DWORD target_id = pReader->Read<DWORD>();
+		std::string msg = pReader->ReadString();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryInscribeItem(target_id, msg);
+		break;
+	}
+	case APPRAISE: // Identify
+	{
+		DWORD target_id = pReader->ReadDWORD();
+
+		if (pReader->GetLastError())
+			break;
+
+		Identify(target_id);
+		break;
+	}
+	case ADMIN_TELEPORT: // Advocate teleport (triggered by having an admin flag set, clicking the mini-map)
+	{
+		if (m_pPlayer->GetAccessLevel() < ADVOCATE_ACCESS)
+			break;
+
+		// Starts with string (was empty when I tested)
+		pReader->ReadString();
+
+		// Then position (target)
+		Position position;
+		position.UnPack(pReader);
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->Movement_Teleport(position);
+		break;
+	}
+	case ABUSE_LOG_REQUEST: // Send abuse report
+	{
+		// Read: string target, uint status = 1, string complaint
+		break;
+	}
+	case CHANNEL_ADD: // Join chat channel
+	{
+		// Read: uint channel ID
+		break;
+	}
+	case CHANNEL_REMOVE: // Leave chat channel
+	{
+		// Read: uint channel ID
+		break;
+	}
+	case CHANNEL_TEXT: // Channel Text
+	{
+		DWORD channel_id = pReader->ReadDWORD();
+		char *msg = pReader->ReadString();
+
+		if (pReader->GetLastError())
+			break;
+
+		if (CheckForChatSpam())
+		{
+			std::string filteredText = FilterBadChatCharacters(msg);
+			ChannelText(channel_id, filteredText.c_str());
 		}
-		case 0x024C: //House_RemoveAllStoragePermission 
-		{
-			HouseClearStorageAccess();
+
+		break;
+	}
+	case CHANNEL_LIST: // List of characters listening to a channel
+	{
+		// Read: PackableList<string> characters
+		break;
+	}
+	case CHANNEL_INDEX: // List of channels available to the player
+	{
+		// Read: PackableList<string> channels
+		break;
+	}
+	case NO_LONGER_VIEWING_CONTAINER: // No longer viewing contents
+	{
+		DWORD container_id = pReader->Read<DWORD>();
+		if (pReader->GetLastError())
 			break;
+
+		NoLongerViewingContents(container_id);
+		break;
+	}
+	case ADD_ITEM_SHORTCUT: // Add item to shortcut bar
+	{
+		ShortCutData data;
+		data.UnPack(pReader);
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->_playerModule.AddShortCut(data);
+		break;
+	}
+	case REMOVE_ITEM_SHORTCUT: // Add item to shortcut bar
+	{
+		int index = pReader->Read<int>();
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->_playerModule.RemoveShortCut(index);
+		break;
+	}
+	case CHARACTER_OPTIONS: // Character Options 
+	{
+		PlayerModule module;
+		if (!module.UnPack(pReader) || pReader->GetLastError())
+			break;
+		if (m_pPlayer && m_pPlayer->AsPlayer())
+		{
+			SendText("Updating character configuration.", LTT_SYSTEM_EVENT);
+			m_pPlayer->UpdateModuleFromClient(module);
 		}
-		case 0x024D: //House_RequestFullGuestList
-		{
-			HouseRequestAccessList();
+		else
+			DEBUG_DATA << "Playermodule call for invalid object";
+		break;
+	}
+	case CANCEL_ATTACK: // Cancel attack
+	{
+		// TODO
+		m_pPlayer->TryCancelAttack();
+		break;
+	}
+	case SPELLBOOK_REMOVE:
+	{
+		// Read in: LayeredSpellID spellID - Full spell ID combining the (SpellID)id with the spell (ushort)layer.
+		break;
+	}
+	case QUERY_HEALTH: // Request health update
+	{
+		DWORD target_id = pReader->ReadDWORD();
+
+		if (pReader->GetLastError())
 			break;
+
+		RequestHealthUpdate(target_id);
+		break;
+	}
+	case QUERY_AGE:
+	{
+		DWORD targetID = pReader->ReadDWORD(); // don't need this, query can't target anyone else
+
+		if (pReader->GetLastError())
+			break;
+
+		int age = m_pPlayer->m_Qualities.GetInt(AGE_INT, 0);
+		SendText(GetAgeString(age).c_str(), LTT_DEFAULT); // You have played for Xm Xd Xh Xm Xs.
+		break;
+	}
+	case QUERY_BIRTH:
+	{
+		DWORD targetID = pReader->ReadDWORD(); // don't need this, query can't target anyone else
+
+		if (pReader->GetLastError())
+			break;
+
+		std::string DOB = m_pPlayer->InqStringQuality(DATE_OF_BIRTH_STRING, "");
+		SendText(csprintf("%s", DOB.c_str()), LTT_DEFAULT);
+		break;
+	}
+	case TEXT_INDIRECT: // Indirect Text (@me)
+	{
+		char *msg = pReader->ReadString();
+
+		if (pReader->GetLastError())
+			break;
+
+		if (CheckForChatSpam())
+		{
+			std::string filteredText = FilterBadChatCharacters(msg);
+			EmoteText(filteredText.c_str());
 		}
-		case 0x0255: //Request allegiance MOTD
-		{
-			SendAllegianceMOTD();
+
+		break;
+	}
+	case TEXT_EMOTE: // Emote Text (*laugh* sends 'laughs')
+	{
+		char *msg = pReader->ReadString();
+
+		if (pReader->GetLastError())
 			break;
+
+		if (CheckForChatSpam())
+		{
+			std::string filteredText = FilterBadChatCharacters(msg);
+			ActionText(filteredText.c_str());
 		}
-		case 0x025C: //House_AddAllStoragePermission
-		{
-			HouseToggleOpenStorageAccess();
+
+		break;
+	}
+	case ADD_TO_SPELLBAR: // Add item to spell bar
+	{
+		DWORD spellID = pReader->Read<DWORD>();
+		int index = pReader->Read<int>();
+		int spellBar = pReader->Read<int>();
+		if (pReader->GetLastError())
 			break;
+
+		m_pPlayer->_playerModule.AddSpellFavorite(spellID, index, spellBar);
+		break;
+	}
+	case REMOVE_FROM_SPELLBAR: // Remove item from spell bar
+	{
+		DWORD spellID = pReader->Read<DWORD>();
+		int spellBar = pReader->Read<int>();
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->_playerModule.RemoveSpellFavorite(spellID, spellBar);
+		break;
+	}
+	case PING: // Ping
+	{
+		Ping();
+		break;
+	}
+	case TRADE_OPEN: // Open Trade Negotiations
+	{
+		if (m_pPlayer->GetTradeManager() != NULL)
+		{
+			//already trading
+			return;
 		}
-		case 0x025E: //House_RemoveAllPermanentGuests
+
+		DWORD target = pReader->Read<DWORD>();
+		if (pReader->GetLastError())
+			return;
+
+		CWeenieObject *pOther = g_pWorld->FindWithinPVS(m_pPlayer, target);
+		CPlayerWeenie *pTarget;
+		if (pOther)
+			pTarget = pOther->AsPlayer();
+
+		if (!pOther || !pTarget)
 		{
-			HouseClearAccessList();
-			break;
+			// cannot open trade
+			m_pPlayer->SendText("Unable to open trade.", LTT_ERROR);
 		}
-		case 0x0262: // House Recall
+		else if (pTarget->_playerModule.options_ & 0x20000)
 		{
-			HouseRecall();
-			break;
-		}		
-		case 0x0263: // Request Item Mana
-		{
-			DWORD itemId = pReader->ReadDWORD();
-
-			if (pReader->GetLastError())
-				break;
-
-			m_pPlayer->HandleItemManaRequest(itemId);
-			break;
+			SendText((pTarget->GetName() + " has disabled trading.").c_str(), LTT_ERROR);
 		}
-		case 0x0266: // House_SetHooksVisibility 
+		else if (pTarget->IsBusyOrInAction())
 		{
-			int newSetting = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			HouseToggleHooks(newSetting > 0);
-			break;
+			SendText((pTarget->GetName() + " is busy.").c_str(), LTT_ERROR);
 		}
-		case 0x0267: //House_ModifyAllegianceGuestPermission 
+		else if (pTarget->GetTradeManager() != NULL)
 		{
-			int newSetting = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			HouseAddOrRemoveAllegianceToAccessList(newSetting > 0);
-			break;
+			SendText((pTarget->GetName() + " is already trading with someone else!").c_str(), LTT_ERROR);
 		}
-		case 0x0268: //House_ModifyAllegianceStoragePermission
+		else if (m_pPlayer->DistanceTo(pOther, true) > 1)
 		{
-			int newSetting = pReader->Read<int>();
-
-			if (pReader->GetLastError())
-				break;
-
-			HouseAddOrRemoveAllegianceToStorageList(newSetting > 0);
-			break;
+			SendText((pTarget->GetName() + " is too far away!").c_str(), LTT_ERROR);
 		}
-		case 0x0278: // House_TeleToMansion
+		else
 		{
-			HouseMansionRecall();
-			break;
+			TradeManager *tm = TradeManager::RegisterTrade(m_pPlayer, pTarget);
+
+			m_pPlayer->SetTradeManager(tm);
+			pTarget->SetTradeManager(tm);
 		}
-		case 0x0279: // "/die" command
+		break;
+	}
+	case TRADE_CLOSE: // Close Trade Negotiations
+	{
+		TradeManager* tm = m_pPlayer->GetTradeManager();
+		if (tm)
 		{
-			if (!m_pPlayer->IsDead() && !m_pPlayer->IsInPortalSpace() && !m_pPlayer->IsBusyOrInAction())
-			{
-				// this is a bad way of doing this...
-				m_pPlayer->SetHealth(0, true);
-				m_pPlayer->OnDeath(m_pPlayer->GetID());
-			}
-
-			break;
+			tm->CloseTrade(m_pPlayer);
+			return;
 		}
-		case 0x027B: // allegiance info request
-			{
-				std::string target = pReader->ReadString();
-				if (target.empty() || pReader->GetLastError())
-					break;
-
-				AllegianceInfoRequest(target);
-				break;
-			}
-		case 0x0286: // "/die" command
-			{
-				DWORD filters = pReader->Read<DWORD>();
-				if (pReader->GetLastError())
-					break;
-
-				m_pPlayer->_playerModule.spell_filters_ = filters;
-				break;
-			}
-		case 0x028D: // Marketplace Recall
+		break;
+	}
+	case TRADE_ADD: // AddToTrade
+	{
+		TradeManager* tm = m_pPlayer->GetTradeManager();
+		if (tm)
 		{
-			MarketplaceRecall();
-			break;
+			DWORD item = pReader->Read<DWORD>();
+
+			tm->AddToTrade(m_pPlayer, item);
 		}
-		case 0x0290: // "Fellowship Assign New Leader"
-			{
-				DWORD target_id = pReader->Read<DWORD>();
-
-				if (pReader->GetLastError())
-					break;
-
-				TryFellowshipAssignNewLeader(target_id);
-				break;
-			}
-		case 0x0291: // "Fellowship Change Openness"
-			{
-				int open = pReader->Read<int>();
-
-				if (pReader->GetLastError())
-					break;
-
-				TryFellowshipChangeOpenness(open);
-				break;
-			}
-		case 0x02AB: //Allegiance_RecallAllegianceHometown (bindstone)
+		break;
+	}
+	case TRADE_ACCEPT: // Accept trade
+	{
+		TradeManager* tm = m_pPlayer->GetTradeManager();
+		if (tm)
 		{
-			AllegianceHometownRecall();
-			break;
+			tm->AcceptTrade(m_pPlayer);
 		}
-		case 0xF61B: // Jump Movement
+		break;
+	}
+	case TRADE_DECLINE: // Decline trade
+	{
+		TradeManager* tm = m_pPlayer->GetTradeManager();
+		if (tm)
 		{
-			float extent = pReader->Read<float>(); // extent
+			tm->DeclineTrade(m_pPlayer);
+		}
+		break;
+	}
+	case TRADE_RESET: // Reset trade
+	{
+		TradeManager* tm = m_pPlayer->GetTradeManager();
+		if (tm)
+		{
+			tm->ResetTrade(m_pPlayer);
+		}
+		break;
+	}
+	case CLEAR_PLAYER_CONSENT_LIST: // Clears the player's corpse looting consent list, /consent clear
+	{
+		m_pPlayer->ClearConsent(false);
+		break;
+	}
+	case DISPLAY_PLAYER_CONSENT_LIST: // Display the player's corpse looting consent list, /consent who
+	{
+		m_pPlayer->DisplayConsent();
+		break;
+	}
+	case REMOVE_FROM_PLAYER_CONSENT_LIST: // Remove your corpse looting permission for the given player, / consent remove
+	{
+		std::string targetName = pReader->ReadString();
 
-			Vector jumpVelocity;
-			jumpVelocity.UnPack(pReader);
+		if (pReader->GetLastError())
+			break;
+		CPlayerWeenie *target = g_pWorld->FindPlayer(targetName.c_str());
+		if (target)
+		{
+			m_pPlayer->RemoveConsent(target);
+		}
+		break;
+	}
+	case ADD_PLAYER_PERMISSION: // Grants a player corpse looting permission, /permit add
+	{
+		std::string targetName = pReader->ReadString();
 
-			Position position;
-			position.UnPack(pReader);
+		if (pReader->GetLastError())
+			break;
 
-			if (pReader->GetLastError())
-				break;
+		CPlayerWeenie *target = g_pWorld->FindPlayer(targetName.c_str());
+		if (target)
+		{
+			m_pPlayer->AddCorpsePermission(target);
+		}
+		break;
+	}
+	case REMOVE_PLAYER_PERMISSION:
+	{
+		std::string targetName = pReader->ReadString();
 
-			// CTransition *transition = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
+		if (pReader->GetLastError())
+			break;
 
-			/*
+		CPlayerWeenie *target = g_pWorld->FindPlayer(targetName.c_str());
+		if (target)
+		{
+			m_pPlayer->RemoveCorpsePermission(target);
+		}
+		break;
+	}
+	case HOUSE_BUY: //House_BuyHouse 
+	{
+		DWORD slumlord = pReader->Read<DWORD>();
+
+		// TODO sanity check on the number of items here
+		PackableList<DWORD> items;
+		items.UnPack(pReader);
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseBuy(slumlord, items);
+		break;
+	}
+	case HOUSE_ABANDON: //House_AbandonHouse 
+	{
+		HouseAbandon();
+		break;
+	}
+	case HOUSE_OF_PLAYER_QUERY: //House_QueryHouse 
+	{
+		HouseRequestData();
+		break;
+	}
+	case HOUSE_RENT: //House_RentHouse 
+	{
+		DWORD slumlord = pReader->Read<DWORD>();
+
+		// TODO sanity check on the number of items here
+		PackableList<DWORD> items;
+		items.UnPack(pReader);
+
+		if (pReader->GetLastError())
+			break;
+
+		//HouseRent(slumlord, items);
+		break;
+	}
+	case HOUSE_ADD_GUEST: //House_AddPermanentGuest 
+	{
+		std::string name = pReader->ReadString();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseAddPersonToAccessList(name);
+		break;
+	}
+	case HOUSE_REMOVE_GUEST: //House_RemovePermanentGuest
+	{
+		std::string name = pReader->ReadString();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseRemovePersonFromAccessList(name);
+		break;
+	}
+	case HOUSE_SET_OPEN_ACCESS: //House_SetOpenHouseStatus
+	{
+		int newSetting = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseToggleOpenAccess(newSetting > 0);
+		break;
+	}
+	case HOUSE_CHANGE_STORAGE_PERMISSIONS: //House_ChangeStoragePermission
+	{
+		std::string name = pReader->ReadString();
+		int isAdd = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseAddOrRemovePersonToStorageList(name, isAdd > 0);
+		break;
+	}
+	case HOUSE_CLEAR_STORAGE_PERMISSIONS: //House_RemoveAllStoragePermission 
+	{
+		HouseClearStorageAccess();
+		break;
+	}
+	case HOUSE_GUEST_LIST: //House_RequestFullGuestList
+	{
+		HouseRequestAccessList();
+		break;
+	}
+	case ALLEGIANCE_SET_MOTD:
+	{
+		MAllegianceMOTDSet_0254 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_QUERY_MOTD: //Request allegiance MOTD
+	{
+		MAllegianceMOTDQuery_0255 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_CLEAR_MOTD:
+	{
+		MAllegianceMOTDClear_0256 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case HOUSE_QUERY_SLUMLORD:
+	{
+		// read in: DWORD lord = pReader->ReadDWORD();
+	}
+	case HOUSE_SET_OPEN_STORAGE_ACCESS: //House_AddAllStoragePermission
+	{
+		HouseToggleOpenStorageAccess();
+		break;
+	}
+	case HOUSE_REMOVE_ALL_GUESTS: //House_RemoveAllPermanentGuests
+	{
+		HouseClearAccessList();
+		break;
+	}
+	case HOUSE_BOOT_ALL:
+	{
+		break;
+	}
+	case RECALL_HOUSE: // House Recall
+	{
+		HouseRecall();
+		break;
+	}
+	case ITEM_MANA_REQUEST: // Request Item Mana
+	{
+		DWORD itemId = pReader->ReadDWORD();
+
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->HandleItemManaRequest(itemId);
+		break;
+	}
+	case HOUSE_SET_HOOKS_VISIBILITY: // House_SetHooksVisibility 
+	{
+		int newSetting = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseToggleHooks(newSetting > 0);
+		break;
+	}
+	case HOUSE_CHANGE_ALLEGIANCE_GUEST_PERMISSIONS: //House_ModifyAllegianceGuestPermission 
+	{
+		int newSetting = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseAddOrRemoveAllegianceToAccessList(newSetting > 0);
+		break;
+	}
+	case HOUSE_CHANGE_ALLEGIANCE_STORAGE_PERMISSIONS: //House_ModifyAllegianceStoragePermission
+	{
+		int newSetting = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		HouseAddOrRemoveAllegianceToStorageList(newSetting > 0);
+		break;
+	}
+	case CHESS_JOIN:
+	{
+		auto const guid = pReader->Read<uint32_t>();
+		pReader->Read<uint32_t>(); // teamId, not used
+
+		CWeenieObject* object = g_pWorld->FindObject(guid);
+		if (!object)
+			break;
+
+		sChessManager->Join(m_pPlayer, object);
+		break;
+	}
+	case CHESS_QUIT:
+		sChessManager->Quit(m_pPlayer);
+		break;
+	case CHESS_MOVE:
+	{
+		GDLE::Chess::ChessPieceCoord from, to;
+		from.UnPack(pReader);
+		to.UnPack(pReader);
+		sChessManager->Move(m_pPlayer, from, to);
+		break;
+	}
+	case CHESS_PASS:
+		sChessManager->MovePass(m_pPlayer);
+		break;
+	case CHESS_STALEMATE:
+	{
+		auto const on = pReader->Read<uint32_t>();
+		sChessManager->Stalemate(m_pPlayer, on);
+		break;
+	}
+	case HOUSE_LIST_AVAILABLE:
+	{
+		// Read: HouseType houseType - type of house to list, cottage 1, villa 2, mansion 3, apartment 4
+		// Reply: 0x0271, HouseType houseType, PackableList<uint> houses, int numHouses
+		break;
+	}
+	case ALLEGIANCE_BOOT_PLAYER: // Boots a player from the allegiance, optionally all characters on their account
+	{
+		MAllegianceBoot_0277 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case RECALL_HOUSE_MANSION: // House_TeleToMansion
+	{
+		HouseMansionRecall();
+		break;
+	}
+	case DIE_COMMAND: // "/die" command
+	{
+		if (!m_pPlayer->IsDead() && !m_pPlayer->IsInPortalSpace() && !m_pPlayer->IsBusyOrInAction())
+		{
+			// this is a bad way of doing this...
+			m_pPlayer->SetHealth(0, true);
+			m_pPlayer->OnDeath(m_pPlayer->GetID());
+		}
+
+		break;
+	}
+	case ALLEGIANCE_INFO_REQUEST: // allegiance info request
+	{
+		MAllegianceInfoRequest_027B msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case SPELLBOOK_FILTERS: // "/die" command
+	{
+		DWORD filters = pReader->Read<DWORD>();
+		if (pReader->GetLastError())
+			break;
+
+		m_pPlayer->_playerModule.spell_filters_ = filters;
+		break;
+	}
+	case RECALL_MARKET: // Marketplace Recall
+	{
+		MarketplaceRecall();
+		break;
+	}
+	case PKLITE:
+	{
+		// change dot to pink
+		// change to attackable by other PKLs
+		// change to dropping nothing on death from other PKL
+		// do PKL animation
+		break;
+	}
+	case FELLOW_ASSIGN_NEW_LEADER: // "Fellowship Assign New Leader"
+	{
+		DWORD target_id = pReader->Read<DWORD>();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryFellowshipAssignNewLeader(target_id);
+		break;
+	}
+	case FELLOW_CHANGE_OPENNESS: // "Fellowship Change Openness"
+	{
+		int open = pReader->Read<int>();
+
+		if (pReader->GetLastError())
+			break;
+
+		TryFellowshipChangeOpenness(open);
+		break;
+	}
+	case ALLEGIANCE_CHAT_BOOT:
+	{
+		MAllegianceChatBoot_02A0 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_ADD_PLAYER_BAN:
+	{
+		MAllegianceBanAdd_02A1 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_REMOVE_PLAYER_BAN:
+	{
+		MAllegianceBanRemove_02A2 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_LIST_BANS:
+	{
+		MAllegianceBanList_02A3 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_REMOVE_OFFICER:
+	{
+		MAllegianceOfficerRemove_02A5 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_LIST_OFFICERS:
+	{
+		MAllegianceOfficersList_02A6 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case ALLEGIANCE_CLEAR_OFFICERS:
+	{
+		MAllegianceOfficersClear_02A7 msg(m_pPlayer);
+		msg.Parse(pReader);
+		break;
+	}
+	case RECALL_ALLEGIANCE_HOMETOWN: //Allegiance_RecallAllegianceHometown (bindstone)
+	{
+		AllegianceHometownRecall();
+		/*MAllegianceRecallHometown_02AB msg(m_pPlayer);
+		msg.Parse(pReader);*/
+		break;
+	}
+	case FINISH_BARBER:
+	{
+		//Read: DataID basePalette, DataID headObject, DataID headTexture, DataID defaultHeadTexture, DataID eyesTexture
+		// DataID defaultEyesTexture, DataID noseTexture, DataID defaultNoseTexture, DataID mouthTexture, DataID defaultMouthTexture
+		// DataID skinPalette, DataID hairPalette, DataID eyesPalette, DataID setupID, int option1, int option2
+		// option1 = toggle certain race options e.g. empyrean float or flaming head undead, option2 = not used?
+		break;
+	}
+	case MOVEMENT_JUMP: // Jump Movement
+	{
+		float extent = pReader->Read<float>(); // extent
+
+		Vector jumpVelocity;
+		jumpVelocity.UnPack(pReader);
+
+		Position position;
+		position.UnPack(pReader);
+
+		if (pReader->GetLastError())
+			break;
+
+		// CTransition *transition = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
+
+		/*
+		CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
+		if (transit)
+		{
+		m_pPlayer->SetPositionInternal(transit);
+		}
+		*/
+
+		/*
+		double dist = m_pPlayer->m_Position.distance(position);
+		if (dist >= 5)
+		{
+		m_pPlayer->_force_position_timestamp++;
+		m_pPlayer->Movement_UpdatePos();
+
+		m_pPlayer->SendText(csprintf("Correcting position due to jump %f", dist), LTT_DEFAULT);
+		}
+		*/
+
+		double dist = m_pPlayer->m_Position.distance(position);
+		if (dist >= 10)
+		{
+			// Snap them back to their previous position
+			m_pPlayer->_force_position_timestamp++;
+		}
+		else
+		{
+			//m_pPlayer->SetPositionSimple(&position, TRUE);
+
+
 			CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
 			if (transit)
 			{
 				m_pPlayer->SetPositionInternal(transit);
 			}
-			*/
-			
-			/*
-			double dist = m_pPlayer->m_Position.distance(position);
-			if (dist >= 5)
-			{
-				m_pPlayer->_force_position_timestamp++;
-				m_pPlayer->Movement_UpdatePos();
 
-				m_pPlayer->SendText(csprintf("Correcting position due to jump %f", dist), LTT_DEFAULT);
-			}
-			*/
+		}
 
-			double dist = m_pPlayer->m_Position.distance(position);
-			if (dist >= 10)
+		// m_pPlayer->m_Position = position;
+
+		/*
+		long stamina = 0;
+		m_pPlayer->get_minterp()->jump(extent, stamina);
+		if (stamina > 0)
+		{
+		unsigned int curStamina = m_pPlayer->GetStamina();
+
+		if (stamina > curStamina)
+		{
+		// should maybe change the extent? idk
+		m_pPlayer->SetStamina(0);
+		}
+		else
+		m_pPlayer->SetStamina(curStamina - stamina);
+		}
+
+		m_pPlayer->Animation_Jump(extent, jumpVelocity);
+		m_pPlayer->m_bAnimUpdate = TRUE;
+		*/
+		long stamina = 0;
+		if (m_pPlayer->JumpStaminaCost(extent, stamina) && stamina > 0)
+		{
+			unsigned int curStamina = m_pPlayer->GetStamina();
+
+			if (stamina > curStamina)
 			{
-				// Snap them back to their previous position
-				m_pPlayer->_force_position_timestamp++;
+				// should maybe change the extent? idk
+				m_pPlayer->SetStamina(0);
 			}
 			else
-			{
-				m_pPlayer->SetPositionSimple(&position, TRUE);
-				
-				/*
-				CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
-				if (transit)
-				{
-					m_pPlayer->SetPositionInternal(transit);
-				}
-				*/
-			}
+				m_pPlayer->SetStamina(curStamina - stamina);
+		}
 
-			// m_pPlayer->m_Position = position;
+		m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
+		m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
+		m_pPlayer->calc_acceleration();
+		m_pPlayer->set_on_walkable(FALSE);
+		m_pPlayer->set_local_velocity(jumpVelocity, 0);
 
-			/*
-			long stamina = 0;
-			m_pPlayer->get_minterp()->jump(extent, stamina);
-			if (stamina > 0)
-			{
-				unsigned int curStamina = m_pPlayer->GetStamina();
+		/*
+		Vector localVel = m_pPlayer->get_local_physics_velocity();
+		Vector vel = m_pPlayer->m_velocityVector;
+		m_pPlayer->EmoteLocal(csprintf("Received jump with velocity %.1f %.1f %.1f (my lv: %.1f %.1f %.1f my v: %.1f %.1f %.1f)",
+		jumpVelocity.x, jumpVelocity.y, jumpVelocity.z,
+		localVel.x, localVel.y, localVel.z,
+		vel.x, vel.y, vel.z));
+		*/
 
-				if (stamina > curStamina)
-				{
-					// should maybe change the extent? idk
-					m_pPlayer->SetStamina(0);
-				}
-				else
-					m_pPlayer->SetStamina(curStamina - stamina);
-			}
+		m_pPlayer->Movement_UpdateVector();
 
-			m_pPlayer->Animation_Jump(extent, jumpVelocity);
-			m_pPlayer->m_bAnimUpdate = TRUE;
-			*/
-			long stamina = 0;
-			if (m_pPlayer->JumpStaminaCost(extent, stamina) && stamina > 0)
-			{
-				unsigned int curStamina = m_pPlayer->GetStamina();
+		break;
+	}
+	case MOVEMENT_MOVE_TO_STATE: // CM_Movement__Event_MoveToState (update vector movement?)
+	{
+		// TODO: Cancel attack
 
-				if (stamina > curStamina)
-				{
-					// should maybe change the extent? idk
-					m_pPlayer->SetStamina(0);
-				}
-				else
-					m_pPlayer->SetStamina(curStamina - stamina);
-			}
-			
-			m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
-			m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
-			m_pPlayer->calc_acceleration();
-			m_pPlayer->set_on_walkable(FALSE);
-			m_pPlayer->set_local_velocity(jumpVelocity, 0);
+		MoveToStatePack moveToState;
+		moveToState.UnPack(pReader);
 
-			/*
-			Vector localVel = m_pPlayer->get_local_physics_velocity();
-			Vector vel = m_pPlayer->m_velocityVector;
-			m_pPlayer->EmoteLocal(csprintf("Received jump with velocity %.1f %.1f %.1f (my lv: %.1f %.1f %.1f my v: %.1f %.1f %.1f)",
-				jumpVelocity.x, jumpVelocity.y, jumpVelocity.z,
-				localVel.x, localVel.y, localVel.z,
-				vel.x, vel.y, vel.z));
-				*/
-
-			m_pPlayer->Movement_UpdateVector();
-
+		if (pReader->GetLastError())
+		{
+			SERVER_WARN << "Bad animation message!";
+			SERVER_WARN << pReader->GetDataStart() << pReader->GetDataLen();
 			break;
 		}
-		case 0xF61C: // CM_Movement__Event_MoveToState (update vector movement?)
+
+		//if (is_newer_event_stamp(moveToState.server_control_timestamp, m_pPlayer->_server_control_timestamp))
+		//{
+		// LOG(Temp, Normal, "Old server control timestamp on 0xF61C. Ignoring.\n");
+		//	break;
+		//}
+
+		if (is_newer_event_stamp(moveToState.teleport_timestamp, m_pPlayer->_teleport_timestamp))
 		{
-			// TODO: Cancel attack
-			
-			MoveToStatePack moveToState;
-			moveToState.UnPack(pReader);
+			SERVER_WARN << "Old teleport timestamp on 0xF61C. Ignoring.";
+			break;
+		}
+		if (is_newer_event_stamp(moveToState.force_position_ts, m_pPlayer->_force_position_timestamp))
+		{
+			SERVER_WARN << "Old force position timestamp on 0xF61C. Ignoring.";
+			break;
+		}
 
-			if (pReader->GetLastError())
-			{
-				LOG_PRIVATE(Animation, Warning, "Bad animation message!\n");
-				LOG_PRIVATE_BYTES(Animation, Verbose, pReader->GetDataStart(), pReader->GetDataLen());
-				break;
-			}
+		if (m_pPlayer->IsDead())
+		{
+			SERVER_WARN << "Dead players can't move. Ignoring.";
+			break;
+		}
 
-			//if (is_newer_event_stamp(moveToState.server_control_timestamp, m_pPlayer->_server_control_timestamp))
-			//{
-				// LOG(Temp, Normal, "Old server control timestamp on 0xF61C. Ignoring.\n");
-			//	break;
-			//}
+		/*
+		CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
+		if (transit)
+		{
+		m_pPlayer->SetPositionInternal(transit);
+		}
+		*/
 
-			if (is_newer_event_stamp(moveToState.teleport_timestamp, m_pPlayer->_teleport_timestamp))
-			{
-				LOG_PRIVATE(Temp, Normal, "Old teleport timestamp on 0xF61C. Ignoring.\n");
-				break;
-			}
-			if (is_newer_event_stamp(moveToState.force_position_ts, m_pPlayer->_force_position_timestamp))
-			{
-				LOG_PRIVATE(Temp, Normal, "Old force position timestamp on 0xF61C. Ignoring.\n");
-				break;
-			}
+		/*
+		double dist = m_pPlayer->m_Position.distance(moveToState.position);
+		if (dist >= 5)
+		{
+		m_pPlayer->_force_position_timestamp++;
+		m_pPlayer->Movement_UpdatePos();
 
-			if (m_pPlayer->IsDead())
-			{
-				LOG_PRIVATE(Temp, Normal, "Dead players can't move. Ignoring.\n");
-				break;
-			}
+		m_pPlayer->SendText(csprintf("Correcting position due to state %f", dist), LTT_DEFAULT);
+		}
+		*/
 
-			/*
+		/*
+		bool bHasCell = m_pPlayer->cell ? true : false;
+		m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
+		if (!m_pPlayer->cell && bHasCell)
+		{
+		m_pPlayer->SendText("Damnet...", LTT_DEFAULT);
+		}
+		*/
+
+		double dist = m_pPlayer->m_Position.distance(moveToState.position);
+		if (dist >= 10)
+		{
+			// Snap them back to their previous position
+			m_pPlayer->_force_position_timestamp++;
+		}
+		else
+		{
+			//m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
+
+
 			CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
 			if (transit)
 			{
 				m_pPlayer->SetPositionInternal(transit);
 			}
-			*/
 
-			/*
-			double dist = m_pPlayer->m_Position.distance(moveToState.position);
-			if (dist >= 5)
+		}
+
+		// m_pPlayer->m_Position = moveToState.position; // should interpolate to this, but oh well
+
+		/*
+		if (moveToState.contact)
+		{
+		m_pPlayer->transient_state |= ((DWORD)TransientState::CONTACT_TS);
+		}
+		else
+		{
+		m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
+		m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
+		}
+		m_pPlayer->calc_acceleration();
+		m_pPlayer->set_on_walkable(moveToState.contact);
+
+		m_pPlayer->get_minterp()->standing_longjump = moveToState.longjump_mode ? TRUE : FALSE;
+		*/
+
+		m_pPlayer->last_move_was_autonomous = true;
+		m_pPlayer->cancel_moveto();
+
+		if (!(moveToState.raw_motion_state.current_style & CM_Style) && moveToState.raw_motion_state.current_style)
+		{
+			SERVER_WARN << "Bad style received" << moveToState.raw_motion_state.current_style;
+			break;
+		}
+
+		if (moveToState.raw_motion_state.forward_command & CM_Action)
+		{
+			SERVER_WARN << "Bad forward command received" << moveToState.raw_motion_state.forward_command;
+			break;
+		}
+
+		if (moveToState.raw_motion_state.sidestep_command & CM_Action)
+		{
+			SERVER_WARN << "Bad sidestep command received" << moveToState.raw_motion_state.sidestep_command;
+			break;
+		}
+
+		if (moveToState.raw_motion_state.turn_command & CM_Action)
+		{
+			SERVER_WARN << "Bad turn command received" << moveToState.raw_motion_state.turn_command;
+			break;
+		}
+
+		CMotionInterp *minterp = m_pPlayer->get_minterp();
+		minterp->raw_state = moveToState.raw_motion_state;
+		minterp->apply_raw_movement(TRUE, minterp->motion_allows_jump(minterp->interpreted_state.forward_command != 0));
+
+		WORD newestActionStamp = m_MoveActionStamp;
+
+		for (const auto &actionNew : moveToState.raw_motion_state.actions)
+		{
+			if (m_pPlayer->get_minterp()->interpreted_state.GetNumActions() >= MAX_EMOTE_QUEUE)
+				break;
+
+			if (is_newer_event_stamp(newestActionStamp, actionNew.stamp))
 			{
-				m_pPlayer->_force_position_timestamp++;
-				m_pPlayer->Movement_UpdatePos();
+				DWORD commandID = GetCommandID(actionNew.action);
 
-				m_pPlayer->SendText(csprintf("Correcting position due to state %f", dist), LTT_DEFAULT);
+				if (!(commandID & CM_Action) || !(commandID & CM_ChatEmote))
+				{
+					SERVER_WARN << "Bad action received" << commandID;
+					continue;
+				}
+
+				MovementParameters params;
+				params.action_stamp = ++m_pPlayer->m_wAnimSequence;
+				params.autonomous = 1;
+				params.speed = actionNew.speed;
+				m_pPlayer->get_minterp()->DoMotion(commandID, &params);
+
+				// minterp->interpreted_state.AddAction(ActionNode(actionNew.action, actionNew.speed, ++m_pPlayer->m_wAnimSequence, TRUE));
+
+				// newestActionStamp = actionNew.stamp;
+				// m_pPlayer->Animation_PlayEmote(actionNew.action, actionNew.speed);
+			}
+		}
+
+		m_MoveActionStamp = newestActionStamp;
+
+		// m_pPlayer->Movement_UpdatePos();
+		m_pPlayer->Animation_Update();
+		// m_pPlayer->m_bAnimUpdate = TRUE;
+
+		// m_pPlayer->Movement_UpdatePos();
+		break;
+	}
+	case MOVEMENT_DO_MOVEMENT_COMMAND:
+	{
+		// Read: uint motion, float speed, uint holdKey
+		break;
+	}
+	case MOVEMENT_TURN_TO:
+	{
+		// Read: TurnToEventPack ttep - set of turning data, not in client
+		break;
+	}
+	case MOVEMENT_STOP:
+	{
+		// Read: uint motion, uint holdKey
+		break;
+	}
+	case MOVEMENT_AUTONOMY_LEVEL:
+	{
+		// Read: uint autonomyLevel - Seems to be 0, 1 or 2. I think 0/1 is server controlled, 2 is client controlled
+		// Align to DWORD boundary
+		break;
+	}
+	case MOVEMENT_AUTONOMOUS_POSITION: // Update Exact Position
+	{
+		Position position;
+		position.UnPack(pReader);
+
+		WORD instance = pReader->ReadWORD();
+
+		if (pReader->GetLastError())
+			break;
+
+		if (instance != m_pPlayer->_instance_timestamp)
+		{
+			SERVER_WARN << "Bad instance.";
+			break;
+		}
+
+		WORD server_control_timestamp = pReader->ReadWORD();
+		if (pReader->GetLastError())
+			break;
+		//if (is_newer_event_stamp(server_control_timestamp, m_pPlayer->_server_control_timestamp))
+		//{
+		//	LOG(Temp, Normal, "Old server control timestamp. Ignoring.\n");
+		//	break;
+		//}
+
+		WORD teleport_timestamp = pReader->ReadWORD();
+		if (pReader->GetLastError())
+			break;
+		if (is_newer_event_stamp(teleport_timestamp, m_pPlayer->_teleport_timestamp))
+		{
+			SERVER_WARN << "Old teleport timestamp. Ignoring.";
+			break;
+		}
+
+		WORD force_position_ts = pReader->ReadWORD();
+		if (pReader->GetLastError())
+			break;
+		if (is_newer_event_stamp(force_position_ts, m_pPlayer->_force_position_timestamp))
+		{
+			SERVER_WARN << "Old force position timestamp. Ignoring.";
+			break;
+		}
+
+		BOOL bHasContact = pReader->ReadBYTE() ? TRUE : FALSE;
+		if (pReader->GetLastError())
+			break;
+
+		double dist = m_pPlayer->m_Position.distance(position);
+		if (dist >= 10)
+		{
+			// Snap them back to their previous position
+			m_pPlayer->_force_position_timestamp++;
+			// m_pPlayer->SendText(csprintf("Correcting position due to position update %f", dist), LTT_DEFAULT);
+		}
+		else
+		{
+			/*
+			CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
+			if (transit)
+			{
+			m_pPlayer->SetPositionInternal(transit);
+			*/
+			/*
+			double distFromClient = m_pPlayer->m_Position.distance(position);
+
+			if (distFromClient >= 3.0)
+			{
+			m_pPlayer->_force_position_timestamp++;
+			}
 			}
 			*/
 
+			m_pPlayer->SetPositionSimple(&position, TRUE);
+
 			/*
-			bool bHasCell = m_pPlayer->cell ? true : false;
-			m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
 			if (!m_pPlayer->cell && bHasCell)
 			{
-				m_pPlayer->SendText("Damnet...", LTT_DEFAULT);
+			m_pPlayer->SendText("Damnet...", LTT_DEFAULT);
 			}
 			*/
+			// m_pPlayer->m_Position = position; // should interpolate this, not set this directly, but oh well
 
-			double dist = m_pPlayer->m_Position.distance(moveToState.position);
-			if (dist >= 10)
-			{
-				// Snap them back to their previous position
-				m_pPlayer->_force_position_timestamp++;
-			}
-			else
-			{
-				m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
-
-				/*
-				CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
-				if (transit)
-				{
-					m_pPlayer->SetPositionInternal(transit);
-				}
-				*/
-			}
-
-			// m_pPlayer->m_Position = moveToState.position; // should interpolate to this, but oh well
-
-			/*
-			if (moveToState.contact)
-			{
-				m_pPlayer->transient_state |= ((DWORD)TransientState::CONTACT_TS);
-			}
-			else
-			{
-				m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
-				m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
-			}
-			m_pPlayer->calc_acceleration();
-			m_pPlayer->set_on_walkable(moveToState.contact);
-
-			m_pPlayer->get_minterp()->standing_longjump = moveToState.longjump_mode ? TRUE : FALSE;
-			*/
-
-			m_pPlayer->last_move_was_autonomous = true;
-			m_pPlayer->cancel_moveto();
-
-			if (!(moveToState.raw_motion_state.current_style & CM_Style) && moveToState.raw_motion_state.current_style)
-			{
-				LOG_PRIVATE(Client, Warning, "Bad style received %08X\n", moveToState.raw_motion_state.current_style);
-				break;
-			}
-
-			if (moveToState.raw_motion_state.forward_command & CM_Action)
-			{
-				LOG_PRIVATE(Client, Warning, "Bad forward command received %08X\n", moveToState.raw_motion_state.forward_command);
-				break;
-			}
-
-			if (moveToState.raw_motion_state.sidestep_command & CM_Action)
-			{
-				LOG_PRIVATE(Client, Warning, "Bad sidestep command received %08X\n", moveToState.raw_motion_state.sidestep_command);
-				break;
-			}
-
-			if (moveToState.raw_motion_state.turn_command & CM_Action)
-			{
-				LOG_PRIVATE(Client, Warning, "Bad turn command received %08X\n", moveToState.raw_motion_state.turn_command);
-				break;
-			}
-
-			CMotionInterp *minterp = m_pPlayer->get_minterp();
-			minterp->raw_state = moveToState.raw_motion_state;
-			minterp->apply_raw_movement(TRUE, minterp->motion_allows_jump(minterp->interpreted_state.forward_command != 0));
-
-			WORD newestActionStamp = m_MoveActionStamp;
-
-			for (const auto &actionNew : moveToState.raw_motion_state.actions)
-			{
-				if (m_pPlayer->get_minterp()->interpreted_state.GetNumActions() >= MAX_EMOTE_QUEUE)
-					break;
-
-				if (is_newer_event_stamp(newestActionStamp, actionNew.stamp))
-				{
-					DWORD commandID = GetCommandID(actionNew.action);
-
-					if (!(commandID & CM_Action) || !(commandID & CM_ChatEmote))
-					{
-						LOG_PRIVATE(Client, Warning, "Bad action received %08X\n", commandID);
-						continue;
-					}
-
-					MovementParameters params;
-					params.action_stamp = ++m_pPlayer->m_wAnimSequence;
-					params.autonomous = 1;
-					params.speed = actionNew.speed;
-					m_pPlayer->get_minterp()->DoMotion(commandID, &params);
-
-					// minterp->interpreted_state.AddAction(ActionNode(actionNew.action, actionNew.speed, ++m_pPlayer->m_wAnimSequence, TRUE));
-
-					// newestActionStamp = actionNew.stamp;
-					// m_pPlayer->Animation_PlayEmote(actionNew.action, actionNew.speed);
-				}
-			}
-
-			m_MoveActionStamp = newestActionStamp;
-
-			// m_pPlayer->Movement_UpdatePos();
-			m_pPlayer->Animation_Update();
-			// m_pPlayer->m_bAnimUpdate = TRUE;
-
-			// m_pPlayer->Movement_UpdatePos();
-			break;
 		}
-		case 0xF753: // Update Exact Position
+
+		if (bHasContact)
 		{
-			Position position;
-			position.UnPack(pReader);
-
-			WORD instance = pReader->ReadWORD();
-
-			if (pReader->GetLastError())
-				break;
-
-			if (instance != m_pPlayer->_instance_timestamp)
-			{
-				LOG_PRIVATE(Temp, Normal, "Bad instance.\n");
-				break;
-			}
-
-			WORD server_control_timestamp = pReader->ReadWORD();
-			if (pReader->GetLastError())
-				break;
-			//if (is_newer_event_stamp(server_control_timestamp, m_pPlayer->_server_control_timestamp))
-			//{
-			//	LOG(Temp, Normal, "Old server control timestamp. Ignoring.\n");
-			//	break;
-			//}
-
-			WORD teleport_timestamp = pReader->ReadWORD();
-			if (pReader->GetLastError())
-				break;
-			if (is_newer_event_stamp(teleport_timestamp, m_pPlayer->_teleport_timestamp))
-			{
-				LOG_PRIVATE(Temp, Normal, "Old teleport timestamp. Ignoring.\n");
-				break;
-			}
-
-			WORD force_position_ts = pReader->ReadWORD();
-			if (pReader->GetLastError())
-				break;
-			if (is_newer_event_stamp(force_position_ts, m_pPlayer->_force_position_timestamp))
-			{
-				LOG_PRIVATE(Temp, Normal, "Old force position timestamp. Ignoring.\n");
-				break;
-			}
-
-			BOOL bHasContact = pReader->ReadBYTE() ? TRUE : FALSE;
-			if (pReader->GetLastError())
-				break;
-			
-			double dist =m_pPlayer->m_Position.distance(position);
-			if (dist >= 10)
-			{
-				// Snap them back to their previous position
-				m_pPlayer->_force_position_timestamp++;
-				// m_pPlayer->SendText(csprintf("Correcting position due to position update %f", dist), LTT_DEFAULT);
-			}
-			else
-			{
-				/*
-				CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &position, 0);
-				if (transit)
-				{
-					m_pPlayer->SetPositionInternal(transit);
-					*/
-					/*
-					double distFromClient = m_pPlayer->m_Position.distance(position);
-
-					if (distFromClient >= 3.0)
-					{
-						m_pPlayer->_force_position_timestamp++;
-					}
-				}
-				*/
-
-				m_pPlayer->SetPositionSimple(&position, TRUE);
-
-				/*
-				if (!m_pPlayer->cell && bHasCell)
-				{
-					m_pPlayer->SendText("Damnet...", LTT_DEFAULT);
-				}
-				*/
-				// m_pPlayer->m_Position = position; // should interpolate this, not set this directly, but oh well
-			
-			}
-
-			if (bHasContact)
-			{
-				m_pPlayer->transient_state |= ((DWORD)TransientState::CONTACT_TS);
-			}
-			else
-			{
-				m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
-				m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
-			}
-			m_pPlayer->calc_acceleration();
-			m_pPlayer->set_on_walkable(bHasContact);
-
-			m_pPlayer->Movement_UpdatePos();
-			break;
+			m_pPlayer->transient_state |= ((DWORD)TransientState::CONTACT_TS);
 		}
-		default:
+		else
 		{
-			//Unknown Event
+			m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
+			m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
+		}
+		m_pPlayer->calc_acceleration();
+		m_pPlayer->set_on_walkable(bHasContact);
+
+		m_pPlayer->Movement_UpdatePos();
+		break;
+	}
+	case MOVEMENT_JUMP_NON_AUTONOMOUS:
+	{
+		// Read: float extent - Power of jump
+		break;
+	}
+	default:
+	{
+		//Unknown Event
 #ifdef _DEBUG
-			SERVER_WARN << "Unhandled client event" << dwEvent;
+		SERVER_WARN << "Unhandled client event" << dwEvent;
 #endif
-			// LOG_BYTES(Temp, Verbose, in->GetDataPtr(), in->GetDataEnd() - in->GetDataPtr() );
-		}
-		}
+		// LOG_BYTES(Temp, Verbose, in->GetDataPtr(), in->GetDataEnd() - in->GetDataPtr() );
+	}
+	}
 }
+
 
 
 

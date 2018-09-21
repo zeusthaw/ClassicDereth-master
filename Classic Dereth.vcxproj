@@ -650,6 +650,7 @@
     <ClInclude Include="Source\EnumUtil.h" />
     <ClInclude Include="Source\BindStone.h" />
     <ClInclude Include="Source\ManaStone.h" />
+    <ClInclude Include="Source\PhatSDK\Header.h" />
     <ClInclude Include="Source\PhatSDK\Support\CombatFormulas.h" />
     <ClInclude Include="Source\PhatSDK\Support\Random.h" />
     <ClInclude Include="Source\PhatSDK\Support\RandomRange.h" />
