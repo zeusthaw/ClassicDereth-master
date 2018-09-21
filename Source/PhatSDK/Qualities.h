@@ -41,6 +41,9 @@ public:
 	DECLARE_PACKABLE_JSON()
 
 	static const char *GetAttributeName(STypeAttribute key); // custom
+	virtual DWORD GetMaxXp();
+	DWORD GetXpNeededForMaxXp();
+
 
 	DWORD _level_from_cp = 0;
 	DWORD _init_level = 0;
@@ -56,6 +59,8 @@ public:
 	DECLARE_PACKABLE()
 	DECLARE_PACKABLE_JSON()
 
+	virtual DWORD GetMaxXp();
+	
 	DWORD _current = 0;
 };
 
@@ -103,6 +108,9 @@ public:
 	DECLARE_PACKABLE_JSON()
 
 	void SetSkillAdvancementClass(SKILL_ADVANCEMENT_CLASS val);
+	bool IsMaxed();
+	DWORD GetMaxXP();
+	DWORD GetXpNeededForMaxXp();
 
 	SKILL_ADVANCEMENT_CLASS _sac = UNDEF_SKILL_ADVANCEMENT_CLASS;
 	DWORD _pp = 0;
