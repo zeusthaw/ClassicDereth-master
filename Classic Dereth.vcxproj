@@ -705,7 +705,7 @@
     <ClInclude Include="Source\Messages\ClientToServer\AllegianceSwear_001D.h" />
     <ClInclude Include="Source\Messages\ClientToServer\AllegianceUpdate_001F.h" />
     <ClInclude Include="Source\Messages\IClientMessage.h" />
-    <ClInclude Include="Source\Messages\messages.h" />
+    <ClInclude Include="Source\messages.h" />
     <ClInclude Include="Source\PhatSDK\Header.h" />
     <ClInclude Include="Source\PhatSDK\Support\CombatFormulas.h" />
     <ClInclude Include="Source\PhatSDK\Support\Random.h" />

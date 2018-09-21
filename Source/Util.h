@@ -148,6 +148,7 @@ char *DataToHexString(const void *input, unsigned int inputlen, char *output);
 bool LoadDataFromFile(const char *filepath, BYTE **data, DWORD *length);
 bool LoadDataFromPhatDataBin(DWORD data_id, BYTE **data, DWORD *length, DWORD magic1, DWORD magic2);
 bool LoadDataFromCompressedFile(const char *filepath, BYTE **data, DWORD *length, DWORD magic1, DWORD magic2);
+std::string TimeToString(int seconds);
 long FindNeedle(void *haystack, unsigned int haystacklength, void *needle, unsigned int needlelength);
 bool ReplaceString(std::string& str, const std::string& from, const std::string& to);
 
@@ -213,3 +214,6 @@ const DWORD dwMinimumCellX = 0x0;
 const DWORD dwMinimumCellY = 0x0;
 const DWORD dwMaximumCellX = (0x800 - 1);
 const DWORD dwMaximumCellY = (0x800 - 1);
+
+// strictness 1 = chat, strictness 2 = player names, titles, allegiance names
+extern bool containsBadCharacters(std::string, int strictness = 1);

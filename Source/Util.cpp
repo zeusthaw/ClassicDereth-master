@@ -261,6 +261,31 @@ long FindNeedle(void *haystack, unsigned int haystacklength, void *needle, unsig
 	return (dataPos - (BYTE *)haystack);
 }
 
+// returns a string of "Xmo, Xd, Xh, Xm, Xs"
+std::string TimeToString(int seconds)
+{
+	int mo = seconds / 2629800; // seconds in a month
+	int leftover = seconds % 2629800;
+	int d = leftover / 86400; // seconds in a day
+	leftover %= 86400;
+	int h = leftover / 3600; // seconds in an hour
+	leftover %= 3600;
+	int m = leftover / 60; // seconds in a minute
+	leftover %= 60;
+	int s = leftover;
+	std::string out = "";
+	if (mo)
+		out += csprintf("%dmo ", mo);
+	if (d)
+		out += csprintf("%dd ", d);
+	if (h)
+		out += csprintf("%dh ", h);
+	if (m)
+		out += csprintf("%dm ", m);
+	out += csprintf("%ds", s);
+	return out;
+}
+
 bool ReplaceString(std::string& str, const std::string& from, const std::string& to) {
 	size_t start_pos = str.find(from);
 	if (start_pos == std::string::npos)
@@ -758,4 +783,25 @@ DWORD64 GetTotalMemory()
 	status.dwLength = sizeof(status);
 	GlobalMemoryStatusEx(&status);
 	return status.ullTotalPhys;
+}
+
+// strictness 1 = chat, strictness 2 = player names, titles, allegiance names
+bool containsBadCharacters(std::string input, int strictness)
+{
+	std::string goodChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'- ";
+	if (strictness == 1)
+	{
+		goodChars += "!\"£$%^&*()_-+={}[]:;<>,.?/@'~#`¬|\\";
+	}
+
+	for (auto c : input)
+	{
+		if (goodChars.find(c) != goodChars.npos)
+		{
+			continue;
+		}
+		else
+			return true;
+	}
+	return false;
 }

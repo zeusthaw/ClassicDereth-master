@@ -482,4 +482,10 @@ CMutationFilter *CInferredPortalData::GetMutationFilter(DWORD id)
 	return NULL;
 }
 
+std::vector<std::string> CInferredPortalData::GetBannedWords()
+{
+	return _bannedWords;
+}
+
+
 

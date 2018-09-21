@@ -85,6 +85,8 @@ public:
 
 	virtual int PKRespiteTime() { return m_PKRespiteTime; }
 	virtual bool SpellPurgeOnLogin() { return m_bSpellPurgeOnLogin; }
+	virtual bool UpdateAllegianceData() { return m_bUpdateAllegianceData; }
+
 
 
 	virtual double SalvageMultiplier() { return m_SalvageMult; }
@@ -166,7 +168,7 @@ protected:
 
 	int m_PKRespiteTime = 300;
 	bool m_bSpellPurgeOnLogin = false;
-
+	bool m_bUpdateAllegianceData = false;
 	float m_SalvageMult = 1.0f;
 };
 

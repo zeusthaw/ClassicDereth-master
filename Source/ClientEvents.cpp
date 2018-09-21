@@ -30,7 +30,7 @@
 #include <chrono>
 
 #include "Config.h"
-#include "Messages.h"
+#include "messages.h"
 
 CClientEvents::CClientEvents(CClient *parent)
 {
