@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_SetMotd | 0254
 // Sets the allegiance MOTD ( /allegiance motd set )

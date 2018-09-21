@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_RemoveAllegianceBan | 02A2
 // Removes a player from the allegiance ban list

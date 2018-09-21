@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_ClearAllegianceName | 0031
 // Clears the name of the allegiance

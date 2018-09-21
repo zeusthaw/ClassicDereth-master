@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_ListAllegianceOfficers | 02A6
 // Shows a list of characters that are officers of the allegiance

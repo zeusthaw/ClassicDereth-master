@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_SetAllegianceOfficerTitle | 003C
 // Sets a custom officer title for the given permission level

@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_SetAllegianceOfficer | 003B
 // Sets a player as an allegiance officer at the given permission level

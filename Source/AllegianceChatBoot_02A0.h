@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 #include "Player.h"
 
 // Allegiance_AllegianceChatBoot | 02A0

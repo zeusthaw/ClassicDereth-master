@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_ListAllegianceOfficerTitles | 003D
 // Lists the current officer titles for the allegiance

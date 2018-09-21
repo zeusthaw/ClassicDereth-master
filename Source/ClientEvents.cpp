@@ -3195,7 +3195,7 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 		HouseAddOrRemoveAllegianceToStorageList(newSetting > 0);
 		break;
 	}
-	case CHESS_JOIN:
+	/*case CHESS_JOIN:
 	{
 		auto const guid = pReader->Read<uint32_t>();
 		pReader->Read<uint32_t>(); // teamId, not used
@@ -3226,7 +3226,7 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 		auto const on = pReader->Read<uint32_t>();
 		sChessManager->Stalemate(m_pPlayer, on);
 		break;
-	}
+	}*/
 	case HOUSE_LIST_AVAILABLE:
 	{
 		// Read: HouseType houseType - type of house to list, cottage 1, villa 2, mansion 3, apartment 4

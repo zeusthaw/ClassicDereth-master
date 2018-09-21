@@ -3053,6 +3053,16 @@ const char *Attribute::GetAttributeName(STypeAttribute key) // custom
 	}
 }
 
+DWORD Attribute::GetMaxXp()
+{
+	return 0;
+}
+
+DWORD Attribute::GetXpNeededForMaxXp()
+{
+	return 0;
+}
+
 SecondaryAttribute::SecondaryAttribute()
 {
 	_current = 0;

@@ -19,6 +19,7 @@ public:
 	bool ChanceExecuteEmoteSet(EmoteCategory category, DWORD target_id);
 	void ExecuteEmoteSet(const EmoteSet &emoteSet, DWORD target_id);
 	void ExecuteEmote(const Emote &emote, DWORD target_id);
+	void ConfirmationResponse(bool accepted, DWORD target_id);
 	void Tick();
 
 	void Cancel();

@@ -1,5 +1,5 @@
 #pragma once
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_QueryMotd | 0255
 // Request to see the allegiance MOTD ( /allegiance motd )

@@ -205,9 +205,20 @@ public:
 	
 	virtual void ChangeCombatMode(COMBAT_MODE mode, bool playerRequested) override;
 	
-	void UpdatePKActivity() { m_iPKActivity = Timer::cur_time + 20; }
+	void UpdatePKActivity();
 	bool CheckPKActivity() { return m_iPKActivity > Timer::cur_time; }
 	void ClearPKActivity() { m_iPKActivity = Timer::cur_time; }
+
+	void AddCorpsePermission(CPlayerWeenie * target);
+	void RemoveCorpsePermission(CPlayerWeenie * target);
+	bool HasPermission(CPlayerWeenie * target);
+	void UpdateCorpsePermissions();
+	void ClearPermissions(); // TODO: Add call on logout
+	void RemoveConsent(CPlayerWeenie * target);
+	void DisplayConsent();
+	void ClearConsent(bool onLogout); // TODO: Add call on logout
+	std::unordered_map<int, int> m_umCorpsePermissions;
+	std::unordered_map<int, int> m_umConsentList;
 
 protected:
 	CClient *m_pClient;
@@ -216,7 +227,7 @@ protected:
 
 	double m_fNextMakeAwareCacheFlush = 0.0;
 	bool m_bAttackable = true;
-
+	double m_NextCorpsePermissionsUpdate = 0.0;
 	double m_NextSave = 0.0;
 
 	double m_NextHealthUpdate = 0.0;

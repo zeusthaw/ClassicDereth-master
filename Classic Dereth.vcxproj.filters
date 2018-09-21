@@ -211,6 +211,33 @@
     <ClCompile Include="Source\WeenieObject.cpp" />
     <ClCompile Include="Source\World.cpp" />
     <ClCompile Include="Source\WorldLandBlock.cpp" />
+    <ClCompile Include="Source\AllegianceApprovedVassalSet_0040.cpp" />
+    <ClCompile Include="Source\AllegianceBanAdd_02A1.cpp" />
+    <ClCompile Include="Source\AllegianceBanList_02A3.cpp" />
+    <ClCompile Include="Source\AllegianceBanRemove_02A2.cpp" />
+    <ClCompile Include="Source\AllegianceBoot_0277.cpp" />
+    <ClCompile Include="Source\AllegianceBreak_001E.cpp" />
+    <ClCompile Include="Source\AllegianceChatBoot_02A0.cpp" />
+    <ClCompile Include="Source\AllegianceChatGag_0041.cpp" />
+    <ClCompile Include="Source\AllegianceHouseAction_0042.cpp" />
+    <ClCompile Include="Source\AllegianceInfoRequest_027B.cpp" />
+    <ClCompile Include="Source\AllegianceLockAction_003F.cpp" />
+    <ClCompile Include="Source\AllegianceMOTDClear_0256.cpp" />
+    <ClCompile Include="Source\AllegianceMOTDQuery_0255.cpp" />
+    <ClCompile Include="Source\AllegianceMOTDSet_0254.cpp" />
+    <ClCompile Include="Source\AllegianceNameClear_0031.cpp" />
+    <ClCompile Include="Source\AllegianceNameQuery_0030.cpp" />
+    <ClCompile Include="Source\AllegianceNameSet_0033.cpp" />
+    <ClCompile Include="Source\AllegianceOfficerRemove_02A5.cpp" />
+    <ClCompile Include="Source\AllegianceOfficersClear_02A7.cpp" />
+    <ClCompile Include="Source\AllegianceOfficerSet_003B.cpp" />
+    <ClCompile Include="Source\AllegianceOfficersList_02A6.cpp" />
+    <ClCompile Include="Source\AllegianceOfficerTitlesClear_003E.cpp" />
+    <ClCompile Include="Source\AllegianceOfficerTitleSet_003C.cpp" />
+    <ClCompile Include="Source\AllegianceOfficerTitlesList_003D.cpp" />
+    <ClCompile Include="Source\AllegianceRecallHometown_02AB.cpp" />
+    <ClCompile Include="Source\AllegianceSwear_001D.cpp" />
+    <ClCompile Include="Source\AllegianceUpdate_001F.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Source\PhysicsDesc.h" />
@@ -450,6 +477,33 @@
     <ClInclude Include="Source\World.h" />
     <ClInclude Include="Source\WorldLandBlock.h" />
     <ClInclude Include="Source\messages.h" />
+    <ClInclude Include="Source\AllegianceApprovedVassalSet_0040.h" />
+    <ClInclude Include="Source\AllegianceBanAdd_02A1.h" />
+    <ClInclude Include="Source\AllegianceBanList_02A3.h" />
+    <ClInclude Include="Source\AllegianceBanRemove_02A2.h" />
+    <ClInclude Include="Source\AllegianceBoot_0277.h" />
+    <ClInclude Include="Source\AllegianceBreak_001E.h" />
+    <ClInclude Include="Source\AllegianceChatBoot_02A0.h" />
+    <ClInclude Include="Source\AllegianceChatGag_0041.h" />
+    <ClInclude Include="Source\AllegianceHouseAction_0042.h" />
+    <ClInclude Include="Source\AllegianceInfoRequest_027B.h" />
+    <ClInclude Include="Source\AllegianceLockAction_003F.h" />
+    <ClInclude Include="Source\AllegianceMOTDClear_0256.h" />
+    <ClInclude Include="Source\AllegianceMOTDQuery_0255.h" />
+    <ClInclude Include="Source\AllegianceMOTDSet_0254.h" />
+    <ClInclude Include="Source\AllegianceNameClear_0031.h" />
+    <ClInclude Include="Source\AllegianceNameQuery_0030.h" />
+    <ClInclude Include="Source\AllegianceNameSet_0033.h" />
+    <ClInclude Include="Source\AllegianceOfficerRemove_02A5.h" />
+    <ClInclude Include="Source\AllegianceOfficersClear_02A7.h" />
+    <ClInclude Include="Source\AllegianceOfficerSet_003B.h" />
+    <ClInclude Include="Source\AllegianceOfficersList_02A6.h" />
+    <ClInclude Include="Source\AllegianceOfficerTitlesClear_003E.h" />
+    <ClInclude Include="Source\AllegianceOfficerTitleSet_003C.h" />
+    <ClInclude Include="Source\AllegianceOfficerTitlesList_003D.h" />
+    <ClInclude Include="Source\AllegianceRecallHometown_02AB.h" />
+    <ClInclude Include="Source\AllegianceSwear_001D.h" />
+    <ClInclude Include="Source\AllegianceUpdate_001F.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="Resource\PhatAC.rc" />

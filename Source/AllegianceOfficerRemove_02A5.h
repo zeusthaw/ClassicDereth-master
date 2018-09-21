@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_RemoveAllegianceOfficer | 02A5
 // Removes a player from the allegiance officers list

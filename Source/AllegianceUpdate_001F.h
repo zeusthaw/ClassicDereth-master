@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 #include "Client.h"
 
 // Allegiance_UpdateRequest | 001F

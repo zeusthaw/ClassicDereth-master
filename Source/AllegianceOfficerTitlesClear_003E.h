@@ -1,6 +1,6 @@
 #pragma once
 #include "BinaryReader.h"
-#include "Messages\IClientMessage.h"
+#include "IClientMessage.h"
 
 // Allegiance_ClearAllegianceOfficerTitles | 003E
 // Clears the allegiance custom officer titles
