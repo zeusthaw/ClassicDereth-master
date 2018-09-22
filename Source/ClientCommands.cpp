@@ -4886,10 +4886,35 @@ CLIENT_COMMAND(givecredit, "[value]", "Gives you some skill credits for testing.
 	amount = min(amount, 100);
 
 	pPlayer->GiveSkillCredits(amount, true);
+	pPlayer->EmitEffect(138, 1.0f);
 
 	return false;
 }
 
+CLIENT_COMMAND(givecreditother, "[value]", "Gives someone skill credits.", BASIC_ACCESS)
+{
+	if (!g_pConfig->EnableXPCommands() && pPlayer->GetAccessLevel() < SENTINEL_ACCESS)
+	{
+		pPlayer->SendText("This command is not enabled on this server.", LTT_DEFAULT);
+		return false;
+	}
+
+	DWORD amount = 0;
+	if (argc >= 1)
+	{
+		amount = strtoul(argv[0], NULL, 10);
+	}
+
+	amount = max(amount, 1);
+	amount = min(amount, 100);
+
+	CWeenieObject *assessed = g_pWorld->FindObject(pPlayer->m_LastAssessed);
+
+	assessed->GiveSkillCredits(amount, true);
+	assessed->EmitEffect(138, 1.0f);
+
+	return false;
+}
 
 CLIENT_COMMAND(givexpother, "[value]", "Gives you some XP for testing.", ADMIN_ACCESS)
 {
