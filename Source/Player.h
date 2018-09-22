@@ -31,6 +31,7 @@ public:
 	
 	virtual class CPlayerWeenie *AsPlayer() { return this; }
 
+	virtual bool IsChunky();
 	virtual bool IsAdvocate() override;
 	virtual bool IsSentinel() override;
 	virtual bool IsAdmin() override;

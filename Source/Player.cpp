@@ -124,6 +124,11 @@ void CPlayerWeenie::AddSpellByID(DWORD id)
 	SendNetMessage(AddSpellToSpellbook.GetData(), AddSpellToSpellbook.GetSize(), EVENT_MSG, true);
 }
 
+bool CPlayerWeenie::IsChunky()
+{
+	return GetAccessLevel() >= DONOR_ACCESS;
+}
+
 bool CPlayerWeenie::IsAdvocate()
 {
 	return GetAccessLevel() >= ADVOCATE_ACCESS;
@@ -2993,7 +2998,7 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 	float SalvageMult = (g_pConfig->SalvageMultiplier());
 	//SALVAGING SKILL DETERMINES SALVAGE AMOUNT
 	DWORD salvagingSkillValue;
-	InqSkill(STypeSkill::SALVAGING_SKILL, salvagingSkillValue, false);
+	InqSkill(STypeSkill::ARMOR_APPRAISAL_SKILL, salvagingSkillValue, false);
 
 	DWORD highestTinkeringSkillValue;
 	DWORD tinkeringSkills[4];
@@ -3055,16 +3060,16 @@ void CPlayerWeenie::PerformSalvaging(DWORD toolId, PackableList<DWORD> items)
 		}
 		else
 		{
-			int salvagingAmount = CalculateSalvageAmount(salvagingSkillValue, workmanship, numAugs);
+			int salvagingAmount = CalculateSalvageAmount(salvagingSkillValue, workmanship, numAugs) * SalvageMult;
 
 			// tinkering can at best return the workmanship as the amount
-			int tinkeringAmount = min(CalculateSalvageAmount(highestTinkeringSkillValue, workmanship, 0), workmanship);
+			int tinkeringAmount = min(CalculateSalvageAmount(highestTinkeringSkillValue, workmanship, 0), workmanship) * SalvageMult; 
 
 			// We choose the one that gives best results
 			int salvageAmount = max(salvagingAmount, tinkeringAmount);
 
 			// formula taken from http://asheron.wikia.com/wiki/Salvaging/Value_Pre2013
-			int salvageValue = itemValue * ( salvagingSkillValue / 387.0 ) *(1 + numAugs * 0.25) *SalvageMult;
+			int salvageValue = itemValue * ( salvagingSkillValue / 387.0 ) *(1 + numAugs * 0.25);
 			salvageMap[material].totalValue += salvageValue;
 			salvageMap[material].amount += salvageAmount;
 			salvageMap[material].itemsSalvagedCountCont++;
@@ -3239,6 +3244,7 @@ void CPlayerWeenie::SetLoginPlayerQualities()
 
 	if (IsChunky())
 	{
+
 		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1.1);
 
 	}
@@ -3247,6 +3253,8 @@ void CPlayerWeenie::SetLoginPlayerQualities()
 		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1);
 		m_Qualities.SetInt(ALLEGIANCE_RANK_INT, 10);
 		m_Qualities.SetInt(ALLEGIANCE_FOLLOWERS_INT, 500);
+
+
 
 	}
 
