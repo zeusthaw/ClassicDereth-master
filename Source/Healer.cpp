@@ -152,12 +152,12 @@ void CHealerUseEvent::OnUseAnimSuccess(DWORD motion)
 					if (skill._sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
 					{
 						heal_min = (int)(healing_skill * 0.05) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
-						heal_max = (int)(healing_skill * 0.10) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
+						heal_max = (int)(healing_skill * 0.15) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
 					}
 					else
 					{
-						heal_min = (int)(healing_skill * 0.025) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
-						heal_max = (int)(healing_skill * 0.05) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
+						heal_min = (int)(healing_skill * 0.05) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
+						heal_max = (int)(healing_skill * 0.20) * tool->InqFloatQuality(HEALKIT_MOD_FLOAT, 1.0);
 					}
 
 					amountHealed = Random::GenInt(heal_min, heal_max);
