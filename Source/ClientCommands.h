@@ -8,6 +8,7 @@ class CPhysicsObj;
 class CommandBase;
 class ClientCommand;
 class ServerCommand;
+class PlayerIDForPet;
 
 //Note: Server commands don't require a source player.
 typedef bool(*pfnCommandCallback)(class CClient *player_client, class CPlayerWeenie *player_weenie, class CPhysicsObj *player_physobj, char* argv[], int argc);

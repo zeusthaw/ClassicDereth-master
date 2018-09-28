@@ -1480,7 +1480,7 @@ CLIENT_COMMAND(spawnmonster2, "<model index> <base palette>", "Spawns a monster.
 */
 
 #ifndef PUBLIC_BUILD
-CLIENT_COMMAND(spawnmonster, "<model index> [scale=1] [name=*] [dotcolor]", "Spawns a monster.", ADMIN_ACCESS)
+CLIENT_COMMAND(spawnpet, "<model index> [scale=1] [name=*] [dotcolor]", "Spawns a monster.", ADMIN_ACCESS)
 {	
 	if (argc < 1)
 	{
@@ -1509,7 +1509,70 @@ CLIENT_COMMAND(spawnmonster, "<model index> [scale=1] [name=*] [dotcolor]", "Spa
 	g_pWorld->CreateEntity(pSpawn);
 
 	pSpawn->SetLongDescription(csprintf("This monster was spawned by %s.\nModel #: %08X\nScale: %f\n", pPlayer->GetName().c_str(), dwModel, flScale));
+	Skill runSkill;
+	runSkill._init_level = 0;
+	Position pos;
 
+	MovementParameters params;
+	params.can_charge = 1,
+		params.sticky = 1;
+	params.autonomous = 0;
+	pSpawn->stick_to_object(pPlayer->GetID());
+
+	// params.desired_heading = fmod(pObject->m_Position.frame.get_heading() + 90.0, 360.0);
+
+
+
+	//Set Pet Attributes.
+	pSpawn->m_Qualities.SetInt(LEVEL_INT, 5);
+	pSpawn->m_Qualities.SetAttribute(STRENGTH_ATTRIBUTE, 100);
+	pSpawn->m_Qualities.SetAttribute(ENDURANCE_ATTRIBUTE, 100);
+	pSpawn->m_Qualities.SetAttribute(COORDINATION_ATTRIBUTE, 100);
+	pSpawn->m_Qualities.SetAttribute(QUICKNESS_ATTRIBUTE, 200);
+	pSpawn->m_Qualities.SetAttribute(FOCUS_ATTRIBUTE, 100);
+	pSpawn->m_Qualities.SetAttribute(SELF_ATTRIBUTE, 100);
+	pSpawn->m_Qualities.SetAttribute2nd(MAX_HEALTH_ATTRIBUTE_2ND, 1200000);
+	pPlayer->SendText("Pet Attributes SET!", LTT_DEFAULT);
+	//Set name to Players name + Pet
+	pSpawn->m_Qualities.SetString(NAME_STRING, pPlayer->m_Qualities.GetString(NAME_STRING, "") + "'s Pet");
+	pSpawn->NotifyStringStatUpdated(NAME_STRING);
+	pPlayer->SendText("Pet's Name SET!", LTT_DEFAULT);
+	pSpawn->m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 0.4);
+	pSpawn->NotifyFloatStatUpdated(DEFAULT_SCALE_FLOAT);
+	pPlayer->SendText("Pet's Size SET!", LTT_DEFAULT);
+	//Setting Run Skill
+	pSpawn->m_Qualities.InqSkill(RUN_SKILL, runSkill);
+	pSpawn->m_Qualities.SetSkill(RUN_SKILL, runSkill);
+	pSpawn->NotifySkillStatUpdated(RUN_SKILL);
+	pPlayer->SendText("Pet Run Skill SET!", LTT_DEFAULT);
+	//Set all Vitals to Max
+	pSpawn->SetMaxVitals();
+	pPlayer->SendText("Pet's Vitals SET!", LTT_DEFAULT);
+	//Setting Heartbeat to use as Internal Clock
+	pSpawn->m_Qualities.SetFloat(HEARTBEAT_INTERVAL_FLOAT, 1);
+	pSpawn->m_Qualities.SetFloat(HEARTBEAT_TIMESTAMP_FLOAT, 0);
+	pSpawn->m_Qualities.SetFloat(CHARGE_SPEED_FLOAT, 100);
+	pPlayer->SendText("Pet's Heartbeat SET!", LTT_DEFAULT);
+	//Set IID, Not sure if this is implemented yet.
+	pSpawn->m_Qualities.SetInstanceID(PET_OWNER_IID, pPlayer->GetID());
+	pPlayer->m_Qualities.SetInstanceID(PET_IID, pSpawn->GetID());
+	pPlayer->SendText("Pet's IIDs SET!", LTT_DEFAULT);
+	//Hook to make Pet continually follow, this is garbage!
+	if
+		(pPlayer->m_Qualities.InqPosition(LOCATION_POSITION, pos) != pSpawn->m_Qualities.InqPosition(LOCATION_POSITION, pos))
+		pSpawn->MoveToObject(pPlayer->GetID(), &params);
+
+	else
+		pSpawn->MoveToObject(pPlayer->GetID(), &params);
+	if
+		(pPlayer->m_Qualities.InqPosition(LOCATION_POSITION, pos) >= pSpawn->m_Qualities.InqPosition(LOCATION_POSITION, pos))
+		pSpawn->MoveToObject(pPlayer->GetID(), &params);
+	else
+		pSpawn->MoveToObject(pPlayer->GetID(), &params);
+
+	//Set Effect to show if command is working
+	pSpawn->EmitEffect(PS_Create, 1.0f);
+	pPlayer->SendText("Pet Starting Movement!", LTT_DEFAULT);
 	return false;
 }
 #endif
@@ -4178,37 +4241,78 @@ CLIENT_COMMAND(barber, "", "", ADMIN_ACCESS)
 
 CLIENT_COMMAND(spawnfollow, "", "", ADMIN_ACCESS)
 {
-
+	
 	if (!pPlayer->m_dwLastSpawnedCreatureID)
 		return false;
 
-	CWeenieObject *pObject = g_pWorld->FindObject(pPlayer->m_dwLastSpawnedCreatureID);
-	if (!pObject)
+	CMonsterWeenie *pet = new CMonsterWeenie();
+	if (!pet)
 		return false;
 
+	Skill runSkill;
+	runSkill._init_level = 0;
+	Position pos;
+
 	MovementParameters params;
-	params.sticky = 1,
-		params.autonomous = 1;
-
-
+	params.can_charge = 1,
+	params.sticky = 1;
+	params.autonomous = 0;
+	pet->stick_to_object(pPlayer->GetID());
+	
 	// params.desired_heading = fmod(pObject->m_Position.frame.get_heading() + 90.0, 360.0);
-	pObject->MoveToObject(pPlayer->GetID(), &params);
 
-	pObject->m_Qualities.SetInt(LEVEL_INT, 50);
-	pObject->m_Qualities.SetAttribute(STRENGTH_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute(ENDURANCE_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute(COORDINATION_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute(QUICKNESS_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute(FOCUS_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute(SELF_ATTRIBUTE, 100);
-	pObject->m_Qualities.SetAttribute2nd(MAX_HEALTH_ATTRIBUTE_2ND, 120);
-	pObject->SetMaxVitals();
-	pObject->EmitEffect(138, 1.0f);
+	
 
-
-
-
-
+	//Set Pet Attributes.
+	pet->m_Qualities.SetInt(LEVEL_INT, 5);
+	pet->m_Qualities.SetAttribute(STRENGTH_ATTRIBUTE, 100);
+	pet->m_Qualities.SetAttribute(ENDURANCE_ATTRIBUTE, 100);
+	pet->m_Qualities.SetAttribute(COORDINATION_ATTRIBUTE, 100);
+	pet->m_Qualities.SetAttribute(QUICKNESS_ATTRIBUTE, 200);
+	pet->m_Qualities.SetAttribute(FOCUS_ATTRIBUTE, 100);
+	pet->m_Qualities.SetAttribute(SELF_ATTRIBUTE, 100);
+	pet->m_Qualities.SetAttribute2nd(MAX_HEALTH_ATTRIBUTE_2ND, 1200000);
+	pPlayer->SendText("Pet Attributes SET!", LTT_DEFAULT);
+	//Set name to Players name + Pet
+	pet->m_Qualities.SetString(NAME_STRING, pPlayer->m_Qualities.GetString(NAME_STRING, "") + "'s Pet");
+	pet->NotifyStringStatUpdated(NAME_STRING);
+	pPlayer->SendText("Pet's Name SET!", LTT_DEFAULT);
+	pet->m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 0.4);
+	pet->NotifyFloatStatUpdated(DEFAULT_SCALE_FLOAT);
+	pPlayer->SendText("Pet's Size SET!", LTT_DEFAULT);
+	//Setting Run Skill
+	pet->m_Qualities.InqSkill(RUN_SKILL, runSkill);
+	pet->m_Qualities.SetSkill(RUN_SKILL, runSkill);
+	pet->NotifySkillStatUpdated(RUN_SKILL);
+	pPlayer->SendText("Pet Run Skill SET!", LTT_DEFAULT);
+	//Set all Vitals to Max
+	pet->SetMaxVitals();
+	pPlayer->SendText("Pet's Vitals SET!", LTT_DEFAULT);
+	//Setting Heartbeat to use as Internal Clock
+	pet->m_Qualities.SetFloat(HEARTBEAT_INTERVAL_FLOAT, 1);
+	pet->m_Qualities.SetFloat(HEARTBEAT_TIMESTAMP_FLOAT, 0);
+	pet->m_Qualities.SetFloat(CHARGE_SPEED_FLOAT, 100);
+	pPlayer->SendText("Pet's Heartbeat SET!", LTT_DEFAULT);
+	//Set IID, Not sure if this is implemented yet.
+	pet->m_Qualities.SetInstanceID(PET_OWNER_IID, pPlayer->GetID());
+	pPlayer->m_Qualities.SetInstanceID(PET_IID, pet->GetID());
+	pPlayer->SendText("Pet's IIDs SET!", LTT_DEFAULT);
+	//Hook to make Pet continually follow, this is garbage!
+	if 
+		(pPlayer->m_Qualities.InqPosition(LOCATION_POSITION, pos) != pet->m_Qualities.InqPosition(LOCATION_POSITION, pos))
+		pet->MoveToObject(pPlayer->GetID(), &params);
+	
+	else
+		pet->MoveToObject(pPlayer->GetID(), &params);
+	if 
+		(pPlayer->m_Qualities.InqPosition(LOCATION_POSITION, pos) >= pet->m_Qualities.InqPosition(LOCATION_POSITION, pos))
+		pet->MoveToObject(pPlayer->GetID(), &params);
+	else
+		pet->MoveToObject(pPlayer->GetID(), &params);
+	
+	//Set Effect to show if command is working
+	pet->EmitEffect(PS_Create, 1.0f);
+	pPlayer->SendText("Pet Starting Movement!", LTT_DEFAULT);
 }
 
 CLIENT_COMMAND(spawnfollow2, "", "", ADMIN_ACCESS)
