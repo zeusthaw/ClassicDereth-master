@@ -389,7 +389,7 @@ DEFINE_UNPACK_JSON(CTreasureProfile)
 	if (HasField(reader, "missileWeapons"))
 		missileWeapons = reader.at("missileWeapons").get<std::vector<CTreasureProfileCategory>>();
 	if (HasField(reader, "casters"))
-		casters = reader.at("casters");
+		casters = reader.at("casters").get<std::vector<CTreasureProfileCategory>>();
 	if (HasField(reader, "gemstones"))
 		gemstones = reader.at("gemstones");
 	if (HasField(reader, "armor"))
@@ -1340,7 +1340,8 @@ CWeenieObject *CTreasureFactory::GenerateTreasure(int tierId, eTreasureCategory 
 			category = &_TreasureProfile->jewelry[getRandomNumberExclusive((int)_TreasureProfile->jewelry.size())];
 		break;
 	case TreasureCategory_Caster:
-		category = &_TreasureProfile->casters;
+		if (!_TreasureProfile->casters.empty())
+			category = &_TreasureProfile->casters[getRandomNumberExclusive((int)_TreasureProfile->casters.size())];
 		break;
 	case TreasureCategory_Gem:
 		category = &_TreasureProfile->gemstones;

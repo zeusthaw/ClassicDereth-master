@@ -306,7 +306,7 @@ public:
 
 	std::vector<CTreasureProfileCategory> meleeWeapons;
 	std::vector<CTreasureProfileCategory> missileWeapons;
-	CTreasureProfileCategory casters;
+	std::vector<CTreasureProfileCategory> casters;
 	CTreasureProfileCategory gemstones;
 	CTreasureArmorProfile armor;
 	std::vector<CTreasureProfileCategory> clothing;
