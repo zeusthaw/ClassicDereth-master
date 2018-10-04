@@ -84,7 +84,7 @@ void CalculateAttributeDamageBonus(DamageEventData *dmgEvent)
 	case DF_MISSILE:
 	{
 		DWORD attrib = 0;
-		if (dmgEvent->attackSkill == FINESSE_WEAPONS_SKILL || dmgEvent->attackSkill == MISSILE_WEAPONS_SKILL)			
+		if (dmgEvent->attackSkill == DAGGER_SKILL || dmgEvent->attackSkill == BOW_SKILL || dmgEvent->attackSkill == CROSSBOW_SKILL || dmgEvent->attackSkill == THROWN_WEAPON_SKILL)
 			dmgEvent->source->m_Qualities.InqAttribute(COORDINATION_ATTRIBUTE, attrib, FALSE);
 		else
 			dmgEvent->source->m_Qualities.InqAttribute(STRENGTH_ATTRIBUTE, attrib, FALSE);
