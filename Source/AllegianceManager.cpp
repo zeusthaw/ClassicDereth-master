@@ -1055,13 +1055,22 @@ void AllegianceManager::HandleAllegiancePassup(DWORD source_id, long long amount
 	{
 		node->_cp_tithed += passupAmount;
 		patron->_cp_cached += passupAmount;
-		patron->_cp_pool_to_unload = min(4294967295ull, patron->_cp_pool_to_unload + passupAmount);
+		patron->_cp_pool_to_unload += passupAmount;
+		//Classic Version//
+		CWeenieObject *patron_weenie = g_pWorld->FindPlayer(patron->_charID);
+		if (patron_weenie)
+			patron_weenie->TryToUnloadAllegianceXP(false);
+
+		HandleAllegiancePassup(patron->_charID, passupAmount, false);
+
+		//GDLE VERSION//
+		/*patron->_cp_pool_to_unload = min(4294967295ull, patron->_cp_pool_to_unload + passupAmount);
 
 		CWeenieObject *patron_weenie = g_pWorld->FindPlayer(patron->_charID); // pass up now if the patron is online (otherwise remains in cp_cached until their next login)
 		if (patron_weenie)
 			patron_weenie->TryToUnloadAllegianceXP(false);
 
-		HandleAllegiancePassup(patron->_charID, passupAmount, false);
+		HandleAllegiancePassup(patron->_charID, passupAmount, false); */
 	}
 }
 
