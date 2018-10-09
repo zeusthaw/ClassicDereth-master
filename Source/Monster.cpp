@@ -2038,7 +2038,7 @@ void CMonsterWeenie::GenerateDeathLoot(CCorpseWeenie *pCorpse)
 	for each(auto item in pCorpse->m_Items)
 	{
 		if (item->IsDestroyedOnDeath())
-			removeList.push_back(item);
+			item->Remove();
 	}
 
 	for (auto item : removeList)

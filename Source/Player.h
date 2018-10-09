@@ -223,6 +223,8 @@ public:
 	std::unordered_map<int, int> m_umCorpsePermissions;
 	std::unordered_map<int, int> m_umConsentList;
 
+	CCraftOperation *TryGetAlternativeOperation(CWeenieObject *target, CWeenieObject *tool, CCraftOperation *op);
+
 
 
 protected:

@@ -1575,9 +1575,11 @@ bool CTreasureFactory::MutateItem(CWeenieObject *newItem, sItemCreationInfo &cre
 			{
 				newItem->m_Qualities.SetInt(PALETTE_TEMPLATE_INT, ptid);
 				newItem->m_Qualities.SetFloat(SHADE_FLOAT, getRandomDouble(1.0));
+				/* 
 				newItem->m_Qualities.SetFloat(SHADE2_FLOAT, getRandomDouble(1.0));
 				newItem->m_Qualities.SetFloat(SHADE3_FLOAT, getRandomDouble(1.0));
-				newItem->m_Qualities.SetFloat(SHADE4_FLOAT, getRandomDouble(1.0));
+				newItem->m_Qualities.SetFloat(SHADE4_FLOAT, getRandomDouble(1.0)); 
+				*/
 			}
 		}
 
