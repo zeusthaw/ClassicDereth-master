@@ -939,6 +939,7 @@ void CClient::GenerateStarterGear(CWeenieObject *weenieObject, ACCharGenResult c
 			weenie->SpawnInContainer(W_NEWBIEWANDSHO_CLASS, 1);
 
 		break;
+		/*
 	case Viamontian_HeritageGroup:
 		weenie->SpawnInContainer(W_APPLE_CLASS, 1);
 		if (cg.skillAdvancementClasses[LIGHT_WEAPONS_SKILL] >= SKILL_ADVANCEMENT_CLASS::TRAINED_SKILL_ADVANCEMENT_CLASS)
@@ -1129,7 +1130,7 @@ void CClient::GenerateStarterGear(CWeenieObject *weenieObject, ACCharGenResult c
 			weenie->SpawnInContainer(W_WANDTRAINING_CLASS, 1);
 			
 
-		break;
+		break; */
 	}
 
 	weenie->SpawnInContainer(W_SACK_CLASS, 1);
