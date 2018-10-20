@@ -4584,3 +4584,5 @@ el::base::debug::CrashHandler elCrashHandler(ELPP_USE_DEF_CRASH_HANDLER);\
 #define NETWORK_ERROR CLOG(ERROR, _NELOG)
 #define _CTLOG "chat", "info"
 #define CHAT_LOG CLOG(INFO, _CTLOG)
+#define _SPLOG "spawn", "info"
+#define SPAWN_LOG CLOG(INFO, _SPLOG)

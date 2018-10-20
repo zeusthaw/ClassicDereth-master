@@ -3725,6 +3725,7 @@ CLIENT_COMMAND(spawnwcid, "<name> [ptid] [shade]", "Spawn by wcid.", ADMIN_ACCES
 		if (pPlayer->GetAccessLevel() < SENTINEL_ACCESS)
 		{
 			pPlayer->SendText("You do not have access to this command.", LTT_DEFAULT);
+			
 			return false;
 		}
 	}
@@ -3779,7 +3780,9 @@ CLIENT_COMMAND(spawnwcid, "<name> [ptid] [shade]", "Spawn by wcid.", ADMIN_ACCES
 
 	if (weenie->IsCreature())
 	{
+		
 		pPlayer->m_dwLastSpawnedCreatureID = weenie->GetID();
+		SPAWN_LOG << "{" "\"id\"" ":" << "REPLACE_ME" <<  "," << "\"wcid\"" ":" << (atoi(argv[0])) << ",""\"pos\""": {" << "\"objcell_id\"" ":" << player_physobj->m_Position.objcell_id << "\"frame\"" ": {" << "\"origin\"" ": {" << "\"x\"" ":" << player_physobj->m_Position.frame.m_origin.x << "," << "\"y\"" ":" << player_physobj->m_Position.frame.m_origin.y << "," << "\"z\"" ":" << player_physobj->m_Position.frame.m_origin.z << "}, " << "\"angles\"" ":" " {" << "\"w\"" ":" << player_physobj->m_Position.frame.m_angles.w << "," << "\"x\"" ":" << player_physobj->m_Position.frame.m_angles.x << "," << "\"y\"" ":" << player_physobj->m_Position.frame.m_angles.y << "," << "\"z\"" ":" << player_physobj->m_Position.frame.m_angles.z << "} } } },";
 	}
 
 	return false;
