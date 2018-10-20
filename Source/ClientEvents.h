@@ -115,6 +115,7 @@ public:
 
 	void HouseClearAccessList();
 	void HouseClearStorageAccess();
+	//void Remove();
 
 	// Remote Container
 	void NoLongerViewingContents(DWORD container_id);

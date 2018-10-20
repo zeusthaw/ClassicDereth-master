@@ -2836,6 +2836,44 @@ void CWeenieObject::InventoryTick()
 		m_EmoteManager->Tick();
 
 	CheckForExpiredEnchantments();
+
+	if (_timeToRot >= 0 && _timeToRot <= Timer::cur_time)
+	{
+		// only destroy items with a lifespan or that have already been flagged to rot.
+		if (_beganRot || m_Qualities.GetInt(LIFESPAN_INT, 0))
+
+		{
+			CWeenieObject *owner = GetWorldTopLevelOwner();
+
+			if (_beganRot)
+			{
+				if ((_timeToRot + 2.0) <= Timer::cur_time)
+				{
+					if (IsWielded())
+					{
+						if (owner->id == GetWielderID())
+						{
+							owner->DoForcedStopCompletely();
+							owner->ChangeCombatMode(NONCOMBAT_COMBAT_MODE, false);
+						}
+					}
+
+					Remove();
+					RecalculateEncumbrance();
+					owner->SendText(csprintf("Its lifespan finished, your %s crumbles to dust.", GetName().c_str()), LTT_DEFAULT);
+
+					if (AsClothing() && m_bWorldIsAware)
+						owner->UpdateModel();
+
+				}
+			}
+			else
+			{
+				_beganRot = true;
+			}
+		}
+	}
+
 }
 
 void CWeenieObject::Tick()
@@ -2958,7 +2996,8 @@ void CWeenieObject::Tick()
 
 	if (_timeToRot >= 0 && _timeToRot <= Timer::cur_time)
 	{
-		if (!HasOwner())
+		// Allow items to rot if they have a predetermined lifespan.
+		if (!HasOwner() || m_Qualities.GetInt(LIFESPAN_INT, 0))
 		{
 			if (_beganRot)
 			{

@@ -574,6 +574,13 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 		//----not sure where to change msg prepended to it.
 
 
+		if (pEntity->m_Qualities.GetInt(ITEM_TYPE_INT, 0) == ITEM_TYPE::TYPE_TINKERING_MATERIAL)
+		{
+			profile._intStatsTable->remove(STRUCTURE_INT);
+			profile._intStatsTable->remove(MAX_STRUCTURE_INT);
+		}
+
+
 		if (bIsPlayer)
 		{
 			if (!(characterOptions2 & DisplayAge_CharacterOptions2))
@@ -619,6 +626,13 @@ BinaryWriter *IdentifyObject(CWeenieObject *pSource, CWeenieObject *pEntity, DWO
 				profile._intStatsTable->add(SHIELD_VALUE_INT, &halfTrueValue);
 			}
 		}
+
+		if (pEntity->m_Qualities.GetInt(LIFESPAN_INT, 0) && pEntity->_timeToRot)
+		{
+			int newLifespan = (int)(pEntity->_timeToRot - Timer::cur_time);
+			profile._intStatsTable->add(REMAINING_LIFESPAN_INT, &newLifespan); // Update the remaining_lifespan_int for inspect window.	
+		}
+
 
 	}
 

@@ -377,6 +377,16 @@ bool CWorld::CreateEntity(CWeenieObject *pEntity, bool bMakeAware)
 	if (!pEntity->m_Qualities.InqFloat(CREATION_TIMESTAMP_FLOAT, createTime))
 		pEntity->m_Qualities.SetFloat(CREATION_TIMESTAMP_FLOAT, Timer::cur_time);
 
+	int lifespan = pEntity->m_Qualities.GetInt(LIFESPAN_INT, 0);
+
+	if (lifespan && !pEntity->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0))
+	{
+		time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+		pEntity->m_Qualities.SetInt(CREATION_TIMESTAMP_INT, t);
+		pEntity->_timeToRot = Timer::cur_time + lifespan;
+	}
+
+
 	if (!pEntity->GetID())
 	{
 		bool useEphemeral = (pEntity->m_PhysicsState & MISSILE_PS)

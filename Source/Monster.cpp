@@ -482,8 +482,8 @@ void CMonsterWeenie::FinishMoveItemToContainer(CWeenieObject *sourceItem, CConta
 
 	//if (!sourceItem->HasOwner())
 	//{
-		if (CWeenieObject *generator = g_pWorld->FindObject(sourceItem->InqIIDQuality(GENERATOR_IID, 0)))
-			generator->NotifyGeneratedPickedUp(sourceItem);
+	if (CWeenieObject *generator = g_pWorld->FindObject(sourceItem->InqIIDQuality(GENERATOR_IID, 0)))
+		generator->NotifyGeneratedPickedUp(sourceItem);
 	//}
 
 	// Take it out of whatever slot it's in.
@@ -530,9 +530,12 @@ void CMonsterWeenie::FinishMoveItemToContainer(CWeenieObject *sourceItem, CConta
 	if (AsPlayer() && IsCurrency(sourceItem->m_Qualities.id))
 		RecalculateCoinAmount(sourceItem->m_Qualities.id);
 
-	sourceItem->m_Qualities.RemoveFloat(TIME_TO_ROT_FLOAT);
-	sourceItem->_timeToRot = -1.0;
-	sourceItem->_beganRot = false;
+	if (!sourceItem->m_Qualities.GetInt(LIFESPAN_INT, 0))
+	{
+		sourceItem->m_Qualities.RemoveFloat(TIME_TO_ROT_FLOAT);
+		sourceItem->_timeToRot = -1.0;
+		sourceItem->_beganRot = false;
+	}
 }
 
 bool CMonsterWeenie::MoveItemTo3D(DWORD sourceItemId, bool animationDone)
@@ -609,9 +612,13 @@ void CMonsterWeenie::FinishMoveItemTo3D(CWeenieObject *sourceItem)
 	g_pWorld->InsertEntity(sourceItem);
 	sourceItem->Movement_Teleport(GetPosition());
 
-	sourceItem->_timeToRot = Timer::cur_time + 300.0;
-	sourceItem->_beganRot = false;
-	sourceItem->m_Qualities.SetFloat(TIME_TO_ROT_FLOAT, sourceItem->_timeToRot);
+	if (!sourceItem->m_Qualities.GetInt(LIFESPAN_INT, 0))
+	{
+		sourceItem->_timeToRot = Timer::cur_time + 300.0;
+		sourceItem->_beganRot = false;
+		sourceItem->m_Qualities.SetFloat(TIME_TO_ROT_FLOAT, sourceItem->_timeToRot);
+	}
+
 
 	RecalculateEncumbrance();
 
@@ -725,6 +732,79 @@ bool CMonsterWeenie::FinishMoveItemToWield(CWeenieObject *sourceItem, DWORD targ
 	{
 		sourceItem->m_Qualities.RemoveDataID(SPELL_DID);
 		sourceItem->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
+	}
+	time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+	// Remove all loot items with wcid > g_pConfig->WcidForPurge()
+	if (g_pConfig->InventoryPurgeOnLogin())
+	{
+		if (sourceItem->m_Qualities.id == g_pConfig->WcidForPurge() || sourceItem->m_Qualities.id == 33257 ||
+
+			sourceItem->m_Qualities.id == 41201 ||
+
+			sourceItem->m_Qualities.id == 41200 ||
+
+			sourceItem->m_Qualities.id == 41199 ||
+
+			sourceItem->m_Qualities.id == 41198 ||
+
+			sourceItem->m_Qualities.id == 41197 ||
+
+			sourceItem->m_Qualities.id == 48919 ||
+
+			sourceItem->m_Qualities.id == 32984 ||
+
+			sourceItem->m_Qualities.id == 33053 ||
+
+			sourceItem->m_Qualities.id == 33116 ||
+
+			sourceItem->m_Qualities.id == 41889 ||
+
+			sourceItem->m_Qualities.id == 35916 ||
+
+			sourceItem->m_Qualities.id == 35173 ||
+
+			sourceItem->m_Qualities.id == 43056 ||
+
+			sourceItem->m_Qualities.id == 27092 ||
+
+			sourceItem->m_Qualities.id == 41885 ||
+
+			sourceItem->m_Qualities.id == 41886 ||
+
+			sourceItem->m_Qualities.id == 37478 ||
+
+			sourceItem->m_Qualities.id == 34277 ||
+
+			sourceItem->m_Qualities.id == 27305 ||
+
+			sourceItem->m_Qualities.id == 38456 ||
+
+			sourceItem->m_Qualities.id == 49563)
+		{
+			sourceItem->_timeToRot = Timer::cur_time;
+			sourceItem->_beganRot = true;
+		}
+	}
+
+
+	// Remove all expired items, or set _timeToRot if not yet expired.
+	int lifespan = sourceItem->m_Qualities.GetInt(LIFESPAN_INT, 0);
+
+	if (lifespan)
+	{
+		int creationTime = sourceItem->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0);
+		int lived = t - creationTime;
+
+		if (creationTime && lived >= lifespan)
+		{
+			sourceItem->_timeToRot = Timer::cur_time;
+		}
+		else
+		{
+			int lifespanRemaining = lifespan - lived;
+			sourceItem->_timeToRot = Timer::cur_time + lifespanRemaining;
+		}
+
 	}
 
 
@@ -1035,9 +1115,13 @@ bool CMonsterWeenie::FinishMoveItemToWield(CWeenieObject *sourceItem, DWORD targ
 	if (sourceItem->AsClothing() && m_bWorldIsAware)
 		UpdateModel();
 
-	sourceItem->m_Qualities.RemoveFloat(TIME_TO_ROT_FLOAT);
-	sourceItem->_timeToRot = -1.0;
-	sourceItem->_beganRot = false;
+	if (!sourceItem->m_Qualities.GetInt(LIFESPAN_INT, 0))
+	{
+		sourceItem->m_Qualities.RemoveFloat(TIME_TO_ROT_FLOAT);
+		sourceItem->_timeToRot = -1.0;
+		sourceItem->_beganRot = false;
+	}
+
 
 	// Checks the old motion vs Motion_NonCombat to prevent getting stuck while adjusting to the new combat style.
 	if (oldmotion != Motion_NonCombat)

@@ -14,9 +14,11 @@
 #include "ChatMsgs.h"
 #include "ObjectMsgs.h"
 
+#include "WeenieDefaults.h"
 #include "WeenieObject.h"
 #include "Monster.h"
 #include "Player.h"
+#include "PhatDataBin.h"
 #include "ChatMsgs.h"
 #include "Movement.h"
 #include "EmoteManager.h"
@@ -195,9 +197,9 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		return;
 	}
 	*/
-	
+
 	m_pPlayer = new CPlayerWeenie(m_pClient, char_weenie_id, m_pClient->IncCharacterInstanceTS(char_weenie_id));
-	
+
 	if (!m_pPlayer->Load())
 	{
 		LoginError(13); // update error codes
@@ -291,333 +293,6 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		}
 	}
 
-	for (auto wielded : m_pPlayer->m_Wielded)
-	{
-	
-		// Updates shields to have SHIELD_VALUE_INT
-		if(wielded->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && wielded->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
-		{
-			wielded->m_Qualities.SetInt(SHIELD_VALUE_INT, wielded->InqIntQuality(ARMOR_LEVEL_INT, 0));
-		}
-
-		// Weeping wand nerf
-		if (wielded->m_Qualities.m_WeenieType == 35 && wielded->InqStringQuality(NAME_STRING, "") == "Weeping Wand" 
-			&& (wielded->InqDIDQuality(SPELL_DID, 0) > 0 || wielded->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
-		{
-			wielded->m_Qualities.RemoveDataID(SPELL_DID);
-			wielded->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
-		}
-
-		//Spadone Fix
-		DWORD spadonePhysical;
-		DWORD spadoneElectric;
-		DWORD spadoneAcid;
-		DWORD spadoneFrost;
-		DWORD spadoneFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadonePhysical) && spadonePhysical == 0x0200130B)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Spadone");//Re-Write the name to match Item//
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneElectric) && spadoneElectric == 0x02001892)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Electric Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneAcid) && spadoneAcid == 0x02001891)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Acid Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFrost) && spadoneFrost == 0x02001890)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Frost Spadone");//Re-Write the name to match Item//
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFlame) && spadoneFlame == 0x0200188F)
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Flame Spadone");//Re-Write the name to match Item//
-		}
-
-		//  Elemental Staff Fix  //
-		int staffSlash;
-		int staffPierce;
-		int staffBludge;
-		int staffAcid;
-		int staffElectric;
-		int staffFrost;
-		int staffFlame;
-
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffSlash) && staffSlash == SLASH_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006852);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slashing Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x02001850);
-
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffPierce) && staffPierce == PIERCE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x00600685B);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184F);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffBludge) && staffBludge == BLUDGEON_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006853);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Bludgeoning Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184B);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffAcid) && staffAcid == ACID_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006855);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Acid Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184A);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffElectric) && staffElectric == ELECTRIC_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006858);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Electric Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184C);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFrost) && staffFrost == COLD_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006857);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Frost Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184E);
-		}
-		if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFlame) && staffFlame == FIRE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
-		{
-			wielded->m_Qualities.SetDataID(ICON_DID, 0x006006854);//Elemental Staff Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetString(NAME_STRING, "Fire Staff");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184D);
-		}
-
-		//Compound Bow Fix
-		DWORD compoundBow;
-		DWORD compoundBowSlash;
-		DWORD compoundBowPierce;
-		DWORD compoundBowBludge;
-		DWORD compoundBowAcid;
-		DWORD compoundBowElectric;
-		DWORD compoundBowFrost;
-		DWORD compoundBowFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBow) && compoundBow == 0x0200144E)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Compound Bow");//Re-Write the name to match Item//
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowSlash) && compoundBowSlash == 0x02001488)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slicing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowPierce) && compoundBowPierce == 0x0200148A)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AD);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowBludge) && compoundBowBludge == 0x02001489)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B1);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smashing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowAcid) && compoundBowAcid == 0x02001475)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AE);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Corrosive Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowElectric) && compoundBowElectric == 0x02001472)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AF);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Sparking Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFrost) && compoundBowFrost == 0x02001473)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AA);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Chilling Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFlame) && compoundBowFlame == 0x02001474)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B0);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Searing Compound Bow");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-		//Elemental Yumi Bow Fix
-		DWORD yumiSlash;
-		DWORD yumiPierce;
-		DWORD yumiBludge;
-		DWORD yumiAcid;
-		DWORD yumiElectric;
-		DWORD yumiFrost;
-		DWORD yumiFlame;
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiSlash) && yumiSlash == 33559028)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiPierce) && yumiPierce == 33559027)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
-
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiBludge) && yumiBludge == 33559030)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiAcid) && yumiAcid == 33559029)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiElectric) && yumiElectric == 33559031)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFrost) && yumiFrost == 33559026)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
-
-		}
-		if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFlame) && yumiFlame == 33559025)
-		{
-			//wielded->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
-			wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
-			wielded->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
-			wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
-			wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
-
-		}
-
-	}
-
-	for (auto item : m_pPlayer->m_Items)
-	{
-		// Updates shields to have SHIELD_VALUE_INT
-		if (item->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && item->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
-		{
-			item->m_Qualities.SetInt(SHIELD_VALUE_INT, item->InqIntQuality(ARMOR_LEVEL_INT, 0));
-		}
-
-		// Weeping wand nerf
-		if (item->m_Qualities.m_WeenieType == 35 && item->InqStringQuality(NAME_STRING, "") == "Weeping Wand"
-			&& (item->InqDIDQuality(SPELL_DID, 0) > 0 || item->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
-		{
-			item->m_Qualities.RemoveDataID(SPELL_DID);
-			item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
-		}
-	}
-
-	for (auto pack : m_pPlayer->m_Packs)
-	{
-		
-		if (pack->m_Qualities.id != W_PACKCREATUREESSENCE_CLASS && pack->m_Qualities.id != W_PACKITEMESSENCE_CLASS && pack->m_Qualities.id != W_PACKLIFEESSENCE_CLASS &&
-			pack->m_Qualities.id != W_PACKWARESSENCE_CLASS )
-		{
-			
-			for (auto item : pack->AsContainer()->m_Items)
-			{
-				// Updates shields to have SHIELD_VALUE_INT
-				if (item->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && item->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
-				{
-					item->m_Qualities.SetInt(SHIELD_VALUE_INT, item->InqIntQuality(ARMOR_LEVEL_INT, 0));
-				}
-
-				// Weeping wand nerf
-				if (item->m_Qualities.m_WeenieType == 35 && item->InqStringQuality(NAME_STRING, "") == "Weeping Wand"
-					&& (item->InqDIDQuality(SPELL_DID, 0) > 0 || item->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
-				{
-					item->m_Qualities.RemoveDataID(SPELL_DID);
-					item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
-				}
-			}
-		}
-	}
-
 	// give characters created before creation timestamp was being set a timestamp and DOB from their DB date_created
 	if (!m_pPlayer->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0))
 	{
@@ -635,7 +310,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 		}
 	}
 
-	if(m_pPlayer->m_Qualities.GetInt(HERITAGE_GROUP_INT, 0) == Lugian_HeritageGroup)
+	if (m_pPlayer->m_Qualities.GetInt(HERITAGE_GROUP_INT, 0) == Lugian_HeritageGroup)
 		m_pPlayer->m_Qualities.SetDataID(MOTION_TABLE_DID, 0x9000216);
 
 	if (m_pPlayer->m_Qualities.GetInt(HERITAGE_GROUP_INT, 0) == Empyrean_HeritageGroup && m_pPlayer->m_Qualities.GetDID(MOTION_TABLE_DID, 0x9000001) == 0x9000001)
@@ -649,112 +324,528 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 	/*
 	if (*g_pConfig->WelcomeMessage() != 0)
 	{
-		m_pPlayer->SendText(g_pConfig->WelcomeMessage(), LTT_DEFAULT);
+	m_pPlayer->SendText(g_pConfig->WelcomeMessage(), LTT_DEFAULT);
 	}
 	*/
 
 	g_pWorld->CreateEntity(m_pPlayer);
 
-	//temporarily add all enchantments back from the character's wielded items
-	if (g_pConfig->SpellPurgeOnLogin())
+	time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+
+	for (auto wielded : m_pPlayer->m_Wielded)
 	{
-		for (auto item : m_pPlayer->m_Wielded)
+
+		// Updates shields to have SHIELD_VALUE_INT
+		if (wielded->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && wielded->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
 		{
-			if (item->m_Qualities._spell_book)
+			wielded->m_Qualities.SetInt(SHIELD_VALUE_INT, wielded->InqIntQuality(ARMOR_LEVEL_INT, 0));
+		}
+
+		// Weeping wand nerf
+		if (wielded->m_Qualities.m_WeenieType == 35 && wielded->InqStringQuality(NAME_STRING, "") == "Weeping Wand"
+			&& (wielded->InqDIDQuality(SPELL_DID, 0) > 0 || wielded->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
+		{
+			wielded->m_Qualities.RemoveDataID(SPELL_DID);
+			wielded->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
+		}
+
+		if (g_pConfig->InventoryPurgeOnLogin())
+		{
+			if (wielded->m_Qualities.id == g_pConfig->WcidForPurge() || wielded->m_Qualities.id == 33257 || wielded->m_Qualities.id == 41201 || wielded->m_Qualities.id == 41200 || wielded->m_Qualities.id == 41199 || wielded->m_Qualities.id == 41198 || wielded->m_Qualities.id == 41197 || wielded->m_Qualities.id == 48919 || wielded->m_Qualities.id == 32984 || wielded->m_Qualities.id == 33053 || wielded->m_Qualities.id == 33116 || wielded->m_Qualities.id == 41889 || wielded->m_Qualities.id == 35916 || wielded->m_Qualities.id == 35173 || wielded->m_Qualities.id == 43056 || wielded->m_Qualities.id == 27092 || wielded->m_Qualities.id == 41885 || wielded->m_Qualities.id == 41886 || wielded->m_Qualities.id == 37478 || wielded->m_Qualities.id == 34277 || wielded->m_Qualities.id == 27305 || wielded->m_Qualities.id == 38456 || wielded->m_Qualities.id == 49563)
 			{
-				bool bShouldCast = true;
+				wielded->_timeToRot = Timer::cur_time; wielded->_beganRot = true;
+			}
+		}
 
-				std::string name;
-				if (item->m_Qualities.InqString(CRAFTSMAN_NAME_STRING, name))
+		// Remove all expired items, or set _timeToRot if not yet expired.
+		int lifespan = wielded->m_Qualities.GetInt(LIFESPAN_INT, 0);
+
+		if (lifespan)
+		{
+			int creationTime = wielded->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0);
+			int lived = t - creationTime;
+
+			if (creationTime && lived >= lifespan)
+			{
+				wielded->_timeToRot = Timer::cur_time;
+			}
+			else
+			{
+				int lifespanRemaining = lifespan - lived;
+				wielded->_timeToRot = Timer::cur_time + lifespanRemaining;
+			}
+
+			//Spadone Fix
+			DWORD spadonePhysical;
+			DWORD spadoneElectric;
+			DWORD spadoneAcid;
+			DWORD spadoneFrost;
+			DWORD spadoneFlame;
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, spadonePhysical) && spadonePhysical == 0x0200130B)
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Spadone");//Re-Write the name to match Item//
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneElectric) && spadoneElectric == 0x02001892)
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Spadone Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Electric Spadone");//Re-Write the name to match Item//
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneAcid) && spadoneAcid == 0x02001891)
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Acid Spadone");//Re-Write the name to match Item//
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFrost) && spadoneFrost == 0x02001890)
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Frost Spadone");//Re-Write the name to match Item//
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, spadoneFlame) && spadoneFlame == 0x0200188F)
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x06006B77);//Spadone Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04001A25);//Spadone Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Flame Spadone");//Re-Write the name to match Item//
+			}
+
+			//  Elemental Staff Fix  //
+			int staffSlash;
+			int staffPierce;
+			int staffBludge;
+			int staffAcid;
+			int staffElectric;
+			int staffFrost;
+			int staffFlame;
+
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffSlash) && staffSlash == SLASH_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006852);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Slashing Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x02001850);
+
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffPierce) && staffPierce == PIERCE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x00600685B);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Piercing Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184F);
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffBludge) && staffBludge == BLUDGEON_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006853);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Bludgeoning Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184B);
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffAcid) && staffAcid == ACID_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006855);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Acid Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184A);
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffElectric) && staffElectric == ELECTRIC_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006858);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Electric Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184C);
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFrost) && staffFrost == COLD_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006857);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Frost Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184E);
+			}
+			if (wielded->m_Qualities.InqInt(DAMAGE_TYPE_INT, staffFlame) && staffFlame == FIRE_DAMAGE_TYPE && wielded->InqStringQuality(NAME_STRING, "") == "Staff")
+			{
+				wielded->m_Qualities.SetDataID(ICON_DID, 0x006006854);//Elemental Staff Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x04000BEF);//Elemental Staff Pallete//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
+				wielded->m_Qualities.SetString(NAME_STRING, "Fire Staff");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetDataID(SETUP_DID, 0x0200184D);
+			}
+
+			//Compound Bow Fix
+			DWORD compoundBow;
+			DWORD compoundBowSlash;
+			DWORD compoundBowPierce;
+			DWORD compoundBowBludge;
+			DWORD compoundBowAcid;
+			DWORD compoundBowElectric;
+			DWORD compoundBowFrost;
+			DWORD compoundBowFlame;
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBow) && compoundBow == 0x0200144E)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Compound Bow");//Re-Write the name to match Item//
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowSlash) && compoundBowSlash == 0x02001488)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Slicing Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
+
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowPierce) && compoundBowPierce == 0x0200148A)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AD);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Piercing Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
+
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowBludge) && compoundBowBludge == 0x02001489)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B1);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Smashing Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowAcid) && compoundBowAcid == 0x02001475)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AE);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Corrosive Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowElectric) && compoundBowElectric == 0x02001472)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AF);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Sparking Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFrost) && compoundBowFrost == 0x02001473)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AA);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Chilling Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, compoundBowFlame) && compoundBowFlame == 0x02001474)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060B0);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x01000062D);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Searing Compound Bow");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
+
+			}
+
+			//Elemental Yumi Bow Fix
+			DWORD yumiSlash;
+			DWORD yumiPierce;
+			DWORD yumiBludge;
+			DWORD yumiAcid;
+			DWORD yumiElectric;
+			DWORD yumiFrost;
+			DWORD yumiFlame;
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiSlash) && yumiSlash == 33559028)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 0x0060060AC);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Slicing Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_SLASHING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, SLASH_DAMAGE_TYPE);
+
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiPierce) && yumiPierce == 33559027)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677125);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Piercing Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_PIERCING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, PIERCE_DAMAGE_TYPE);
+
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiBludge) && yumiBludge == 33559030)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677123);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Smashing Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_BLUDGEONING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, BLUDGEON_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiAcid) && yumiAcid == 33559029)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677121);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Stinging Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_ACID);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ACID_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiElectric) && yumiElectric == 33559031)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677118);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Sparking Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_LIGHTNING);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, ELECTRIC_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFrost) && yumiFrost == 33559026)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677119);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Freezing Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FROST);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, COLD_DAMAGE_TYPE);
+
+			}
+			if (wielded->m_Qualities.InqDataID(SETUP_DID, yumiFlame) && yumiFlame == 33559025)
+			{
+				//wielded->m_Qualities.SetDataID(ICON_DID, 100677122);//Compound Bow Icon//
+				wielded->m_Qualities.SetDataID(PALETTE_BASE_DID, 0x09898CD);//Compound Bow Pallete//
+				wielded->m_Qualities.SetString(NAME_STRING, "Smoldering Yumi");//Re-Write the name to match Item//
+				wielded->m_Qualities.SetInt(UI_EFFECTS_INT, UI_EFFECT_FIRE);//Elemental UI Effect//
+				wielded->m_Qualities.SetInt(DAMAGE_TYPE_INT, FIRE_DAMAGE_TYPE);
+
+			}
+
+
+
+			for (auto item : m_pPlayer->m_Items)
+			{
+				// Updates shields to have SHIELD_VALUE_INT
+				if (item->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && item->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
 				{
-					if (!name.empty() && name != item->InqStringQuality(NAME_STRING, ""))
-					{
-						bShouldCast = false;
+					item->m_Qualities.SetInt(SHIELD_VALUE_INT, item->InqIntQuality(ARMOR_LEVEL_INT, 0));
+				}
 
-						m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_NOT_CRAFTSMAN, name.c_str());
+				// Weeping wand nerf
+				if (item->m_Qualities.m_WeenieType == 35 && item->InqStringQuality(NAME_STRING, "") == "Weeping Wand"
+					&& (item->InqDIDQuality(SPELL_DID, 0) > 0 || item->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
+				{
+					item->m_Qualities.RemoveDataID(SPELL_DID);
+					item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
+				}
+
+				// Remove all loot items with wcid > g_pConfig->WcidForPurge()
+				if (g_pConfig->InventoryPurgeOnLogin())
+				{
+					if (item->m_Qualities.id == g_pConfig->WcidForPurge() || item->m_Qualities.id == 33257 || item->m_Qualities.id == 41201 || item->m_Qualities.id == 41200 || item->m_Qualities.id == 41199 || item->m_Qualities.id == 41198 || item->m_Qualities.id == 41197 || item->m_Qualities.id == 48919 || item->m_Qualities.id == 32984 || item->m_Qualities.id == 33053 || item->m_Qualities.id == 33116 || item->m_Qualities.id == 41889 || item->m_Qualities.id == 35916 || item->m_Qualities.id == 35173 || item->m_Qualities.id == 43056 || item->m_Qualities.id == 27092 || item->m_Qualities.id == 41885 || item->m_Qualities.id == 41886 || item->m_Qualities.id == 37478 || item->m_Qualities.id == 34277 || item->m_Qualities.id == 27305 || item->m_Qualities.id == 38456 || item->m_Qualities.id == 49563)
+					{
+						item->_timeToRot = Timer::cur_time; item->_beganRot = true;
 					}
 				}
 
-				int difficulty;
-				difficulty = 0;
-				if (item->m_Qualities.InqInt(ITEM_DIFFICULTY_INT, difficulty, TRUE, FALSE))
-				{
-					DWORD skillLevel = 0;
-					if (!m_pPlayer->m_Qualities.InqSkill(ARCANE_LORE_SKILL, skillLevel, FALSE) || (int)skillLevel < difficulty)
-					{
-						bShouldCast = false;
 
-						m_pPlayer->NotifyWeenieError(WERROR_ACTIVATION_ARCANE_LORE_TOO_LOW);
+				// Remove all expired items, or set _timeToRot if not yet expired.
+				int lifespan = item->m_Qualities.GetInt(LIFESPAN_INT, 0);
+
+				if (lifespan)
+				{
+					int creationTime = item->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0);
+					int lived = t - creationTime;
+
+					if (creationTime && lived >= lifespan)
+					{
+						item->_timeToRot = Timer::cur_time;
+					}
+					else
+					{
+						int lifespanRemaining = lifespan - lived;
+						item->_timeToRot = Timer::cur_time + lifespanRemaining;
 					}
 				}
+			}
 
-				if (bShouldCast)
+			for (auto pack : m_pPlayer->m_Packs)
+			{
+
+				if (pack->m_Qualities.id != W_PACKCREATUREESSENCE_CLASS && pack->m_Qualities.id != W_PACKITEMESSENCE_CLASS && pack->m_Qualities.id != W_PACKLIFEESSENCE_CLASS &&
+					pack->m_Qualities.id != W_PACKWARESSENCE_CLASS)
 				{
-					difficulty = 0;
-					DWORD skillActivationTypeDID = 0;
 
-
-
-					if (item->m_Qualities.InqInt(ITEM_SKILL_LEVEL_LIMIT_INT, difficulty, TRUE, FALSE) && item->m_Qualities.InqDataID(ITEM_SKILL_LIMIT_DID, skillActivationTypeDID))
+					for (auto item : pack->AsContainer()->m_Items)
 					{
-						STypeSkill skillActivationType = SkillTable::OldToNewSkill((STypeSkill)skillActivationTypeDID);
-
-						DWORD skillLevel = 0;
-						if (!m_pPlayer->m_Qualities.InqSkill(skillActivationType, skillLevel, FALSE) || (int)skillLevel < difficulty)
+						// Updates shields to have SHIELD_VALUE_INT
+						if (item->InqIntQuality(ITEM_TYPE_INT, 0) == TYPE_ARMOR && item->InqIntQuality(LOCATIONS_INT, 0) == SHIELD_LOC)
 						{
-							bShouldCast = false;
+							item->m_Qualities.SetInt(SHIELD_VALUE_INT, item->InqIntQuality(ARMOR_LEVEL_INT, 0));
+						}
 
-							m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_SKILL_TOO_LOW, CachedSkillTable->GetSkillName(skillActivationType).c_str());
+						// Weeping wand nerf
+						if (item->m_Qualities.m_WeenieType == 35 && item->InqStringQuality(NAME_STRING, "") == "Weeping Wand"
+							&& (item->InqDIDQuality(SPELL_DID, 0) > 0 || item->InqFloatQuality(SLAYER_DAMAGE_BONUS_FLOAT, 0) != 1.4))
+						{
+							item->m_Qualities.RemoveDataID(SPELL_DID);
+							item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
+						}
+
+						if (g_pConfig->InventoryPurgeOnLogin())
+						{
+							if (item->m_Qualities.id == g_pConfig->WcidForPurge() || item->m_Qualities.id == 33257 || item->m_Qualities.id == 41201 || item->m_Qualities.id == 41200 || item->m_Qualities.id == 41199 || item->m_Qualities.id == 41198 || item->m_Qualities.id == 41197 || item->m_Qualities.id == 48919 || item->m_Qualities.id == 32984 || item->m_Qualities.id == 33053 || item->m_Qualities.id == 33116 || item->m_Qualities.id == 41889 || item->m_Qualities.id == 35916 || item->m_Qualities.id == 35173 || item->m_Qualities.id == 43056 || item->m_Qualities.id == 27092 || item->m_Qualities.id == 41885 || item->m_Qualities.id == 41886 || item->m_Qualities.id == 37478 || item->m_Qualities.id == 34277 || item->m_Qualities.id == 27305 || item->m_Qualities.id == 38456 || item->m_Qualities.id == 49563)
+							{
+								item->_timeToRot = Timer::cur_time; item->_beganRot = true;
+							}
+						}
+
+
+						// Remove all expired items, or set _timeToRot if not yet expired.
+						int lifespan = item->m_Qualities.GetInt(LIFESPAN_INT, 0);
+
+						if (lifespan)
+						{
+							int creationTime = item->m_Qualities.GetInt(CREATION_TIMESTAMP_INT, 0);
+							int lived = t - creationTime;
+
+							if (creationTime && lived >= lifespan)
+							{
+								item->_timeToRot = Timer::cur_time;
+							}
+							else
+							{
+								int lifespanRemaining = lifespan - lived;
+								item->_timeToRot = Timer::cur_time + lifespanRemaining;
+							}
+
 						}
 					}
 				}
 
-				if (bShouldCast && item->InqIntQuality(ITEM_ALLEGIANCE_RANK_LIMIT_INT, 0) > item->InqIntQuality(ALLEGIANCE_RANK_INT, 0))
-				{
-					bShouldCast = false;
-					m_pPlayer->NotifyInventoryFailedEvent(item->GetID(), WERROR_ACTIVATION_RANK_TOO_LOW);
-				}
 
-				if (bShouldCast)
+				//temporarily add all enchantments back from the character's wielded items
+				if (g_pConfig->SpellPurgeOnLogin())
 				{
-					int heritageRequirement = item->InqIntQuality(HERITAGE_GROUP_INT, -1);
-					if (heritageRequirement != -1 && heritageRequirement != item->InqIntQuality(HERITAGE_GROUP_INT, 0))
+					for (auto item : m_pPlayer->m_Wielded)
 					{
-						bShouldCast = false;
-						std::string heritageString = item->InqStringQuality(ITEM_HERITAGE_GROUP_RESTRICTION_STRING, "of the correct heritage");
-						m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_WRONG_RACE, heritageString.c_str());
+						if (item->m_Qualities._spell_book)
+						{
+							bool bShouldCast = true;
+
+							std::string name;
+							if (item->m_Qualities.InqString(CRAFTSMAN_NAME_STRING, name))
+							{
+								if (!name.empty() && name != item->InqStringQuality(NAME_STRING, ""))
+								{
+									bShouldCast = false;
+
+									m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_NOT_CRAFTSMAN, name.c_str());
+								}
+							}
+
+							int difficulty;
+							difficulty = 0;
+							if (item->m_Qualities.InqInt(ITEM_DIFFICULTY_INT, difficulty, TRUE, FALSE))
+							{
+								DWORD skillLevel = 0;
+								if (!m_pPlayer->m_Qualities.InqSkill(ARCANE_LORE_SKILL, skillLevel, FALSE) || (int)skillLevel < difficulty)
+								{
+									bShouldCast = false;
+
+									m_pPlayer->NotifyWeenieError(WERROR_ACTIVATION_ARCANE_LORE_TOO_LOW);
+								}
+							}
+
+							if (bShouldCast)
+							{
+								difficulty = 0;
+								DWORD skillActivationTypeDID = 0;
+
+
+
+								if (item->m_Qualities.InqInt(ITEM_SKILL_LEVEL_LIMIT_INT, difficulty, TRUE, FALSE) && item->m_Qualities.InqDataID(ITEM_SKILL_LIMIT_DID, skillActivationTypeDID))
+								{
+									STypeSkill skillActivationType = SkillTable::OldToNewSkill((STypeSkill)skillActivationTypeDID);
+
+									DWORD skillLevel = 0;
+									if (!m_pPlayer->m_Qualities.InqSkill(skillActivationType, skillLevel, FALSE) || (int)skillLevel < difficulty)
+									{
+										bShouldCast = false;
+
+										m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_SKILL_TOO_LOW, CachedSkillTable->GetSkillName(skillActivationType).c_str());
+									}
+								}
+							}
+
+							if (bShouldCast && item->InqIntQuality(ITEM_ALLEGIANCE_RANK_LIMIT_INT, 0) > item->InqIntQuality(ALLEGIANCE_RANK_INT, 0))
+							{
+								bShouldCast = false;
+								m_pPlayer->NotifyInventoryFailedEvent(item->GetID(), WERROR_ACTIVATION_RANK_TOO_LOW);
+							}
+
+							if (bShouldCast)
+							{
+								int heritageRequirement = item->InqIntQuality(HERITAGE_GROUP_INT, -1);
+								if (heritageRequirement != -1 && heritageRequirement != item->InqIntQuality(HERITAGE_GROUP_INT, 0))
+								{
+									bShouldCast = false;
+									std::string heritageString = item->InqStringQuality(ITEM_HERITAGE_GROUP_RESTRICTION_STRING, "of the correct heritage");
+									m_pPlayer->NotifyWeenieErrorWithString(WERROR_ACTIVATION_WRONG_RACE, heritageString.c_str());
+								}
+							}
+
+							int currentMana = 0;
+							if (bShouldCast && item->m_Qualities.InqInt(ITEM_CUR_MANA_INT, currentMana, TRUE, FALSE))
+							{
+								if (currentMana == 0)
+								{
+									bShouldCast = false;
+									m_pPlayer->NotifyWeenieError(WERROR_ACTIVATION_NOT_ENOUGH_MANA);
+								}
+								else
+									item->_nextManaUse = Timer::cur_time;
+							}
+
+							if (bShouldCast)
+							{
+								DWORD serial = 0;
+								serial |= ((DWORD)m_pPlayer->GetEnchantmentSerialByteForMask(item->InqIntQuality(LOCATIONS_INT, 0, TRUE)) << (DWORD)0);
+								serial |= ((DWORD)m_pPlayer->GetEnchantmentSerialByteForMask(item->InqIntQuality(CLOTHING_PRIORITY_INT, 0, TRUE)) << (DWORD)8);
+
+								for (auto &spellPage : item->m_Qualities._spell_book->_spellbook)
+								{
+									item->MakeSpellcastingManager()->CastSpellEquipped(m_pPlayer->GetID(), spellPage.first, (WORD)serial);
+								}
+							}
+						}
 					}
 				}
+				m_pPlayer->DebugValidate();
 
-				int currentMana = 0;
-				if (bShouldCast && item->m_Qualities.InqInt(ITEM_CUR_MANA_INT, currentMana, TRUE, FALSE))
-				{
-					if (currentMana == 0)
-					{
-						bShouldCast = false;
-						m_pPlayer->NotifyWeenieError(WERROR_ACTIVATION_NOT_ENOUGH_MANA);
-					}
-					else
-						item->_nextManaUse = Timer::cur_time;
-				}
-
-				if (bShouldCast)
-				{
-					DWORD serial = 0;
-					serial |= ((DWORD)m_pPlayer->GetEnchantmentSerialByteForMask(item->InqIntQuality(LOCATIONS_INT, 0, TRUE)) << (DWORD)0);
-					serial |= ((DWORD)m_pPlayer->GetEnchantmentSerialByteForMask(item->InqIntQuality(CLOTHING_PRIORITY_INT, 0, TRUE)) << (DWORD)8);
-
-					for (auto &spellPage : item->m_Qualities._spell_book->_spellbook)
-					{
-						item->MakeSpellcastingManager()->CastSpellEquipped(m_pPlayer->GetID(), spellPage.first, (WORD)serial);
-					}
-				}
+				return;
 			}
 		}
 	}
-	m_pPlayer->DebugValidate();
-
-	return;
 }
 
 void CClientEvents::SendText(const char *szText, long lColor)

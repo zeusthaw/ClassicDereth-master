@@ -170,6 +170,10 @@ void CPhatACServerConfig::PostLoad()
 	m_SalvageMult = max(0.0, atof(GetValue("Salvage_Multiplier", "1.0")));
 	m_bSpellPurgeOnLogin = atoi(GetValue("spell_purge_on_login", "0")) != 0;
 	m_bUpdateAllegianceData = atoi(GetValue("update_allegiance_blob", "0")) != 0;
+	m_bInventoryPurgeOnLogin = atoi(GetValue("inventory_purge_on_login", "0")) != 0;
+
+	m_WcidForPurge = (unsigned int)max(0, atoi(GetValue("wcid_for_purge", "100000")));
+
 
 	m_bAllowGeneralChat = atoi(GetValue("allow_general_chat", "1")) != 0;
 }
