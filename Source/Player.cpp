@@ -1178,16 +1178,35 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 		CCraftOperation *op = g_pPortalDataEx->GetCraftOperation(pTool->m_Qualities.id, pTarget->m_Qualities.id);
 		if (!op)
 		{
-			//Try inversing the combination.
-			op = g_pPortalDataEx->GetCraftOperation(pTarget->m_Qualities.id, pTool->m_Qualities.id);
+			//Try using our get alternative operation function for Rare Dyes, Infinite Leather, etc.
+			op = TryGetAlternativeOperation(pTarget, pTool, op);
+
 
 			if (!op)
-				return WERROR_NONE;
 
-			//swap things around
-			CWeenieObject *swapHelper = pTool;
-			pTool = pTarget;
-			pTarget = swapHelper;
+			{
+
+
+				//Try inversing the combination.
+
+
+				op = g_pPortalDataEx->GetCraftOperation(pTarget->m_Qualities.id, pTool->m_Qualities.id);
+
+
+
+
+
+				if (!op)
+
+
+					return WERROR_NONE;
+
+				//swap things around
+				CWeenieObject *swapHelper = pTool;
+				pTool = pTarget;
+				pTarget = swapHelper;
+			}
+
 		}
 
 		if (pTool->IsWielded() || pTarget->IsWielded())
@@ -1288,8 +1307,7 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 		{
 			double toolWorkmanship = pTool->InqIntQuality(ITEM_WORKMANSHIP_INT, 0);
 			double itemWorkmanship = pTarget->InqIntQuality(ITEM_WORKMANSHIP_INT, 0);
-			if (pTool->InqIntQuality(ITEM_TYPE_INT, 0) == ITEM_TYPE::TYPE_TINKERING_MATERIAL)
-				toolWorkmanship /= (double)pTool->InqIntQuality(NUM_ITEMS_IN_MATERIAL_INT, 1);
+			toolWorkmanship /= (double)pTool->InqIntQuality(NUM_ITEMS_IN_MATERIAL_INT, 1);
 			int amountOfTimesTinkered = pTarget->InqIntQuality(NUM_TIMES_TINKERED_INT, 0);
 
 			if (amountOfTimesTinkered > 9)  // Don't allow 10 tinked items to have any more tinkers/imbues (Ivory & Leather don't use this case)
@@ -1326,6 +1344,26 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				if (m_Qualities.GetInt(AUGMENTATION_BONUS_IMBUE_CHANCE_INT, 0))
 					successChance += 0.05;
 			}
+
+			switch (pTool->m_Qualities.id)
+			{
+			case W_MATERIALRAREFOOLPROOFAQUAMARINE_CLASS:
+			case W_MATERIALRAREFOOLPROOFBLACKGARNET_CLASS:
+			case W_MATERIALRAREFOOLPROOFBLACKOPAL_CLASS:
+			case W_MATERIALRAREFOOLPROOFEMERALD_CLASS:
+			case W_MATERIALRAREFOOLPROOFFIREOPAL_CLASS:
+			case W_MATERIALRAREFOOLPROOFIMPERIALTOPAZ_CLASS:
+			case W_MATERIALRAREFOOLPROOFJET_CLASS:
+			case W_MATERIALRAREFOOLPROOFPERIDOT_CLASS:
+			case W_MATERIALRAREFOOLPROOFREDGARNET_CLASS:
+			case W_MATERIALRAREFOOLPROOFSUNSTONE_CLASS:
+			case W_MATERIALRAREFOOLPROOFWHITESAPPHIRE_CLASS:
+			case W_MATERIALRAREFOOLPROOFYELLOWTOPAZ_CLASS:
+			case W_MATERIALRAREFOOLPROOFZIRCON_CLASS:
+				successChance = 1.0;
+			}
+
+
 			break;
 		}
 		default:
@@ -3252,12 +3290,9 @@ void CPlayerWeenie::SetLoginPlayerQualities()
 	{
 		m_Qualities.SetFloat(DEFAULT_SCALE_FLOAT, 1);
 		m_Qualities.SetInt(ALLEGIANCE_RANK_INT, 10);
-		m_Qualities.SetInt(ALLEGIANCE_FOLLOWERS_INT, 500);
-
-
-
+		m_Qualities.SetInt(MONARCHS_RANK_INT, 10);
+		m_Qualities.SetInt(ALLEGIANCE_MIN_LEVEL_INT, 10);
 	}
-
 
 	if (IsAdvocate())
 	{
@@ -3948,6 +3983,236 @@ CCraftOperation *CPlayerWeenie::TryGetAlternativeOperation(CWeenieObject *target
 
 		break;
 	}
+	case W_MATERIALIVORY_CLASS:
+	{
+		//Check if the item is Ivoryable
+		if (!target->m_Qualities.GetBool(IVORYABLE_BOOL, 0))
+			return NULL;
+
+		//Grab ivory recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3977);
+		break;
+	}
+	case W_MATERIALLEATHER_CLASS:
+	{
+		//Check if the item is already retained or if it is not sellable.
+		if (target->m_Qualities.GetBool(RETAINED_BOOL, 0) || !target->m_Qualities.GetBool(IS_SELLABLE_BOOL, 1))
+			return NULL;
+
+		//Grab leather recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(4426);
+		break;
+	}
+	case W_MATERIALGOLD_CLASS:
+	{
+		//Check if the item has value and workmanship.
+		if (!target->m_Qualities.GetInt(VALUE_INT, 0) || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab gold recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3851);
+		break;
+	}
+	case W_MATERIALLINEN_CLASS:
+	{
+		//Check if the item has burden and workmanship.
+		if (!target->m_Qualities.GetInt(ENCUMB_VAL_INT, 0) || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab linen recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3854);
+		break;
+	}
+	case W_MATERIALMOONSTONE_CLASS:
+	{
+		//Check if the item has mana and workmanship.
+		if (!target->m_Qualities.GetInt(ITEM_MAX_MANA_INT, 0) || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab moonstone recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3978);
+		break;
+	}
+	case W_MATERIALPINE_CLASS:
+	{
+		//Check if the item has value and workmanship.
+		if (!target->m_Qualities.GetInt(VALUE_INT, 0) || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab pine recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3858);
+		break;
+	}
+	case W_MATERIALIRON_CLASS:
+	case W_MATERIALGRANITE_CLASS:
+	case W_MATERIALVELVET_CLASS:
+	{
+		//Check if the item is a melee weapon and has workmanship.
+		if (target->m_Qualities.m_WeenieType != MeleeWeapon_WeenieType || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab correct recipe to use as a base.
+		switch (tool->m_Qualities.id)
+		{
+		case W_MATERIALIRON_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3853); break;
+		case W_MATERIALGRANITE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3852); break;
+		case W_MATERIALVELVET_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3861); break;
+		}
+
+		break;
+
+	}
+	case W_MATERIALMAHOGANY_CLASS:
+	{
+		//Check if the item is a missile weapon and has workmanship.
+		if (target->m_Qualities.m_WeenieType != MissileLauncher_WeenieType || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab mahog recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3855);
+		break;
+	}
+	case W_MATERIALOPAL_CLASS:
+	{
+		//Check if the item is a caster and has workmanship.
+		if (target->m_Qualities.m_WeenieType != Caster_WeenieType || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab opal recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(3979);
+		break;
+	}
+	case W_MATERIALGREENGARNET_CLASS:
+	{
+		//Check if the item is a caster and has workmanship.
+		if (target->m_Qualities.m_WeenieType != Caster_WeenieType || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0))
+			return NULL;
+
+		//Grab green garnet recipe to use as a base.
+		op = g_pPortalDataEx->_craftTableData._operations.lookup(5202);
+		break;
+	}
+	case W_MATERIALROSEQUARTZ_CLASS:
+	case W_MATERIALREDJADE_CLASS:
+	case W_MATERIALMALACHITE_CLASS:
+	case W_MATERIALLAVENDERJADE_CLASS:
+	case W_MATERIALHEMATITE_CLASS:
+	case W_MATERIALBLOODSTONE_CLASS:
+	case W_MATERIALAZURITE_CLASS:
+	case W_MATERIALAGATE_CLASS:
+	case W_MATERIALSMOKYQUARTZ_CLASS:
+	case W_MATERIALCITRINE_CLASS:
+	case W_MATERIALCARNELIAN_CLASS:
+	{
+		//Check if the item is a generic weenietype, jewelry item type, and has workmanship.
+		if (target->m_Qualities.m_WeenieType != Generic_WeenieType || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0) || target->m_Qualities.GetInt(ITEM_TYPE_INT, 0) != TYPE_JEWELRY)
+			return NULL;
+
+		//Grab correct recipe to use as a base.
+		switch (tool->m_Qualities.id)
+		{
+		case W_MATERIALROSEQUARTZ_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4446); break;
+		case W_MATERIALREDJADE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4442); break;
+		case W_MATERIALMALACHITE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4438); break;
+		case W_MATERIALLAVENDERJADE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4441); break;
+		case W_MATERIALHEMATITE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4440); break;
+		case W_MATERIALBLOODSTONE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4448); break;
+		case W_MATERIALAZURITE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4437); break;
+		case W_MATERIALAGATE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4445); break;
+		case W_MATERIALSMOKYQUARTZ_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4447); break;
+		case W_MATERIALCITRINE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4439); break;
+		case W_MATERIALCARNELIAN_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4443); break;
+		}
+
+		break;
+
+	}
+	case W_MATERIALSTEEL_CLASS:
+	case W_MATERIALALABASTER_CLASS:
+	case W_MATERIALBRONZE_CLASS:
+	case W_MATERIALMARBLE_CLASS:
+	case W_MATERIALARMOREDILLOHIDE_CLASS:
+	case W_MATERIALCERAMIC_CLASS:
+	case W_MATERIALWOOL_CLASS:
+	case W_MATERIALREEDSHARKHIDE_CLASS:
+	case W_MATERIALSILVER_CLASS:
+	case W_MATERIALCOPPER_CLASS:
+	{
+		//Armor and shields
+		//Check if the item is armor item type, has AL, and has workmanship.
+		if (target->m_Qualities.GetInt(ITEM_TYPE_INT, 0) != TYPE_ARMOR || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0) || !target->m_Qualities.GetInt(ARMOR_LEVEL_INT, 0))
+			return NULL;
+
+		//Grab correct recipe to use as a base.
+		switch (tool->m_Qualities.id)
+		{
+		case W_MATERIALSTEEL_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3860); break;
+		case W_MATERIALALABASTER_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3846); break;
+		case W_MATERIALBRONZE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3849); break;
+		case W_MATERIALMARBLE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3856); break;
+		case W_MATERIALARMOREDILLOHIDE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3847); break;
+		case W_MATERIALCERAMIC_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3850); break;
+		case W_MATERIALWOOL_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3862); break;
+		case W_MATERIALREEDSHARKHIDE_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(3859); break;
+		case W_MATERIALSILVER_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4427); break;
+		case W_MATERIALCOPPER_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4428); break;
+		}
+
+		break;
+	}
+	case W_MATERIALPERIDOT_CLASS:
+	case W_MATERIALYELLOWTOPAZ_CLASS:
+	case W_MATERIALZIRCON_CLASS:
+	case W_MATERIALRAREFOOLPROOFPERIDOT_CLASS:
+	case W_MATERIALRAREFOOLPROOFYELLOWTOPAZ_CLASS:
+	case W_MATERIALRAREFOOLPROOFZIRCON_CLASS:
+	{
+		//Armor only
+		//Check if the item is clothing weenietype, armor item type, has AL, and has workmanship.
+		if (target->m_Qualities.m_WeenieType != Clothing_WeenieType || target->m_Qualities.GetInt(ITEM_TYPE_INT, 0) != TYPE_ARMOR || !target->m_Qualities.GetInt(ITEM_WORKMANSHIP_INT, 0) || !target->m_Qualities.GetInt(ARMOR_LEVEL_INT, 0))
+			return NULL;
+
+		//Grab correct recipe to use as a base.
+		switch (tool->m_Qualities.id)
+		{
+		case W_MATERIALPERIDOT_CLASS:
+		case W_MATERIALRAREFOOLPROOFPERIDOT_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4435); break;
+		case W_MATERIALYELLOWTOPAZ_CLASS:
+		case W_MATERIALRAREFOOLPROOFYELLOWTOPAZ_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4434); break;
+		case W_MATERIALZIRCON_CLASS:
+		case W_MATERIALRAREFOOLPROOFZIRCON_CLASS:
+			op = g_pPortalDataEx->_craftTableData._operations.lookup(4433); break;
+		}
+
+		break;
+
+	}
 	case W_POTDYEDARKGREEN_CLASS:
 	case W_POTDYEDARKRED_CLASS:
 	case W_POTDYEDARKYELLOW_CLASS:
@@ -3959,45 +4224,47 @@ CCraftOperation *CPlayerWeenie::TryGetAlternativeOperation(CWeenieObject *target
 	case W_POTDYESPRINGPURPLE_CLASS:
 	{
 		//Check if the item is armor/clothing and is Dyeable.
-		if (target->m_Qualities.m_WeenieType != 2 || !target->m_Qualities.GetBool(DYABLE_BOOL, 0))
+		if (target->m_Qualities.m_WeenieType != Clothing_WeenieType || !target->m_Qualities.GetBool(DYABLE_BOOL, 0))
 			return NULL;
 
 		//Grab dye recipe to use as a base.
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(3844);
 		break;
 	}
-	//Foolproof tinks, use wcid to grab the operation. 100% chance is handled in Imbue code.
+	//Regular and Foolproof imbues, use wcid to grab the operation. 100% chance is handled in Imbue code for foolproof.
 	case W_MATERIALRAREFOOLPROOFAQUAMARINE_CLASS:
+	case W_MATERIALAQUAMARINE_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4436); break;
 	case W_MATERIALRAREFOOLPROOFBLACKGARNET_CLASS:
+	case W_MATERIALBLACKGARNET_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4449); break;
 	case W_MATERIALRAREFOOLPROOFBLACKOPAL_CLASS:
+	case W_MATERIALBLACKOPAL_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(3863); break;
 	case W_MATERIALRAREFOOLPROOFEMERALD_CLASS:
+	case W_MATERIALEMERALD_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4450); break;
 	case W_MATERIALRAREFOOLPROOFFIREOPAL_CLASS:
+	case W_MATERIALFIREOPAL_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(3864); break;
 	case W_MATERIALRAREFOOLPROOFIMPERIALTOPAZ_CLASS:
+	case W_MATERIALIMPERIALTOPAZ_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4454); break;
 	case W_MATERIALRAREFOOLPROOFJET_CLASS:
+	case W_MATERIALJET_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4451); break;
-	case W_MATERIALRAREFOOLPROOFPERIDOT_CLASS:
-		op = g_pPortalDataEx->_craftTableData._operations.lookup(4435); break;
 	case W_MATERIALRAREFOOLPROOFREDGARNET_CLASS:
+	case W_MATERIALREDGARNET_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4452); break;
 	case W_MATERIALRAREFOOLPROOFSUNSTONE_CLASS:
+	case W_MATERIALSUNSTONE_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(3865); break;
 	case W_MATERIALRAREFOOLPROOFWHITESAPPHIRE_CLASS:
+	case W_MATERIALWHITESAPPHIRE_CLASS:
 		op = g_pPortalDataEx->_craftTableData._operations.lookup(4453); break;
-	case W_MATERIALRAREFOOLPROOFYELLOWTOPAZ_CLASS:
-		op = g_pPortalDataEx->_craftTableData._operations.lookup(4434); break;
-	case W_MATERIALRAREFOOLPROOFZIRCON_CLASS:
-		op = g_pPortalDataEx->_craftTableData._operations.lookup(4433); break;
 	default:
 		return NULL;
 	}
-
-
 
 	return op;
 }
