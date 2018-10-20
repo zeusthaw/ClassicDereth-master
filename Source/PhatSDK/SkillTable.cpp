@@ -41,10 +41,8 @@ STypeSkill SkillTable::OldToNewSkill(STypeSkill old) // Custom
 	{
 	case SWORD_SKILL:
 		return SWORD_SKILL;
-
 	case DAGGER_SKILL:
 		return DAGGER_SKILL;
-
 	case AXE_SKILL:
 		return AXE_SKILL;
 	case MACE_SKILL:
@@ -55,13 +53,24 @@ STypeSkill SkillTable::OldToNewSkill(STypeSkill old) // Custom
 		return SPEAR_SKILL;
 	case UNARMED_COMBAT_SKILL:
 		return UNARMED_COMBAT_SKILL;
-
 	case BOW_SKILL:
 		return BOW_SKILL;
 	case CROSSBOW_SKILL:
 		return CROSSBOW_SKILL;
 	case THROWN_WEAPON_SKILL:
 		return THROWN_WEAPON_SKILL;
+
+		//TOD SKILL TO OLD
+	case TWO_HANDED_COMBAT_SKILL:
+		return SWORD_SKILL;
+	case FINESSE_WEAPONS_SKILL:
+		return DAGGER_SKILL;
+	case LIGHT_WEAPONS_SKILL:
+		return UNARMED_COMBAT_SKILL;
+	case HEAVY_WEAPONS_SKILL:
+		return SWORD_SKILL;
+	case MISSILE_WEAPONS_SKILL:
+		return BOW_SKILL;
 	}
 
 	return old;
