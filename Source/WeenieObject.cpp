@@ -2891,129 +2891,142 @@ void CWeenieObject::Tick()
 
 	if (_nextRegen >= 0 && _nextRegen <= Timer::cur_time)
 	{
-		if (m_Qualities._generator_queue)
+		int numSpawned = m_Qualities._generator_registry ? (DWORD)m_Qualities._generator_registry->_registry.size() : 0;
+
+		//check if the number spawned is higher than the max_generated_objects. Linkable generators have a max of 0, so check if there is an existing _generator_queue instead.
+		if (numSpawned < InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE) || InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE) == 0 && m_Qualities._generator_queue)
 		{
-			PackableList<GeneratorQueueNode> &queue = m_Qualities._generator_queue->_queue;
-			for (auto entry = queue.begin(); entry != queue.end();)
+			if (m_Qualities._generator_queue)
 			{
-				if (entry->when <= Timer::cur_time)
-				{
-					double regenInterval = 0.0;
-					if (m_Qualities.InqFloat(REGENERATION_INTERVAL_FLOAT, regenInterval) && regenInterval > 0.0)
+				PackableList<GeneratorQueueNode> &queue = m_Qualities._generator_queue->_queue;
+				for (auto entry = queue.begin(); entry != queue.end();)
 					{
-						if (m_Qualities._generator_table)
+						// don't spawn from generator queue if numSpawned is greater than or equal to the max generated. Does not apply for linked generators with max of 0.
+						if (numSpawned >= InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE) && InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE) != 0)
+							break;
+
+						if (entry->when <= Timer::cur_time)
 						{
-							for (auto &profile : m_Qualities._generator_table->_profile_list)
+							double regenInterval = 0.0;
+							if (m_Qualities.InqFloat(REGENERATION_INTERVAL_FLOAT, regenInterval) && regenInterval > 0.0)
 							{
-								if (profile.slot == entry->slot)
+								if (m_Qualities._generator_table)
 								{
-									g_pWeenieFactory->GenerateFromTypeOrWcid(this, &profile);
+									for (auto &profile : m_Qualities._generator_table->_profile_list)
+									{
+										if (profile.slot == entry->slot)
+										{
+											g_pWeenieFactory->GenerateFromTypeOrWcid(this, &profile);
+											numSpawned++;
+											break;
+										}
+									}
+								}
+							}
+
+							//ChanceCreateGeneratorSlot(entry->slot);
+							entry = queue.erase(entry);
+							continue;
+						}
+
+						entry++;
+					}
+				}
+
+				g_pWeenieFactory->AddFromGeneratorTable(this, false);
+
+				//Linkable generators do not have a _nextRegen time when the generator_queue is empty and they have spawns in the world. Regular generators should not have a _nextRegen time if they have more spawns than MAX_GENERATED_OBJECTS_INT.
+				if ((!m_Qualities._generator_queue || m_Qualities._generator_queue->_queue.empty()) && numSpawned >= InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE))
+					_nextRegen = -1.0;
+				else if (InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE) > 0 && numSpawned >= InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE))
+					_nextRegen = -1.0;
+				else
+					_nextRegen = Timer::cur_time + (InqFloatQuality(REGENERATION_INTERVAL_FLOAT, -1.0, TRUE) * g_pConfig->RespawnTimeMultiplier());
+			}
+		}
+
+		if (_nextHeartBeat != -1.0 && _nextHeartBeat <= Timer::cur_time)
+		{
+			if (!IsDead() && !IsInPortalSpace())
+			{
+				if (_nextHeartBeatEmote != -1.0 && _nextHeartBeatEmote <= Timer::cur_time)
+				{
+					_nextHeartBeatEmote = Timer::cur_time + Random::GenUInt(2, 15); //add a little variation to avoid synchronization.
+
+																					//_last_update_pos is the time of the last attack/movement/action, basically we don't want to do heartBeat emotes if we're active.
+					if (Timer::cur_time > _last_update_pos + 30.0 && m_Qualities._emote_table)
+					{
+						PackableList<EmoteSet> *emoteSetList = m_Qualities._emote_table->_emote_table.lookup(HeartBeat_EmoteCategory);
+
+						if (emoteSetList)
+						{
+							double dice = Random::GenFloat(0.0, 1.0);
+
+							for (auto &emoteSet : *emoteSetList)
+							{
+								if (dice < emoteSet.probability)
+								{
+									if (movement_manager && movement_manager->motion_interpreter)
+									{
+										if (emoteSet.style == movement_manager->motion_interpreter->interpreted_state.current_style &&
+											emoteSet.substyle == movement_manager->motion_interpreter->interpreted_state.forward_command &&
+											!movement_manager->motion_interpreter->interpreted_state.turn_command &&
+											!movement_manager->motion_interpreter->interpreted_state.sidestep_command)
+										{
+											MakeEmoteManager()->ExecuteEmoteSet(emoteSet, 0);
+										}
+									}
+
 									break;
 								}
 							}
 						}
 					}
-
-					//ChanceCreateGeneratorSlot(entry->slot);
-					entry = queue.erase(entry);
-					continue;
 				}
 
-				entry++;
+				CheckRegeneration(InqFloatQuality(HEALTH_RATE_FLOAT, 0.0), HEALTH_ATTRIBUTE_2ND, MAX_HEALTH_ATTRIBUTE_2ND);
+				CheckRegeneration(InqFloatQuality(STAMINA_RATE_FLOAT, 0.0), STAMINA_ATTRIBUTE_2ND, MAX_STAMINA_ATTRIBUTE_2ND);
+				CheckRegeneration(InqFloatQuality(MANA_RATE_FLOAT, 0.0), MANA_ATTRIBUTE_2ND, MAX_MANA_ATTRIBUTE_2ND);
+			}
+
+			double heartbeatInterval;
+			if (m_Qualities.InqFloat(HEARTBEAT_INTERVAL_FLOAT, heartbeatInterval, TRUE))
+				_nextHeartBeat = Timer::cur_time + heartbeatInterval;
+			else
+				_nextHeartBeat = -1.0;
+
+			m_Qualities.SetFloat(HEARTBEAT_TIMESTAMP_FLOAT, Timer::cur_time);
+		}
+
+		if (_nextReset >= 0)
+		{
+			if (_nextReset <= Timer::cur_time)
+			{
+				ResetToInitialState();
+				_nextReset = -1.0;
 			}
 		}
 
-		g_pWeenieFactory->AddFromGeneratorTable(this, false);
-
-		int numSpawned = m_Qualities._generator_registry ? (DWORD)m_Qualities._generator_registry->_registry.size() : 0;
-		if ((!m_Qualities._generator_queue || m_Qualities._generator_queue->_queue.empty()) && numSpawned >= InqIntQuality(MAX_GENERATED_OBJECTS_INT, 0, TRUE))
-			_nextRegen = -1.0;
-		else
-			_nextRegen = Timer::cur_time + (InqFloatQuality(REGENERATION_INTERVAL_FLOAT, -1.0, TRUE) * g_pConfig->RespawnTimeMultiplier());
-	}
-
-	if (_nextHeartBeat != -1.0 && _nextHeartBeat <= Timer::cur_time)
-	{
-		if (!IsDead() && !IsInPortalSpace())
+		if (_timeToRot >= 0 && _timeToRot <= Timer::cur_time)
 		{
-			if (_nextHeartBeatEmote != -1.0 && _nextHeartBeatEmote <= Timer::cur_time)
+			if (!HasOwner())
 			{
-				_nextHeartBeatEmote = Timer::cur_time + Random::GenUInt(2, 15); //add a little variation to avoid synchronization.
-
-				//_last_update_pos is the time of the last attack/movement/action, basically we don't want to do heartBeat emotes if we're active.
-				if (Timer::cur_time > _last_update_pos + 30.0 && m_Qualities._emote_table)
+				if (_beganRot)
 				{
-					PackableList<EmoteSet> *emoteSetList = m_Qualities._emote_table->_emote_table.lookup(HeartBeat_EmoteCategory);
-
-					if (emoteSetList)
+					if ((_timeToRot + 2.0) <= Timer::cur_time)
 					{
-						double dice = Random::GenFloat(0.0, 1.0);
-
-						for (auto &emoteSet : *emoteSetList)
-						{
-							if (dice < emoteSet.probability)
-							{
-								if (movement_manager && movement_manager->motion_interpreter)
-								{
-									if (emoteSet.style == movement_manager->motion_interpreter->interpreted_state.current_style &&
-										emoteSet.substyle == movement_manager->motion_interpreter->interpreted_state.forward_command &&
-										!movement_manager->motion_interpreter->interpreted_state.turn_command &&
-										!movement_manager->motion_interpreter->interpreted_state.sidestep_command)
-									{
-										MakeEmoteManager()->ExecuteEmoteSet(emoteSet, 0);
-									}
-								}
-
-								break;
-							}
-						}
+						MarkForDestroy();
 					}
 				}
-			}
-
-			CheckRegeneration(InqFloatQuality(HEALTH_RATE_FLOAT, 0.0), HEALTH_ATTRIBUTE_2ND, MAX_HEALTH_ATTRIBUTE_2ND);
-			CheckRegeneration(InqFloatQuality(STAMINA_RATE_FLOAT, 0.0), STAMINA_ATTRIBUTE_2ND, MAX_STAMINA_ATTRIBUTE_2ND);
-			CheckRegeneration(InqFloatQuality(MANA_RATE_FLOAT, 0.0), MANA_ATTRIBUTE_2ND, MAX_MANA_ATTRIBUTE_2ND);
-		}
-
-		double heartbeatInterval;
-		if (m_Qualities.InqFloat(HEARTBEAT_INTERVAL_FLOAT, heartbeatInterval, TRUE))
-			_nextHeartBeat = Timer::cur_time + heartbeatInterval;
-		else
-			_nextHeartBeat = -1.0;
-
-		m_Qualities.SetFloat(HEARTBEAT_TIMESTAMP_FLOAT, Timer::cur_time);
-	}
-
-	if (_nextReset >= 0)
-	{
-		if (_nextReset <= Timer::cur_time)
-		{
-			ResetToInitialState();
-			_nextReset = -1.0;
-		}
-	}
-
-	if (_timeToRot >= 0 && _timeToRot <= Timer::cur_time)
-	{
-		// Allow items to rot if they have a predetermined lifespan.
-		if (!HasOwner() || m_Qualities.GetInt(LIFESPAN_INT, 0))
-		{
-			if (_beganRot)
-			{
-				if ((_timeToRot + 2.0) <= Timer::cur_time)
+				else
 				{
-					MarkForDestroy();
+					EmitEffect(PS_Destroy, 1.0f);
+					_beganRot = true;
 				}
 			}
-			else
-			{
-				EmitEffect(PS_Destroy, 1.0f);
-				_beganRot = true;
-			}
 		}
 	}
-}
+
 
 void CWeenieObject::CheckRegeneration(double rate, STypeAttribute2nd currentAttrib, STypeAttribute2nd maxAttrib)
 {
