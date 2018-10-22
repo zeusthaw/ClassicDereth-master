@@ -86,6 +86,7 @@ public:
 	CCorpseWeenie *CreateCorpse(bool visible = true);
 
 	bool IsAttackMotion(DWORD motion);
+	bool CheckRareEligible(CWeenieObject *highestDamageDealer);
 
 	DWORD m_highestDamageSource = 0;
 	int m_totalDamageTaken = 0;
@@ -103,6 +104,7 @@ public:
 	DWORD m_ChargingAttackHeight = false;
 	float m_ChargingAttackPower = 0.0f;
 	float m_fChargeAttackStartTime = (float) INVALID_TIME;
+	bool m_bIsRareEligible = false;
 
 	unsigned int m_MeleeDamageBonus = 0;
 	

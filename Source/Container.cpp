@@ -1044,7 +1044,7 @@ bool CContainerWeenie::IsGroundContainer()
 	if (HasOwner())
 		return false;
 
-	if (!InValidCell())
+	if (m_Qualities.m_PositionStats->empty())
 		return false;
 
 	return true;

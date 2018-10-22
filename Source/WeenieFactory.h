@@ -21,6 +21,8 @@ public:
 	int GenerateFromTypeOrWcid(CWeenieObject *parent, const GeneratorProfile *profile);
 	int GenerateFromTypeOrWcid(CWeenieObject *parent, RegenLocationType destinationType, DWORD treasureType, unsigned int ptid = 0, float shade = 0.0f);
 	int GenerateFromTypeOrWcid(CWeenieObject *parent, DestinationType destinationType, DWORD treasureType, unsigned int ptid = 0, float shade = 0.0f);
+	int GenerateRareItem(CWeenieObject *parent, CWeenieObject *killer);
+
 
 	bool ApplyWeenieDefaults(CWeenieObject *weenie, DWORD wcid);
 

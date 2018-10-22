@@ -181,6 +181,10 @@ protected:
 
 	float m_SalvageMult = 1.0f;
 	bool m_bAllowGeneralChat = 1;
+
+	bool m_bRealTimeRares = 0;
+	double m_fRareDropMultiplier = 0.0;
+
 };
 
 extern CPhatACServerConfig *g_pConfig;

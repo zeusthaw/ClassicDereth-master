@@ -877,12 +877,13 @@ void CWorld::BroadcastGlobal(void *_data, DWORD _len, WORD _group, DWORD ignore_
 	}
 }
 
-void CWorld::BroadcastLocal(DWORD cellid, std::string text)
+void CWorld::BroadcastLocal(DWORD cellid, std::string text, LogTextType channel)
 {
-	BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
+	BinaryWriter *textMsg = ServerText(text.c_str(), channel);
 	g_pWorld->BroadcastPVS(cellid, textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
 	delete textMsg;
 }
+
 
 void CWorld::Test()
 {

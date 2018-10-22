@@ -294,6 +294,12 @@ public:
 	double qualityModifier = 0.0;
 };
 
+class CRareTier
+{
+public:
+	std::vector<int> rareTierWcids;
+};
+
 class CTreasureProfile : public PackableJson
 {
 public:
@@ -340,6 +346,7 @@ public:
 
 	std::map<int, int> chestTreasureTypeReplacementTable;
 	std::map<int, CTreasureType> treasureTypeOverrides;
+	std::map<int, CRareTier> rareTiers;
 
 	bool isInitialized;
 	int nextSpellId;
@@ -404,6 +411,7 @@ public:
 
 	int GenerateFromTypeOrWcid(CWeenieObject *parent, int destinationType, bool isRegenLocationType, DWORD treasureTypeOrWcid, unsigned int ptid = 0, float shade = 0.0f, const GeneratorProfile *profile = NULL);
 	int GenerateFromType(CTreasureType *type, CWeenieObject *parent, int destinationType, bool isRegenLocationType, DWORD treasureTypeOrWcid, unsigned int ptid = 0, float shade = 0.0f, const GeneratorProfile *profile = NULL);
+	int GenerateRareItem(CWeenieObject *parent, CWeenieObject *killer);
 
 	//bool AddTreasureToContainerInferred(CContainerWeenie *container, DWORD treasureType);
 	//CWeenieObject *GenerateMundaneItemInferred(int tierId, eTreasureCategory treasureCategory);
@@ -411,6 +419,7 @@ public:
 	CWeenieObject *GenerateTreasure(int tier, eTreasureCategory treasureCategory, double qualityModifier = 0.0);
 	CWeenieObject *GenerateJunk();
 	CWeenieObject *GenerateMundaneItem(CTreasureTier *tier);
+	CWeenieObject *GenerateRandomRareByTier(int rareTier);
 	CWeenieObject *GenerateScroll(CTreasureTier *tier);
 
 	bool MutateItem(CWeenieObject *newItem, sItemCreationInfo &creationInfo, CTreasureTier *tier, CTreasureProfileCategory *category, CItemTreasureProfileEntry *entry);

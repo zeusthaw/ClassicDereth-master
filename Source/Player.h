@@ -25,7 +25,7 @@ class CPlayerWeenie : public CMonsterWeenie
 {
 public:
 	CPlayerWeenie(CClient *, DWORD dwGUID, WORD instance_ts);
-	~CPlayerWeenie();
+	virtual ~CPlayerWeenie();
 
 	virtual void Tick() override;
 	

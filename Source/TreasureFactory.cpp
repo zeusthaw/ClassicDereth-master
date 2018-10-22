@@ -368,6 +368,13 @@ void from_json(const nlohmann::json &reader, CTreasureType &output)
 	output.qualityModifier = reader.value("qualityModifier", 0.0f);
 }
 
+void from_json(const nlohmann::json &reader, CRareTier &output)
+{
+	if (HasField(reader, "rareTierWcids"))
+		output.rareTierWcids = reader.at("rareTierWcids").get<std::vector<int>>();
+}
+
+
 DEFINE_UNPACK_JSON(CTreasureProfile)
 {
 	if (HasField(reader, "options"))
@@ -482,6 +489,17 @@ DEFINE_UNPACK_JSON(CTreasureProfile)
 		for (auto iter = tempTreasureTypeOverrides.begin(); iter != tempTreasureTypeOverrides.end(); ++iter)
 			treasureTypeOverrides.emplace(atoi(iter->first.c_str()), iter->second);
 	}
+
+	if (HasField(reader, "rareTiers"))
+	{
+		// nlohmann::json doesn't like int keys in maps, so we read as string and convert to int.
+		std::map<std::string, CRareTier> tempRareTiers;
+		tempRareTiers = reader.at("rareTiers").get<std::map<std::string, CRareTier>>();
+
+		for (auto iter = tempRareTiers.begin(); iter != tempRareTiers.end(); ++iter)
+			rareTiers.emplace(atoi(iter->first.c_str()), iter->second);
+	}
+
 	return true;
 }
 
@@ -1338,6 +1356,27 @@ int CTreasureFactory::GenerateFromType(CTreasureType *type, CWeenieObject * pare
 	}
 	return amountCreated;
 }
+
+CWeenieObject *CTreasureFactory::GenerateRandomRareByTier(int rareTier)
+{
+	int rareWcid = 0;
+	if (_TreasureProfile->rareTiers.empty())
+		return NULL;
+
+	for each (auto entry in _TreasureProfile->rareTiers)
+	{
+		if (entry.first == rareTier)
+		{
+			rareWcid = entry.second.rareTierWcids[getRandomNumberExclusive((int)entry.second.rareTierWcids.size())];
+			break;
+		}
+	}
+
+	if (rareWcid)
+		return g_pWeenieFactory->CreateWeenieByClassID(rareWcid);
+	return NULL;
+}
+
 
 CWeenieObject *CTreasureFactory::GenerateMundaneItem(CTreasureTier *tier)
 {
