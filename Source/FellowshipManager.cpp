@@ -104,13 +104,15 @@ void Fellowship::UpdateData()
 	_share_xp = (bAllOver50 || bWithin10Levels) && _desiredShareXP;
 
 	unsigned int xpPortionSum = CalculateExperienceProportionSum();
+	double xpPortionPctg = 1.0 / (double)xpPortionSum;
+
 
 	for (auto &entry : _fellowship_table)
 	{
 		if (_even_xp_split)
 			entry.second.splitPercent = FellowshipManager::GetEvenSplitXPPctg((DWORD) _fellowship_table.size());
 		else
-			entry.second.splitPercent = FellowshipManager::GetExperienceProportion(entry.second._level) / (double)xpPortionSum;
+			entry.second.splitPercent = xpPortionPctg * (double)entry.second._level;
 	}
 }
 
