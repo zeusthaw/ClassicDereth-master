@@ -746,7 +746,7 @@ void CMissileAttackEvent::Setup()
 	attackTime = max(0, min(120, attackTime));
 
 	_attack_speed = 2.5f - (attackTime * (1.0 / 70.0));
-	_attack_speed = max(min(_attack_speed, 2.5), 0.8);
+	_attack_speed = max(min(_attack_speed, 2.25f), 0.8f);
 
 	CAttackEventData::Setup();
 

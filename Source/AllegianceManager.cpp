@@ -62,8 +62,8 @@ void AllegianceTreeNode::FillAllegianceNode(AllegianceNode *node)
 {
 	node->_data._rank = _rank;
 	node->_data._level = _level;
-	node->_data._cp_cached = min(4294967295, _cp_cached);
-	node->_data._cp_tithed = min(4294967295, _cp_tithed);
+	node->_data._cp_cached = min(4294967295ull, _cp_cached);
+	node->_data._cp_tithed = min(4294967295ull, _cp_tithed);
 	node->_data._gender = _gender;
 	node->_data._hg = _hg;
 	node->_data._leadership = _leadership;
@@ -1030,16 +1030,17 @@ void AllegianceManager::HandleAllegiancePassup(DWORD source_id, long long amount
 		avgIngameHoursVassalsSworn += vassalIngameHours;
 	}
 
-	avgRealDaysVassalsSworn /= max(1, patron->_vassals.size());
-	avgIngameHoursVassalsSworn /= max(1, patron->_vassals.size());
+	avgRealDaysVassalsSworn /= max(size_t{ 1 }, patron->_vassals.size());
+	avgIngameHoursVassalsSworn /= max(size_t{ 1 }, patron->_vassals.size());
 
 	double vassalFactor = min(1.0, max(0.0, 0.25 * patron->_vassals.size()));
 	double realDaysSwornFactor = min(realDaysSworn, 730.0) / 730.0;
 	double ingameHoursSwornFactor = min(ingameHoursSworn, 720.0) / 720.0;
 	double avgRealDaysVassalsSwornFactor = min(avgRealDaysVassalsSworn, 730.0) / 730.0;
 	double avgIngameHoursVassalsSwornFactor = min(avgIngameHoursVassalsSworn, 720.0) / 720.0;
-	double loyaltyFactor = min(node->_loyalty, 291.0) / 291.0;
-	double leadershipFactor = min(patron->_leadership, 291.0) / 291.0;
+	double loyaltyFactor = min(node->_loyalty, 291u) / 291.0;
+	double leadershipFactor = min(patron->_leadership, 291u) / 291.0;
+
 
 	double factor1 = direct ? 50.0 : 16.0;
 	double factor2 = direct ? 22.5 : 8.0;
