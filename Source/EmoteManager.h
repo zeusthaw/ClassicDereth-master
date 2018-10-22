@@ -13,7 +13,7 @@ class EmoteManager
 {
 public:
 	EmoteManager(class CWeenieObject *weenie);
-		
+
 	std::string ReplaceEmoteText(const std::string &text, DWORD target_id, DWORD source_id);
 	void killTask(std::string mobName, std::string kCountName, DWORD target_id);
 	void killTaskSub(std::string &mobName, std::string &kCountName, CWeenieObject *targormember);
@@ -27,6 +27,9 @@ public:
 	void Cancel();
 	void OnDeath(DWORD killer_id);
 	bool IsExecutingAlready();
+	bool HasQueue();
+
+	std::map<DWORD, std::string> _confirmMsgList;
 
 protected:
 	class CWeenieObject *_weenie = NULL;

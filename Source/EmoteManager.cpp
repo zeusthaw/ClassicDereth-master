@@ -1,4 +1,3 @@
-
 #include "StdAfx.h"
 #include "EmoteManager.h"
 #include "WeenieObject.h"
@@ -114,14 +113,14 @@ std::string EmoteManager::ReplaceEmoteText(const std::string &text, DWORD target
 		while (ReplaceString(result, "%mn", sourceName));
 	}
 
-	if (result.find("%tqt") != std::string::npos)
+	if (result.find("%CDtime") != std::string::npos || result.find("%tqt") != std::string::npos)
 	{
-		std::string targetName;
-		if (!g_pWorld->FindObjectName(target_id, targetName))
-			return ""; // Couldn't resolve name, don't display this message.
-
 		CWeenieObject *target = g_pWorld->FindObject(target_id);
-		std::string questString = target->Ktref(result.c_str()); //trims the @%tqt off of the quest name and returns the questflag to validate the quest timer against.
+
+		if (!target)
+			return ""; // Couldn't find target, don't display this message.
+
+		std::string questString = target->Ktref(result.c_str()); //trims the "@TEXTSUFFIX" off of the quest name and returns the questflag to validate the quest timer against. 
 
 		if (target->InqQuest(questString.c_str()))
 		{
@@ -129,22 +128,24 @@ std::string EmoteManager::ReplaceEmoteText(const std::string &text, DWORD target
 
 			if (timeTilOkay > 0)
 			{
-				int secs = timeTilOkay % 60;					
-				timeTilOkay /= 60;
+				std::string cdTime = TimeToString(timeTilOkay); //Converts time to string.
 
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
+				if (result.find("%tqt") != std::string::npos)
+				{
+					result = "You must wait " + cdTime + " to complete this quest again.";//standard uncustomized msg returned when using wild card %tqt somewhere in the string. Should follow format "QuestStampToCheck@%tqt"
+				}
 
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				result = csprintf("You must wait %dd %dh %dm %ds to complete this quest again.", days, hours, mins, secs);
+				else
+				{
+					std::size_t prefixPos = result.find("@") + 1;
+					std::string questText = result.substr(prefixPos); //Trims queststamp prefix from message string.
+					while (ReplaceString(questText, "%CDtime", cdTime)); //Should follow format "QuestStampToCheck@Your message %CDtime more of your message." NOTE: Text message portion of string can be any sequence but must contain at least one instance of %CDtime.
+					result = questText;
+				}
 			}
 			else
 			{
-				return ""; //Quest timer has expired so return blank cooldown message.
+				return ""; //Quest timer has expired so return blank cooldown message OR no timer has been tracked in quests.json! Could set this to return a quest cooldown has expired message in the future.
 			}
 		}
 	}
@@ -159,16 +160,16 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 	switch (emote.type)
 	{
 	default:
-		{
+	{
 #ifndef PUBLIC_BUILD
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target || !target->IsAdmin())
-				break;
-
-			target->SendText(csprintf("Unhandled emote %s (%u)", Emote::EmoteTypeToName(emote.type), emote.type), LTT_DEFAULT);
-#endif
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target || !target->IsAdmin())
 			break;
-		}
+
+		target->SendText(csprintf("Unhandled emote %s (%u)", Emote::EmoteTypeToName(emote.type), emote.type), LTT_DEFAULT);
+#endif
+		break;
+	}
 	case Act_EmoteType:
 	{
 		std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
@@ -193,31 +194,31 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case LocalBroadcast_EmoteType:
+	{
+		std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+
+		if (!text.empty())
 		{
-			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
-
-			if (!text.empty())
-			{
-				BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
-				g_pWorld->BroadcastPVS(_weenie, textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
-				delete textMsg;
-			}
-
-			break;
+			BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
+			g_pWorld->BroadcastPVS(_weenie, textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
+			delete textMsg;
 		}
+
+		break;
+	}
 	case WorldBroadcast_EmoteType:
+	{
+		std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+
+		if (!text.empty())
 		{
-			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
-
-			if (!text.empty())
-			{
-				BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
-				g_pWorld->BroadcastGlobal(textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
-				delete textMsg;
-			}
-
-			break;
+			BinaryWriter *textMsg = ServerText(text.c_str(), LTT_DEFAULT);
+			g_pWorld->BroadcastGlobal(textMsg->GetData(), textMsg->GetSize(), PRIVATE_MSG, 0, false);
+			delete textMsg;
 		}
+
+		break;
+	}
 	case AdminSpam_EmoteType:
 	{
 		std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
@@ -232,71 +233,71 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case Activate_EmoteType:
+	{
+		if (DWORD activation_target_id = _weenie->InqIIDQuality(ACTIVATION_TARGET_IID, 0))
 		{
-			if (DWORD activation_target_id = _weenie->InqIIDQuality(ACTIVATION_TARGET_IID, 0))
-			{
-				CWeenieObject *target = g_pWorld->FindObject(activation_target_id);
-				if (target)
-					target->Activate(target_id);
-			}
-
-			break;
+			CWeenieObject *target = g_pWorld->FindObject(activation_target_id);
+			if (target)
+				target->Activate(target_id);
 		}
+
+		break;
+	}
 	case CastSpellInstant_EmoteType:
-		{
-			if (target_id == 0)
-				target_id = _weenie->GetID();
-			_weenie->MakeSpellcastingManager()->CastSpellInstant(target_id, emote.spellid);
-			break;
-		}
+	{
+		if (target_id == 0)
+			target_id = _weenie->GetID();
+		_weenie->MakeSpellcastingManager()->CastSpellInstant(target_id, emote.spellid);
+		break;
+	}
 	case CastSpell_EmoteType:
-		{
-			if (target_id == 0)
-				target_id = _weenie->GetID();
-			_weenie->MakeSpellcastingManager()->CreatureBeginCast(target_id, emote.spellid);
-			break;
-		}
+	{
+		if (target_id == 0)
+			target_id = _weenie->GetID();
+		_weenie->MakeSpellcastingManager()->CreatureBeginCast(target_id, emote.spellid);
+		break;
+	}
 	case AwardXP_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			long long amount = emote.amount64;
-
-			amount = (int)(amount * g_pConfig->RewardXPMultiplier(target->InqIntQuality(LEVEL_INT, 0)));
-
-			if (amount < 0)
-				amount = 0;
-
-			target->GiveSharedXP(amount, true);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		long long amount = emote.amount64;
+
+		amount = (int)(amount * g_pConfig->RewardXPMultiplier(target->InqIntQuality(LEVEL_INT, 0)));
+
+		if (amount < 0)
+			amount = 0;
+
+		target->GiveSharedXP(amount, true);
+		break;
+	}
 	case AwardNoShareXP_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			long long amount = emote.amount64;
-
-			amount = (int)(amount * g_pConfig->RewardXPMultiplier(target->InqIntQuality(LEVEL_INT, 0)));
-
-			if (amount < 0)
-				amount = 0;
-
-			target->GiveXP(amount, true);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		long long amount = emote.amount64;
+
+		amount = (int)(amount * g_pConfig->RewardXPMultiplier(target->InqIntQuality(LEVEL_INT, 0)));
+
+		if (amount < 0)
+			amount = 0;
+
+		target->GiveXP(amount, true);
+		break;
+	}
 	case AwardSkillXP_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			target->GiveSkillXP((STypeSkill)emote.stat, emote.amount, false);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		target->GiveSkillXP((STypeSkill)emote.stat, emote.amount, false);
+		break;
+	}
 	case AwardLevelProportionalSkillXP_EmoteType:
 	{
 		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
@@ -318,67 +319,67 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 
 		DWORD64 xp_to_give = (DWORD64)round((long double)xp_to_next_level * emote.percent);
 		if (emote.min > 0)
-			xp_to_give = max(xp_to_give, emote.min);
+			xp_to_give = max(xp_to_give, emote.min64);
 		if (emote.max > 0)
-			xp_to_give = min(xp_to_give, emote.max);
+			xp_to_give = min(xp_to_give, emote.max64);
 
 		target->GiveSkillXP((STypeSkill)emote.stat, xp_to_give, false);
 		break;
 	}
 	case AwardSkillPoints_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			target->GiveSkillPoints((STypeSkill)emote.stat, emote.amount);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		target->GiveSkillPoints((STypeSkill)emote.stat, emote.amount);
+		break;
+	}
 	case AwardTrainingCredits_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			target->GiveSkillCredits(emote.amount, true);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		target->GiveSkillCredits(emote.amount, true);
+		break;
+	}
 	case AwardLevelProportionalXP_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
-
-			int current_level = target->m_Qualities.GetInt(LEVEL_INT, 1);
-			DWORD64 xp_to_next_level = ExperienceSystem::ExperienceToRaiseLevel(current_level, current_level + 1);
-
-			DWORD64 xp_to_give = (DWORD64)round((long double)xp_to_next_level * emote.percent);
-			if (emote.min64 > 0)
-				xp_to_give = max(xp_to_give, emote.min64);
-			if (emote.max64 > 0)
-				xp_to_give = min(xp_to_give, emote.max64);
-			target->GiveXP(xp_to_give, true, false);
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
 			break;
-		}
+
+		int current_level = target->m_Qualities.GetInt(LEVEL_INT, 1);
+		DWORD64 xp_to_next_level = ExperienceSystem::ExperienceToRaiseLevel(current_level, current_level + 1);
+
+		DWORD64 xp_to_give = (DWORD64)round((long double)xp_to_next_level * emote.percent);
+		if (emote.min64 > 0)
+			xp_to_give = max(xp_to_give, emote.min64);
+		if (emote.max64 > 0)
+			xp_to_give = min(xp_to_give, emote.max64);
+		target->GiveXP(xp_to_give, true, false);
+		break;
+	}
 	case Give_EmoteType:
-		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (!target)
-				break;
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (!target)
+			break;
 
-			_weenie->SimulateGiveObject(target, emote.cprof.wcid, emote.cprof.stack_size, emote.cprof.palette, emote.cprof.shade, emote.cprof.try_to_bond);
-			break;
-		}
+		_weenie->SimulateGiveObject(target, emote.cprof.wcid, emote.cprof.stack_size, emote.cprof.palette, emote.cprof.shade, emote.cprof.try_to_bond);
+		break;
+	}
 	case Motion_EmoteType:
-		{
-			_weenie->DoAutonomousMotion(OldToNewCommandID(emote.motion));
-			break;
-		}
+	{
+		_weenie->DoAutonomousMotion(OldToNewCommandID(emote.motion));
+		break;
+	}
 	case ForceMotion_EmoteType:
-		{
-			_weenie->DoForcedMotion(OldToNewCommandID(emote.motion));
-			break;
-		}
+	{
+		_weenie->DoForcedMotion(OldToNewCommandID(emote.motion));
+		break;
+	}
 	case PhysScript_EmoteType:
 	{
 		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
@@ -403,60 +404,60 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case Tell_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
-			{
-				std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
 
-				if (!text.empty())
-					target->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
-			}
-
-			break;
+			if (!text.empty())
+				target->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
 		}
+
+		break;
+	}
 	case InflictVitaePenalty_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
-			{
-				target->UpdateVitaePool(0);
-				target->ReduceVitae((float)emote.amount / 100.f);
-				target->UpdateVitaeEnchantment();
-			}
-
-			break;
+			target->UpdateVitaePool(0);
+			target->ReduceVitae((float)emote.amount / 100.f);
+			target->UpdateVitaeEnchantment();
 		}
+
+		break;
+	}
 	case TellFellow_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
+			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+
+			if (text.empty())
+				break;
+
+			Fellowship *fellow = target->GetFellowship();
+
+			if (!fellow)
 			{
-				std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
-
-				if (text.empty())
-					break;
-
-				Fellowship *fellow = target->GetFellowship();
-
-				if (!fellow)
+				target->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
+			}
+			else
+			{
+				for (auto &entry : fellow->_fellowship_table)
 				{
-					target->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
-				}
-				else
-				{
-					for (auto &entry : fellow->_fellowship_table)
+					if (CWeenieObject *member = g_pWorld->FindPlayer(entry.first))
 					{
-						if (CWeenieObject *member = g_pWorld->FindPlayer(entry.first))
-						{
-							member->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
-						}
+						member->SendNetMessage(DirectChat(text.c_str(), _weenie->GetName().c_str(), _weenie->GetID(), target->GetID(), LTT_SPEECH_DIRECT), PRIVATE_MSG, TRUE);
 					}
 				}
 			}
-
-			break;
 		}
+
+		break;
+	}
 
 	case LockFellow_EmoteType:
 	{
@@ -473,31 +474,31 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 	}
 
 	case TextDirect_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
-			{
-				std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
 
-				if (!text.empty())
-					target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
-			}
-
-			break;
+			if (!text.empty())
+				target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
 		}
+
+		break;
+	}
 	case DirectBroadcast_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
-			{
-				std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
 
-				if (!text.empty())
-					target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
-			}
-
-			break;
+			if (!text.empty())
+				target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
 		}
+
+		break;
+	}
 	case BLog_EmoteType:
 	{
 		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
@@ -512,104 +513,104 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case FellowBroadcast_EmoteType:
+	{
+		CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
+		if (target)
 		{
-			CPlayerWeenie *target = g_pWorld->FindPlayer(target_id);
-			if (target)
+			std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
+
+			if (text.empty())
+				break;
+
+			Fellowship *fellow = target->GetFellowship();
+
+			if (!fellow)
 			{
-				std::string text = ReplaceEmoteText(emote.msg, target_id, _weenie->GetID());
-
-				if (text.empty())
-					break;
-
-				Fellowship *fellow = target->GetFellowship();
-
-				if (!fellow)
+				target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
+			}
+			else
+			{
+				for (auto &entry : fellow->_fellowship_table)
 				{
-					target->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
-				}
-				else
-				{
-					for (auto &entry : fellow->_fellowship_table)
+					if (CWeenieObject *member = g_pWorld->FindPlayer(entry.first))
 					{
-						if (CWeenieObject *member = g_pWorld->FindPlayer(entry.first))
-						{
-							member->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
-						}
+						member->SendNetMessage(ServerText(text.c_str(), LTT_DEFAULT), PRIVATE_MSG, TRUE);
 					}
 				}
 			}
+		}
 
-			break;
-		}
+		break;
+	}
 	case TurnToTarget_EmoteType:
-		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				MovementParameters params;
-				_weenie->TurnToObject(target_id, &params);
-			}
-			break;
-		}
-	case Turn_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
 			MovementParameters params;
-			params.desired_heading = emote.frame.get_heading();
-			params.speed = 1.0f;
-			params.action_stamp = ++_weenie->m_wAnimSequence;
-			params.modify_interpreted_state = 0;
-			_weenie->last_move_was_autonomous = false;
-
-			_weenie->cancel_moveto();
-			_weenie->TurnToHeading(&params);
-			break;
+			_weenie->TurnToObject(target_id, &params);
 		}
+		break;
+	}
+	case Turn_EmoteType:
+	{
+		MovementParameters params;
+		params.desired_heading = emote.frame.get_heading();
+		params.speed = 1.0f;
+		params.action_stamp = ++_weenie->m_wAnimSequence;
+		params.modify_interpreted_state = 0;
+		_weenie->last_move_was_autonomous = false;
+
+		_weenie->cancel_moveto();
+		_weenie->TurnToHeading(&params);
+		break;
+	}
 	case TeachSpell_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				target->LearnSpell(emote.spellid, true);
-			}
-			break;
+			target->LearnSpell(emote.spellid, true);
 		}
+		break;
+	}
 	case InqEvent_EmoteType:
-		{
-			bool success = g_pGameEventManager->IsEventStarted(emote.msg.c_str());
+	{
+		bool success = g_pGameEventManager->IsEventStarted(emote.msg.c_str());
 
-			ChanceExecuteEmoteSet(success ? EventSuccess_EmoteCategory : EventFailure_EmoteCategory, emote.msg, target_id);
-			break;
-		}
+		ChanceExecuteEmoteSet(success ? EventSuccess_EmoteCategory : EventFailure_EmoteCategory, emote.msg, target_id);
+		break;
+	}
 
 	case StartEvent_EmoteType:
-		{
-			g_pGameEventManager->StartEvent(emote.msg.c_str());
-			break;
-		}
+	{
+		g_pGameEventManager->StartEvent(emote.msg.c_str());
+		break;
+	}
 
 	case StopEvent_EmoteType:
-		{
-			g_pGameEventManager->StopEvent(emote.msg.c_str());
-			break;
-		}
+	{
+		g_pGameEventManager->StopEvent(emote.msg.c_str());
+		break;
+	}
 
 	case InqQuest_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				bool success = target->InqQuest(emote.msg.c_str());
-
-				ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
-		}
-	case InqFellowNum_EmoteType:
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
+			bool success = target->InqQuest(emote.msg.c_str());
+
+			ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
+		}
+
+		break;
+	}
+	case InqFellowNum_EmoteType:
+	{
 		if (!_weenie->m_Qualities._emote_table)
 		{
 			break;
@@ -638,188 +639,188 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case InqFellowQuest_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
 		{
-			if (!_weenie->m_Qualities._emote_table)
-			{
-				break;
-			}
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				Fellowship *fellow = target->GetFellowship();
-
-				if (!fellow)
-					ChanceExecuteEmoteSet(QuestNoFellow_EmoteCategory, emote.msg, target_id);
-				else
-				{
-					bool success = false;
-
-					for (auto &entry : fellow->_fellowship_table)
-					{
-						if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
-						{
-							success = member->InqQuest(emote.msg.c_str());
-
-							if (success)
-								break;
-						}
-					}
-
-					ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
-				}
-			}
-
 			break;
 		}
-	case UpdateQuest_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
 
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			Fellowship *fellow = target->GetFellowship();
+
+			if (!fellow)
+				ChanceExecuteEmoteSet(QuestNoFellow_EmoteCategory, emote.msg, target_id);
+			else
 			{
-				bool success = target->UpdateQuest(emote.msg.c_str());
-					
+				bool success = false;
+
+				for (auto &entry : fellow->_fellowship_table)
+				{
+					if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
+					{
+						success = member->InqQuest(emote.msg.c_str());
+
+						if (success)
+							break;
+					}
+				}
+
 				ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
 			}
+		}
 
+		break;
+	}
+	case UpdateQuest_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			bool success = target->UpdateQuest(emote.msg.c_str());
+
+			ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
+		}
+
+		break;
+	}
+	case StampQuest_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target && emote.msg.find("@#kt") != std::string::npos)  //if @#kt found in quest string this is a killtask call collect data pass to killtask func.
+		{
+			auto kCountName = target->Ktref(emote.msg.c_str()); //trims the @#kt off of the quest name and returns the questflag used by the quest for stamping/validation
+
+			std::string mobName;
+			_weenie->m_Qualities.InqString((STypeString)1, mobName);
+
+			killTask(mobName, kCountName.c_str(), target_id);
 			break;
 		}
-	case StampQuest_EmoteType:
+
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target && emote.msg.find("@#kt") != std::string::npos)  //if @#kt found in quest string this is a killtask call collect data pass to killtask func.
-			{
-				auto kCountName = target->Ktref(emote.msg.c_str()); //trims the @#kt off of the quest name and returns the questflag used by the quest for stamping/validation
-
-				std::string mobName;
-				_weenie->m_Qualities.InqString((STypeString)1, mobName);
-
-				killTask(mobName, kCountName.c_str(), target_id);
-				break;
-			}
-			
-			if (target)
-			{
-				target->StampQuest(emote.msg.c_str());
-			}
-			
+			target->StampQuest(emote.msg.c_str());
 		}
-		break;
+
+	}
+	break;
 
 	case StampFellowQuest_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				Fellowship *fellow = target->GetFellowship();
+			Fellowship *fellow = target->GetFellowship();
 
-				if (fellow)
+			if (fellow)
+			{
+				for (auto &entry : fellow->_fellowship_table)
 				{
-					for (auto &entry : fellow->_fellowship_table)
+					if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
 					{
-						if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
-						{
-							member->StampQuest(emote.msg.c_str());
-						}
+						member->StampQuest(emote.msg.c_str());
 					}
 				}
 			}
-
-			break;
 		}
+
+		break;
+	}
 	case UpdateFellowQuest_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
+			Fellowship *fellow = target->GetFellowship();
+			if (!fellow)
+				ChanceExecuteEmoteSet(QuestNoFellow_EmoteCategory, emote.msg, target_id);
+			else
 			{
-				Fellowship *fellow = target->GetFellowship();
-				if (!fellow)
-					ChanceExecuteEmoteSet(QuestNoFellow_EmoteCategory, emote.msg, target_id);
-				else
+				/*
+				bool success = false;
+
+				for (auto &entry : fellow->_fellowship_table)
 				{
-					/*
-					bool success = false;
+				if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
+				{
+				success = member->UpdateQuest(emote.msg.c_str());
 
-					for (auto &entry : fellow->_fellowship_table)
-					{
-						if (CWeenieObject *member = g_pWorld->FindObject(entry.first))
-						{
-							success = member->UpdateQuest(emote.msg.c_str());
-
-							if (success)
-								break;
-						}
-					}
-
-					PackableList<EmoteSet> *emoteCategory = _weenie->m_Qualities._emote_table->_emote_table.lookup(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory);
-					if (!emoteCategory)
-						break;
-
-					for (auto &entry : *emoteCategory)
-					{
-						if (!_stricmp(entry.quest.c_str(), emote.msg.c_str()))
-						{
-							// match
-							ExecuteEmoteSet(entry, target_id);
-							break;
-						}
-					}
-					*/
-
-					target->SendText("Unsupported quest logic, please report to Pea how you received this.", LTT_DEFAULT);
-
-					ChanceExecuteEmoteSet(QuestFailure_EmoteCategory, emote.msg, target_id);
+				if (success)
+				break;
 				}
-			}
+				}
 
-			break;
+				PackableList<EmoteSet> *emoteCategory = _weenie->m_Qualities._emote_table->_emote_table.lookup(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory);
+				if (!emoteCategory)
+				break;
+
+				for (auto &entry : *emoteCategory)
+				{
+				if (!_stricmp(entry.quest.c_str(), emote.msg.c_str()))
+				{
+				// match
+				ExecuteEmoteSet(entry, target_id);
+				break;
+				}
+				}
+				*/
+
+				target->SendText("Unsupported quest logic, please report to Pea how you received this.", LTT_DEFAULT);
+
+				ChanceExecuteEmoteSet(QuestFailure_EmoteCategory, emote.msg, target_id);
+			}
 		}
+
+		break;
+	}
 	case IncrementQuest_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				target->IncrementQuest(emote.msg.c_str());
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			target->IncrementQuest(emote.msg.c_str());
 		}
+
+		break;
+	}
 	case DecrementQuest_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				target->DecrementQuest(emote.msg.c_str());
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			target->DecrementQuest(emote.msg.c_str());
 		}
+
+		break;
+	}
 	case EraseQuest_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				target->EraseQuest(emote.msg.c_str());
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
-		}
-	case Goto_EmoteType:
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			ChanceExecuteEmoteSet(GotoSet_EmoteCategory, emote.msg, target_id);
+			target->EraseQuest(emote.msg.c_str());
 		}
+
+		break;
+	}
+	case Goto_EmoteType:
+	{
+		ChanceExecuteEmoteSet(GotoSet_EmoteCategory, emote.msg, target_id);
+	}
 	case InqBoolStat_EmoteType:
 	{
 		if (!_weenie->m_Qualities._emote_table)
@@ -847,33 +848,33 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case InqIntStat_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
+			bool success = false;
+			bool hasQuality = false;
 
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
+			int intStat;
+			if (target->m_Qualities.InqInt((STypeInt)emote.stat, intStat))
 			{
-				bool success = false;
-				bool hasQuality = false;
-
-				int intStat;
-				if (target->m_Qualities.InqInt((STypeInt) emote.stat, intStat))
+				hasQuality = true;
+				if (intStat >= emote.min && intStat <= emote.max)
 				{
-					hasQuality = true;
-					if (intStat >= emote.min && intStat <= emote.max)
-					{
-						success = true;
-					}
+					success = true;
 				}
-
-				if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
-					break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
-				ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
 			}
 
-			break;
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
 		}
+
+		break;
+	}
 	case InqFloatStat_EmoteType:
 	{
 		if (!_weenie->m_Qualities._emote_table)
@@ -1031,148 +1032,148 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 		break;
 	}
 	case InqSkillTrained_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				bool success = false;
-
-				SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-				bool hasQuality = target->m_Qualities.InqSkillAdvancementClass((STypeSkill)emote.stat, sac);
-
-				if (sac == TRAINED_SKILL_ADVANCEMENT_CLASS || sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
-					success = true;
-
-				if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
-					break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
-				ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			bool success = false;
+
+			SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
+			bool hasQuality = target->m_Qualities.InqSkillAdvancementClass((STypeSkill)emote.stat, sac);
+
+			if (sac == TRAINED_SKILL_ADVANCEMENT_CLASS || sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
+				success = true;
+
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
 		}
+
+		break;
+	}
 	case InqSkillSpecialized_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				bool success = false;
-
-				SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
-				bool hasQuality = target->m_Qualities.InqSkillAdvancementClass((STypeSkill)emote.stat, sac);
-
-				if (sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
-					success = true;
-
-				if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
-					break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
-				ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			bool success = false;
+
+			SKILL_ADVANCEMENT_CLASS sac = SKILL_ADVANCEMENT_CLASS::UNTRAINED_SKILL_ADVANCEMENT_CLASS;
+			bool hasQuality = target->m_Qualities.InqSkillAdvancementClass((STypeSkill)emote.stat, sac);
+
+			if (sac == SPECIALIZED_SKILL_ADVANCEMENT_CLASS)
+				success = true;
+
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
 		}
+
+		break;
+	}
 	case InqSkillStat_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				bool success = false;
-				bool hasQuality = false;
-
-				DWORD skillStat;
-				if (target->m_Qualities.InqSkill((STypeSkill)emote.stat, skillStat, FALSE))
-				{
-					hasQuality = true;
-					if (skillStat >= emote.min && skillStat <= emote.max)
-					{
-						success = true;
-					}
-				}
-
-				if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
-					break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
-				ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
-			}
-
+	{
+		if (!_weenie->m_Qualities._emote_table)
 			break;
-		}
-	case InqRawSkillStat_EmoteType:
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
+			bool success = false;
+			bool hasQuality = false;
 
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
+			DWORD skillStat;
+			if (target->m_Qualities.InqSkill((STypeSkill)emote.stat, skillStat, FALSE))
 			{
-				bool success = false;
-				bool hasQuality = false;
-
-				DWORD skillStat;
-				if (target->m_Qualities.InqSkill((STypeSkill)emote.stat, skillStat, TRUE))
+				hasQuality = true;
+				if (skillStat >= emote.min && skillStat <= emote.max)
 				{
-					hasQuality = true;
-					if (skillStat >= emote.min && skillStat <= emote.max)
-					{
-						success = true;
-					}
-				}
-
-				if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
-					break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
-				ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
-			}
-
-			break;
-		}
-	case InqQuestSolves_EmoteType:
-		{
-			if (!_weenie->m_Qualities._emote_table)
-				break;
-
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				bool success = false;
-
-				int intQuestSolves = target->InqQuestSolves(emote.msg.c_str());
-
-				if (intQuestSolves >= emote.min && intQuestSolves <= emote.max)
 					success = true;
-
-				ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
+				}
 			}
 
-			break;
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
 		}
+
+		break;
+	}
+	case InqRawSkillStat_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			bool success = false;
+			bool hasQuality = false;
+
+			DWORD skillStat;
+			if (target->m_Qualities.InqSkill((STypeSkill)emote.stat, skillStat, TRUE))
+			{
+				hasQuality = true;
+				if (skillStat >= emote.min && skillStat <= emote.max)
+				{
+					success = true;
+				}
+			}
+
+			if (!hasQuality && ChanceExecuteEmoteSet(TestNoQuality_EmoteCategory, emote.msg, target_id))
+				break; //if we have a TestNoQuality_EmoteCategory break otherwise try the categories below.
+			ChanceExecuteEmoteSet(success ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, emote.msg, target_id);
+		}
+
+		break;
+	}
+	case InqQuestSolves_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			bool success = false;
+
+			int intQuestSolves = target->InqQuestSolves(emote.msg.c_str());
+
+			if (intQuestSolves >= emote.min && intQuestSolves <= emote.max)
+				success = true;
+
+			ChanceExecuteEmoteSet(success ? QuestSuccess_EmoteCategory : QuestFailure_EmoteCategory, emote.msg, target_id);
+		}
+
+		break;
+	}
 	case SetIntStat_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				target->m_Qualities.SetInt((STypeInt)emote.stat, emote.amount);
-				target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
-			}
-			break;
+			target->m_Qualities.SetInt((STypeInt)emote.stat, emote.amount);
+			target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
 		}
+		break;
+	}
 	case IncrementIntStat_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
 		{
-			CWeenieObject *target = g_pWorld->FindObject(target_id);
-			if (target)
-			{
-				int intStat = target->InqIntQuality((STypeInt)emote.stat, 0, TRUE) + 1;
-				target->m_Qualities.SetInt((STypeInt)emote.stat, intStat);
-				target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
-			}
-			break;
+			int intStat = target->InqIntQuality((STypeInt)emote.stat, 0, TRUE) + 1;
+			target->m_Qualities.SetInt((STypeInt)emote.stat, intStat);
+			target->NotifyIntStatUpdated((STypeInt)emote.stat, FALSE);
 		}
+		break;
+	}
 	case DecrementIntStat_EmoteType:
 	{
 		CWeenieObject *target = g_pWorld->FindObject(target_id);
@@ -1303,29 +1304,26 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 	}
 
 	case SetQuestCompletions_EmoteType:
-
+	{
 		if (!_weenie->m_Qualities._emote_table)
 			break;
-	{
+
 		CWeenieObject *target = g_pWorld->FindObject(target_id);
 
 		if (target)
 		{
 			target->SetQuestCompletions(emote.msg.c_str(), emote.amount);
 		}
-
+		break;
 	}
-	break;
 
-	case Generate_EmoteType: //type:72 adds from generator table attached to creature weenie. Sets init value of generator table and calls weenie factory to begin generation. Can use same emote with value of 0 in amount field to disable generator.
+	case Generate_EmoteType: //type:72 adds from generator table attached to weenie. Sets init value of generator table and calls weenie factory to begin generation. Can use same emote with value of 0 in amount field to disable generator.
 	{
-		CMonsterWeenie *monster = _weenie->AsMonster();
-		if (monster)
-			_weenie->m_Qualities.SetInt((STypeInt)82, emote.amount);
-		{
-			if ((emote.amount) != 0)
-				_weenie->InitCreateGeneratorOnDeath();
-		}
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		_weenie->m_Qualities.SetInt((STypeInt)82, emote.amount);
+		_weenie->GenerateOnDemand(emote.amount);
 
 		break;
 	}
@@ -1367,6 +1365,7 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 
 			target->SendNetMessage(&yesnoMessage, PRIVATE_MSG, TRUE, FALSE);
 
+			_confirmMsgList[target_id] = emote.msg;
 		}
 		break;
 	}
@@ -1401,21 +1400,357 @@ void EmoteManager::ExecuteEmote(const Emote &emote, DWORD target_id)
 
 		DWORD itemWCID = emote.cprof.wcid;
 		int itemAmount = emote.cprof.stack_size;
+		CWeenieObject *dummyitem = g_pWeenieFactory->CreateWeenieByClassID(itemWCID, NULL, false);
+		std::string dummyname = "";
+		std::string substring = "";
 
-		if (target)
+		if (target && dummyitem)
 		{
 			if (target->GetItemCount(itemWCID) >= itemAmount)
+			{
 				target->ConsumeItem(itemAmount, itemWCID);
+
+				if (itemAmount > 1)
+				{
+					dummyname = dummyitem->GetPluralName();
+					substring = csprintf("%d of your", itemAmount);
+				}
+				else
+				{
+					dummyname = dummyitem->GetName();
+					substring = "a";
+				}
+
+				target->SendText(csprintf("You hand over %s %s.", substring.c_str(), dummyname.c_str()), LTT_DEFAULT);
+
+			}
+		}
+
+		if (dummyitem)
+			dummyitem->Destroy();
+
+		break;
+	}
+	case UntrainSkill_EmoteType: //type: 110 changes skill to untrained and returns the approriate number of skill credits. Acts like a skill lowering gem with minor tweaks.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *player = g_pWorld->FindObject(target_id)->AsPlayer();
+		STypeSkill skillToAlter = (STypeSkill)emote.stat;
+
+		if (player)
+		{
+			Skill skill;
+			if (!player->m_Qualities.InqSkill(skillToAlter, skill))
+			{
+				break;
+			}
+
+			int numSkillCredits = player->InqIntQuality(AVAILABLE_SKILL_CREDITS_INT, 0, TRUE);
+
+			switch (skill._sac)
+			{
+			default:
+				break;
+
+			case SPECIALIZED_SKILL_ADVANCEMENT_CLASS:
+			{
+				SkillTable *pSkillTable = SkillSystem::GetSkillTable();
+				const SkillBase *pSkillBase = pSkillTable->GetSkillBase(skillToAlter);
+				if (pSkillBase != NULL)
+				{
+
+					HeritageGroup_CG *heritageGroup = CachedCharGenData->mHeritageGroupList.lookup(player->InqIntQuality(HERITAGE_GROUP_INT, 0, true));
+					if (heritageGroup)
+					{
+						//first we check our heritage specific skills as we cannot untrain those.
+						for (DWORD i = 0; i < heritageGroup->mSkillList.num_used; i++)
+						{
+							if (heritageGroup->mSkillList.array_data[i].skillNum == skillToAlter)
+							{
+								DWORD64 xpToAward = skill._pp;
+								skill._sac = TRAINED_SKILL_ADVANCEMENT_CLASS;
+								skill._pp = 0;
+								skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+								skill._init_level = 5;
+								player->m_Qualities.SetSkill(skillToAlter, skill);
+								player->NotifySkillStatUpdated(skillToAlter);
+
+								numSkillCredits += pSkillBase->_specialized_cost - pSkillBase->_trained_cost;
+								player->m_Qualities.SetInt(AVAILABLE_SKILL_CREDITS_INT, numSkillCredits);
+								player->NotifyIntStatUpdated(AVAILABLE_SKILL_CREDITS_INT);
+
+								if (xpToAward > 0)
+								{
+									player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+									player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+								}
+
+								player->SendText(csprintf("Your %s skill has been reset.  All the experience that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+								break;
+							}
+						}
+
+						// break here on Arcane as the _trained_cost is actually 4 but should be treated as if it was 0.
+						if (skillToAlter == ARCANE_LORE_SKILL)
+							break;
+
+					}
+					if (pSkillBase->_trained_cost > 0)
+					{
+						bool isTinker = (skillToAlter == SALVAGING_SKILL ||
+							skillToAlter == WEAPON_APPRAISAL_SKILL ||
+							skillToAlter == ARMOR_APPRAISAL_SKILL ||
+							skillToAlter == MAGIC_ITEM_APPRAISAL_SKILL ||
+							skillToAlter == ITEM_APPRAISAL_SKILL);
+
+						if (isTinker)
+						{
+							switch (skillToAlter)
+							{
+							case WEAPON_APPRAISAL_SKILL: player->m_Qualities.SetInt(AUGMENTATION_SPECIALIZE_WEAPON_TINKERING_INT, 0); break;
+							case ARMOR_APPRAISAL_SKILL:  player->m_Qualities.SetInt(AUGMENTATION_SPECIALIZE_ARMOR_TINKERING_INT, 0); break;
+							case ITEM_APPRAISAL_SKILL:  player->m_Qualities.SetInt(AUGMENTATION_SPECIALIZE_ITEM_TINKERING_INT, 0); break;
+							case MAGIC_ITEM_APPRAISAL_SKILL:  player->m_Qualities.SetInt(AUGMENTATION_SPECIALIZE_MAGIC_ITEM_TINKERING_INT, 0); break;
+							case SALVAGING_SKILL:  player->m_Qualities.SetInt(AUGMENTATION_SPECIALIZE_SALVAGING_INT, 0); break;
+							}
+						}
+						else
+						{
+							numSkillCredits += pSkillBase->_specialized_cost;
+							player->m_Qualities.SetInt(AVAILABLE_SKILL_CREDITS_INT, numSkillCredits);
+							player->NotifyIntStatUpdated(AVAILABLE_SKILL_CREDITS_INT);
+						}
+
+						DWORD64 xpToAward = 0;
+
+						xpToAward = skill._pp;
+						skill._sac = UNTRAINED_SKILL_ADVANCEMENT_CLASS;
+						skill._pp = 0;
+						skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+						skill._init_level = 0;
+
+						player->m_Qualities.SetSkill(skillToAlter, skill);
+						player->NotifySkillStatUpdated(skillToAlter);
+
+						if (xpToAward > 0)
+						{
+							player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+							player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+						}
+
+						player->SendText(csprintf("Your specialized %s skill has been removed. All the experience and skill credits that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+					}
+					else
+					{
+						DWORD64 xpToAward = skill._pp;
+						skill._sac = TRAINED_SKILL_ADVANCEMENT_CLASS;
+						skill._pp = 0;
+						skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+						skill._init_level = 5;
+						player->m_Qualities.SetSkill(skillToAlter, skill);
+						player->NotifySkillStatUpdated(skillToAlter);
+
+						if (xpToAward > 0)
+						{
+							player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+							player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+						}
+
+						player->SendText(csprintf("Your %s skill has been reset.  All the experience that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+
+					}
+				}
+
+
+				break;
+			}
+
+			case TRAINED_SKILL_ADVANCEMENT_CLASS:
+			{
+				SkillTable *pSkillTable = SkillSystem::GetSkillTable();
+				const SkillBase *pSkillBase = pSkillTable->GetSkillBase(skillToAlter);
+
+				if (pSkillBase != NULL)
+				{
+
+					HeritageGroup_CG *heritageGroup = CachedCharGenData->mHeritageGroupList.lookup(player->InqIntQuality(HERITAGE_GROUP_INT, 0, true));
+					if (heritageGroup)
+					{
+						//first we check our heritage specific skills as we cannot untrain those.
+						for (DWORD i = 0; i < heritageGroup->mSkillList.num_used; i++)
+						{
+							if (heritageGroup->mSkillList.array_data[i].skillNum == skillToAlter)
+							{
+								DWORD64 xpToAward = skill._pp;
+								skill._pp = 0;
+								skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+								skill._init_level = 5;
+								player->m_Qualities.SetSkill(skillToAlter, skill);
+								player->NotifySkillStatUpdated(skillToAlter);
+
+								if (xpToAward > 0)
+								{
+									player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+									player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+								}
+
+								player->SendText(csprintf("Your %s skill has been reset.  All the experience that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+								break;
+							}
+						}
+
+						if (skillToAlter == ARCANE_LORE_SKILL)
+							break;
+
+					}
+
+					if (pSkillBase->_trained_cost > 0)
+					{
+						numSkillCredits += pSkillBase->_trained_cost;
+						player->m_Qualities.SetInt(AVAILABLE_SKILL_CREDITS_INT, numSkillCredits);
+						player->NotifyIntStatUpdated(AVAILABLE_SKILL_CREDITS_INT);
+
+						DWORD64 xpToAward = skill._pp;
+						skill._pp = 0;
+
+						skill._sac = UNTRAINED_SKILL_ADVANCEMENT_CLASS;
+						skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+						skill._init_level = 0;
+						player->m_Qualities.SetSkill(skillToAlter, skill);
+						player->NotifySkillStatUpdated(skillToAlter);
+
+						if (xpToAward > 0)
+						{
+							player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+							player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+						}
+
+						player->SendText(csprintf("Your trained %s skill has been removed. All the experience and skill credits that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+
+					}
+					else
+					{
+						DWORD64 xpToAward = skill._pp;
+						skill._pp = 0;
+						skill._level_from_pp = ExperienceSystem::SkillLevelFromExperience(skill._sac, skill._pp);
+						skill._init_level = 5;
+						player->m_Qualities.SetSkill(skillToAlter, skill);
+						player->NotifySkillStatUpdated(skillToAlter);
+
+						if (xpToAward > 0)
+						{
+							player->m_Qualities.SetInt64(AVAILABLE_EXPERIENCE_INT64, player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0) + xpToAward);
+							player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
+						}
+
+						player->SendText(csprintf("Your %s skill has been reset.  All the experience that you spent on this skill have been refunded to you.", pSkillBase->_name.c_str()), LTT_DEFAULT);
+
+					}
+				}
+
+				break;
+			}
+			}
+
+
 		}
 		break;
 	}
+	case SpendLuminance_EmoteType: //type: 112 spends luminance.
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+
+		long long amount = emote.heroxp64;
+		long long lum = target->m_Qualities.GetInt64(AVAILABLE_LUMINANCE_INT64, 0);
+
+		if (target)
+		{
+			if (lum < amount)
+				break;
+
+			target->m_Qualities.SetInt64(AVAILABLE_LUMINANCE_INT64, lum - amount);
+			target->NotifyInt64StatUpdated(AVAILABLE_LUMINANCE_INT64, false);
+		}
+		break;
+	}
+	case SetInt64Stat_EmoteType:
+	{
+		CWeenieObject *target = g_pWorld->FindObject(target_id);
+		if (target)
+		{
+			target->m_Qualities.SetInt64((STypeInt64)emote.stat, emote.amount);
+			target->NotifyInt64StatUpdated((STypeInt64)emote.stat, FALSE);
+		}
+		break;
+	}
+
+	case DeleteSelf_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		_weenie->MarkForDestroy();
+		break;
+	}
+
+	case KillSelf_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		CMonsterWeenie *monster = _weenie->AsMonster();
+		if (monster && !monster->IsDead() && !monster->IsInPortalSpace() && !monster->IsBusyOrInAction())
+		{
+			monster->SetHealth(0, true);
+			monster->OnDeath(monster->GetID());
+		}
+
+		break;
+
+	}
+
+	case SetBoolStat_EmoteType:
+	{
+		if (!_weenie->m_Qualities._emote_table)
+			break;
+
+		if (emote.extent == 2) //if extent is 2 then set bool on self.
+		{
+			_weenie->m_Qualities.SetBool((STypeBool)emote.stat, emote.amount);
+			_weenie->NotifyBoolStatUpdated((STypeBool)emote.stat, FALSE);
+		}
+
+		else
+		{
+			CWeenieObject *target = g_pWorld->FindObject(target_id);
+			if (target)
+			{
+				target->m_Qualities.SetBool((STypeBool)emote.stat, emote.amount);
+				target->NotifyBoolStatUpdated((STypeBool)emote.stat, FALSE);
+			}
+		}
+
+		break;
+	}
+
 	}
 	_weenie->m_Qualities.SetBool(EXECUTING_EMOTE, false);
 }
 
+
 bool EmoteManager::IsExecutingAlready()
 {
 	return _weenie->m_Qualities.GetBool(EXECUTING_EMOTE, false);
+}
+
+bool EmoteManager::HasQueue()
+{
+	return !_emoteQueue.empty();
 }
 
 void EmoteManager::Tick()
@@ -1429,6 +1764,11 @@ void EmoteManager::Tick()
 			break;
 
 		ExecuteEmote(i->_data, i->_target_id);
+
+		//Check if emote queue is empty due to KillSelf_emoteType
+		if (_emoteQueue.empty())
+			return;
+
 		i = _emoteQueue.erase(i);
 		if (i != _emoteQueue.end())
 			i->_executeTime = Timer::cur_time + i->_data.delay;
@@ -1516,5 +1856,12 @@ void EmoteManager::killTaskSub(std::string &mobName, std::string &kCountName, CW
 
 void EmoteManager::ConfirmationResponse(bool accepted, DWORD target_id)
 {
-	ChanceExecuteEmoteSet(accepted ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, accepted ? "Yes_Response" : "No_Response", target_id);
+	if (!_confirmMsgList.empty())
+	{
+		if (_confirmMsgList.find(target_id) != _confirmMsgList.end())
+		{
+			ChanceExecuteEmoteSet(accepted ? TestSuccess_EmoteCategory : TestFailure_EmoteCategory, _confirmMsgList[target_id], target_id);
+			_confirmMsgList.erase(target_id);
+		}
+	}
 }
