@@ -5115,6 +5115,67 @@ CLIENT_COMMAND(challengeai, "", "Challenge an AI to a game of Chess.", BASIC_ACC
 	return false;
 }
 
+CLIENT_COMMAND(sethealth, "[value]", "Set my health to value must be below max health", ADMIN_ACCESS)
+{
+	DWORD amount = 0;
+
+	if (argc >= 1)
+	{
+		amount = strtoul(argv[0], NULL, 10);
+	}
+	else
+		return false;
+
+	pPlayer->SetHealth(amount, true);
+	return true;
+}
+
+CLIENT_COMMAND(setstamina, "[value]", "Set my staminahealth to value must be below max health", ADMIN_ACCESS)
+{
+	DWORD amount = 0;
+
+	if (argc >= 1)
+	{
+		amount = strtoul(argv[0], NULL, 10);
+	}
+	else
+		return false;
+
+	pPlayer->SetStamina(amount, true);
+	return true;
+}
+
+CLIENT_COMMAND(givelum, "[value]", "Gives you some Luminance for testing.", BASIC_ACCESS)
+{
+	if (!g_pConfig->EnableXPCommands() && pPlayer->GetAccessLevel() < SENTINEL_ACCESS)
+	{
+		pPlayer->SendText("This command is not enabled on this server.", LTT_DEFAULT);
+		return false;
+	}
+
+	DWORD amount = 0;
+	DWORD total = pPlayer->m_Qualities.GetInt64(AVAILABLE_LUMINANCE_INT64, 0);
+
+	if (argc >= 1)
+	{
+		amount = strtoul(argv[0], NULL, 10);
+	}
+
+	amount = min(amount, (DWORD)1000000);
+	pPlayer->m_Qualities.SetInt64(AVAILABLE_LUMINANCE_INT64, amount + total);
+	pPlayer->m_Qualities.SetInt64(AVAILABLE_LUMINANCE_INT64, min(amount + total, (DWORD)1000000));
+	pPlayer->NotifyInt64StatUpdated(AVAILABLE_LUMINANCE_INT64, false);
+
+	if (!pPlayer->m_Qualities.GetInt64(MAXIMUM_LUMINANCE_INT64, 0))
+	{
+		pPlayer->m_Qualities.SetInt64(MAXIMUM_LUMINANCE_INT64, 1000000);
+		pPlayer->NotifyInt64StatUpdated(MAXIMUM_LUMINANCE_INT64, false);
+	}
+
+	return false;
+}
+
+
 
 const char* CommandBase::Info(CommandEntry* pCommand)
 {
