@@ -13,6 +13,6 @@ public:
 
 	virtual int Use(CPlayerWeenie *pOther) override;
 	virtual int DoUseResponse(CWeenieObject *player) override;
-	double cooldown = 0;
+	double _nextUse = 0;
 };
 
