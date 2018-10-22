@@ -940,7 +940,7 @@ void CWeenieFactory::AddWeenieToDestination(CWeenieObject *weenie, CWeenieObject
 			double random_y = Random::GenFloat(-genRadius, genRadius);
 
 			pos.frame.m_origin += Vector(random_x, random_y, 0.0f);
-			pos.frame.m_origin.z = CalcSurfaceZ(pos.objcell_id, pos.frame.m_origin.x, pos.frame.m_origin.y, false);
+			pos.frame.m_origin.z = CalcSurfaceZ(pos.objcell_id, pos.frame.m_origin.x, pos.frame.m_origin.y, true);
 
 			if (pos.frame.m_origin.x < 0.5f)
 				pos.frame.m_origin.x = 0.5f;
@@ -971,7 +971,7 @@ void CWeenieFactory::AddWeenieToDestination(CWeenieObject *weenie, CWeenieObject
 			pos = profile->pos_val;
 
 		if ((pos.objcell_id & 0xFFFF) < 0x100) //outdoors
-		pos.frame.m_origin.z = CalcSurfaceZ(pos.objcell_id, pos.frame.m_origin.x, pos.frame.m_origin.y, false);
+			pos.frame.m_origin.z = CalcSurfaceZ(pos.objcell_id, pos.frame.m_origin.x, pos.frame.m_origin.y, true);
 
 		weenie->SetInitialPosition(pos);
 		if (!g_pWorld->CreateEntity(weenie))
