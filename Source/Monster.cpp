@@ -2196,7 +2196,7 @@ void CMonsterWeenie::OnDeath(DWORD killer_id)
 	if (!g_pWorld->FindObjectName(m_highestDamageSource, m_DeathKillerNameForCorpse))
 		m_DeathKillerNameForCorpse = "fate";
 
-	if (m_Qualities._generator_registry)
+	if (m_Qualities._generator_registry && m_Qualities.GetInt(GENERATOR_DESTRUCTION_TYPE_INT, 0) && m_Qualities.GetInt(GENERATOR_DESTRUCTION_TYPE_INT, 0) != 1)
 	{
 		for each(auto entry in m_Qualities._generator_registry->_registry)
 		{
