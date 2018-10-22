@@ -3259,6 +3259,7 @@ int CSpellcastingManager::TryBeginCast(DWORD target_id, DWORD spell_id)
 		m_SpellCastData.current_skill = m_pWeenie->InqIntQuality(ITEM_SPELLCRAFT_INT, 0, 0);
 		int error = LaunchSpellEffect(FALSE);
 		EndCast(error);
+		return WERROR_NONE;
 	}
 	
 	BeginCast();
