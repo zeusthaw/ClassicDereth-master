@@ -3836,12 +3836,13 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 			MoveToStatePack moveToState;
 			moveToState.UnPack(pReader);
 
-				if (pReader->GetLastError())
-				{
-					SERVER_WARN << "Bad animation message!";
-					SERVER_WARN << pReader->GetDataStart() << pReader->GetDataLen();
-					break;
-				}
+			if (pReader->GetLastError())
+			{
+				SERVER_WARN << "Bad animation message!";
+				SERVER_WARN << pReader->GetDataStart() << pReader->GetDataLen();
+				break;
+			}
+
 
 				//if (is_newer_event_stamp(moveToState.server_control_timestamp, m_pPlayer->_server_control_timestamp))
 				//{
@@ -3849,22 +3850,22 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 				//	break;
 				//}
 
-				if (is_newer_event_stamp(moveToState.teleport_timestamp, m_pPlayer->_teleport_timestamp))
-				{
-					SERVER_WARN << "Old teleport timestamp on 0xF61C. Ignoring.";
-					break;
-				}
-				if (is_newer_event_stamp(moveToState.force_position_ts, m_pPlayer->_force_position_timestamp))
-				{
-					SERVER_WARN << "Old force position timestamp on 0xF61C. Ignoring.";
-					break;
-				}
+			if (is_newer_event_stamp(moveToState.teleport_timestamp, m_pPlayer->_teleport_timestamp))
+			{
+				SERVER_WARN << "Old teleport timestamp on 0xF61C. Ignoring.";
+				break;
+			}
+			if (is_newer_event_stamp(moveToState.force_position_ts, m_pPlayer->_force_position_timestamp))
+			{
+				SERVER_WARN << "Old force position timestamp on 0xF61C. Ignoring.";
+				break;
+			}
+			if (m_pPlayer->IsDead())
+			{
+				SERVER_WARN << "Dead players can't move. Ignoring.";
+				break;
+			}
 
-				if (m_pPlayer->IsDead())
-				{
-					SERVER_WARN << "Dead players can't move. Ignoring.";
-					break;
-				}
 
 				/*
 				CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
@@ -3894,24 +3895,24 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 				}
 				*/
 
-				double dist = m_pPlayer->m_Position.distance(moveToState.position);
-				if (dist >= 10)
+			double dist = m_pPlayer->m_Position.distance(moveToState.position);
+			if (dist >= 10)
+			{
+				// Snap them back to their previous position
+				m_pPlayer->_force_position_timestamp++;
+			}
+			else
+			{
+				//m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
+				
+				CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
+				if (transit)
 				{
-					// Snap them back to their previous position
-					m_pPlayer->_force_position_timestamp++;
+					m_pPlayer->SetPositionInternal(transit);
 				}
-				else
-				{
-					//m_pPlayer->SetPositionSimple(&moveToState.position, TRUE);
 
-				
-					CTransition *transit = m_pPlayer->transition(&m_pPlayer->m_Position, &moveToState.position, 0);
-					if (transit)
-					{
-						m_pPlayer->SetPositionInternal(transit);
-					}
-				
-				}
+			}
+
 
 				// m_pPlayer->m_Position = moveToState.position; // should interpolate to this, but oh well
 
@@ -3931,36 +3932,37 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 				m_pPlayer->get_minterp()->standing_longjump = moveToState.longjump_mode ? TRUE : FALSE;
 				*/
 
-				m_pPlayer->last_move_was_autonomous = true;
-				m_pPlayer->cancel_moveto();
+			m_pPlayer->last_move_was_autonomous = true;
+			m_pPlayer->cancel_moveto();
 
-				if (!(moveToState.raw_motion_state.current_style & CM_Style) && moveToState.raw_motion_state.current_style)
-				{
-					SERVER_WARN << "Bad style received" << moveToState.raw_motion_state.current_style;
-					break;
-				}
+			if (!(moveToState.raw_motion_state.current_style & CM_Style) && moveToState.raw_motion_state.current_style)
+			{
+				SERVER_WARN << "Bad style received" << moveToState.raw_motion_state.current_style;
+				break;
+			}
 
-				if (moveToState.raw_motion_state.forward_command & CM_Action)
-				{
-					SERVER_WARN << "Bad forward command received" << moveToState.raw_motion_state.forward_command;
-					break;
-				}
+			if (moveToState.raw_motion_state.forward_command & CM_Action)
+			{
+				SERVER_WARN << "Bad forward command received" << moveToState.raw_motion_state.forward_command;
+				break;
+			}
 
-				if (moveToState.raw_motion_state.sidestep_command & CM_Action)
-				{
-					SERVER_WARN << "Bad sidestep command received" << moveToState.raw_motion_state.sidestep_command;
-					break;
-				}
+			if (moveToState.raw_motion_state.sidestep_command & CM_Action)
+			{
+				SERVER_WARN << "Bad sidestep command received" << moveToState.raw_motion_state.sidestep_command;
+				break;
+			}
 
-				if (moveToState.raw_motion_state.turn_command & CM_Action)
-				{
-					SERVER_WARN << "Bad turn command received" << moveToState.raw_motion_state.turn_command;
-					break;
-				}
+			if (moveToState.raw_motion_state.turn_command & CM_Action)
+			{
+				SERVER_WARN << "Bad turn command received" << moveToState.raw_motion_state.turn_command;
+				break;
+			}
 
-				CMotionInterp *minterp = m_pPlayer->get_minterp();
-				minterp->raw_state = moveToState.raw_motion_state;
-				minterp->apply_raw_movement(TRUE, minterp->motion_allows_jump(minterp->interpreted_state.forward_command != 0));
+			CMotionInterp *minterp = m_pPlayer->get_minterp();
+			minterp->raw_state = moveToState.raw_motion_state;
+			minterp->apply_raw_movement(TRUE, minterp->motion_allows_jump(minterp->interpreted_state.forward_command != 0));
+
 
 				WORD newestActionStamp = m_MoveActionStamp;
 
@@ -3970,14 +3972,16 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 						break;
 
 					if (is_newer_event_stamp(newestActionStamp, actionNew.stamp))
-					{
+
+				{
 						DWORD commandID = GetCommandID(actionNew.action);
 
 						if (!(commandID & CM_Action) || !(commandID & CM_ChatEmote))
-						{
+					{
 							SERVER_WARN << "Bad action received" << commandID;
 							continue;
 						}
+
 
 						MovementParameters params;
 						params.action_stamp = ++m_pPlayer->m_wAnimSequence;
@@ -3985,18 +3989,20 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 						params.speed = actionNew.speed;
 						m_pPlayer->get_minterp()->DoMotion(commandID, &params);
 
-						// minterp->interpreted_state.AddAction(ActionNode(actionNew.action, actionNew.speed, ++m_pPlayer->m_wAnimSequence, TRUE));
 
+						// minterp->interpreted_state.AddAction(ActionNode(actionNew.action, actionNew.speed, ++m_pPlayer->m_wAnimSequence, TRUE));
 						// newestActionStamp = actionNew.stamp;
 						// m_pPlayer->Animation_PlayEmote(actionNew.action, actionNew.speed);
 					}
 				}
+
 
 				m_MoveActionStamp = newestActionStamp;
 
 				// m_pPlayer->Movement_UpdatePos();
 				m_pPlayer->Animation_Update();
 				// m_pPlayer->m_bAnimUpdate = TRUE;
+
 
 			// m_pPlayer->Movement_UpdatePos();
 			break;
@@ -4115,8 +4121,7 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 					m_pPlayer->transient_state &= ~((DWORD)TransientState::CONTACT_TS);
 					m_pPlayer->transient_state &= ~((DWORD)WATER_CONTACT_TS);
 				}
-				m_pPlayer->calc_acceleration();
-				m_pPlayer->set_on_walkable(bHasContact);
+
 
 			m_pPlayer->Movement_UpdatePos();
 			break;
