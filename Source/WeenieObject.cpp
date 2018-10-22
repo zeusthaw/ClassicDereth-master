@@ -3222,9 +3222,31 @@ void CWeenieObject::InitCreateGenerator()
 		g_pWeenieFactory->AddFromGeneratorTable(this, true);
 }
 
-void CWeenieObject::InitCreateGeneratorOnDeath() //Called by Emote_Type 72 Generator
+void CWeenieObject::GenerateOnDemand(int amount) //Called by Emote_Type 72 Generator
 {
-	g_pWeenieFactory->AddFromGeneratorTable(this, true);
+	if (amount != 0)
+	{
+		g_pWeenieFactory->AddFromGeneratorTable(this, true);
+	}
+
+	else (m_Qualities._generator_registry);
+	{
+		while (!m_Qualities._generator_registry->_registry.empty())
+		{
+			DWORD weenie_id = m_Qualities._generator_registry->_registry.begin()->first;
+
+			if (CWeenieObject *spawned_weenie = g_pWorld->FindObject(weenie_id))
+			{
+				//erase weenie from generator registry to stop spawning new weenies.
+				m_Qualities._generator_registry->_registry.erase(weenie_id);
+			}
+		}
+		if (m_Qualities._generator_queue)
+		{
+			m_Qualities._generator_queue->_queue.clear();
+		}
+	}
+
 }
 
 

@@ -335,7 +335,7 @@ public:
 
 	bool IsGeneratorSlotReady(int slot);
 	void InitCreateGenerator();
-	void InitCreateGeneratorOnDeath();
+	void GenerateOnDemand(int amount);
 
 	bool IsStorage();
 	bool CanPickup(); // custom
