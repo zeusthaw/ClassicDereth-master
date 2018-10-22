@@ -1409,7 +1409,9 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				return WERROR_NONE;
 			}
 
-			SendText(op->_successMessage.c_str(), LTT_CRAFT);
+			if (op->_successMessage != "")
+				SendText(op->_successMessage.c_str(), LTT_CRAFT);
+
 			
 			// Broadcast messages for tinkering
 			switch (op->_SkillCheckFormulaType)
@@ -1472,7 +1474,9 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 				return WERROR_NONE;
 			}
 
-			SendText(op->_failMessage.c_str(), LTT_CRAFT);
+			if (op->_failMessage != "")
+				SendText(op->_failMessage.c_str(), LTT_CRAFT);
+
 
 			// Broadcast messages for tinkering
 			switch (op->_SkillCheckFormulaType)
