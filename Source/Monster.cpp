@@ -563,6 +563,14 @@ bool CMonsterWeenie::MoveItemTo3D(DWORD sourceItemId, bool animationDone)
 		return false;
 	}
 
+	// Temporarily disallow dropping stackable items.
+	if (sourceItem->m_Qualities.GetInt(MAX_STACK_SIZE_INT, 0) > 1)
+	{
+		NotifyInventoryFailedEvent(sourceItemId, WERROR_ATTUNED_ITEM);
+		return false;
+	}
+
+
 	if (!animationDone)
 	{
 		CDropInventoryUseEvent *dropEvent = new CDropInventoryUseEvent();
@@ -1443,6 +1451,14 @@ bool CMonsterWeenie::SplitItemto3D(DWORD sourceItemId, DWORD amountToTransfer, b
 		NotifyInventoryFailedEvent(sourceItemId, WERROR_ATTUNED_ITEM);
 		return false;
 	}
+
+	// Temporarily disallow dropping stackable items.
+	if (sourceItem->m_Qualities.GetInt(MAX_STACK_SIZE_INT, 0) > 1)
+	{
+		NotifyInventoryFailedEvent(sourceItemId, WERROR_ATTUNED_ITEM);
+		return false;
+	}
+
 
 	if (!animationDone && !FindContainedItem(sourceItem->GetID()))
 	{
