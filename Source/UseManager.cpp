@@ -254,6 +254,48 @@ void CUseEventData::ExecuteUseAnimation(DWORD motion, MovementParameters *params
 	}
 }
 
+bool CUseEventData::QuestRestrictions(CWeenieObject *target)
+{
+	std::string questString;
+	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty()) //Used for restriction of pickup if quest is already solved. Common use is for timer restritions.
+	{
+		if (_weenie->InqQuest(questString.c_str()))
+		{
+			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
+
+			if (timeTilOkay > 0)
+			{
+				std::string cdTime = ("You cannot complete this quest for another " + TimeToString(timeTilOkay) + ".");
+				_weenie->SendText(cdTime.c_str(), LTT_DEFAULT);
+			}
+
+			_weenie->DoForcedStopCompletely();
+			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
+			return true;
+		}
+
+		_weenie->StampQuest(questString.c_str());
+		target->m_Qualities.SetString(QUEST_STRING, "");
+
+	}
+
+	std::string restriction;
+	if (target->m_Qualities.InqString(QUEST_RESTRICTION_STRING, restriction)) //Allows for restrition of pickup if you are NOT flagged. (IE must have flag for use)
+	{
+		if (CPlayerWeenie *player = _weenie->AsPlayer())
+		{
+			if (!player->InqQuest(restriction.c_str()))
+			{
+				_weenie->DoForcedStopCompletely();
+				Cancel(WERROR_QUEST_RESRICTION_UNSOLVED); // Sends -> This item requires you to complete a specific quest before you can pick it up!
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+
 void CGenericUseEvent::OnReadyToUse()
 {
 	if (_do_use_animation)
@@ -398,36 +440,9 @@ void CPickupInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days= timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->MoveItemToContainer(_source_item_id, _target_container_id, _target_slot, true);
@@ -500,36 +515,9 @@ void CMoveToWieldInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->MoveItemToWield(_sourceItemId, _targetLoc, true);
@@ -564,36 +552,9 @@ void CStackMergeInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->MergeItem(_sourceItemId, _targetItemId, _amountToTransfer, true);
@@ -628,36 +589,9 @@ void CStackSplitToContainerInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->SplitItemToContainer(_sourceItemId, _targetContainerId, _targetSlot, _amountToTransfer, true);
@@ -693,36 +627,9 @@ void CStackSplitTo3DInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->SplitItemto3D(_sourceItemId, _amountToTransfer, true);
@@ -757,36 +664,9 @@ void CStackSplitToWieldInventoryUseEvent::OnUseAnimSuccess(DWORD motion)
 		return;
 	}
 
-	std::string questString;
-	if (target->m_Qualities.InqString(QUEST_STRING, questString) && !questString.empty())
+	if (QuestRestrictions(target))
 	{
-		if (_weenie->InqQuest(questString.c_str()))
-		{
-			int timeTilOkay = _weenie->InqTimeUntilOkayToComplete(questString.c_str());
-
-			if (timeTilOkay > 0)
-			{
-				int secs = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int mins = timeTilOkay % 60;
-				timeTilOkay /= 60;
-
-				int hours = timeTilOkay % 24;
-				timeTilOkay /= 24;
-
-				int days = timeTilOkay;
-
-				_weenie->SendText(csprintf("You cannot complete this quest for another %dd %dh %dm %ds.", days, hours, mins, secs), LTT_DEFAULT);
-			}
-
-			_weenie->DoForcedStopCompletely();
-			Cancel(WERROR_QUEST_SOLVED_TOO_RECENTLY);
-			return;
-		}
-
-		_weenie->StampQuest(questString.c_str());
-		target->m_Qualities.SetString(QUEST_STRING, "");
+		return;
 	}
 
 	bool success = _weenie->AsPlayer()->SplitItemToWield(_sourceItemId, _targetLoc, _amountToTransfer, true);

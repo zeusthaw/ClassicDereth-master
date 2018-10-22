@@ -41,6 +41,8 @@ public:
 	double _max_use_distance = FLT_MAX;
 	double _timeout = FLT_MAX;
 	DWORD _active_use_anim = 0;
+
+	bool QuestRestrictions(CWeenieObject *target);
 };
 
 class CGenericUseEvent : public CUseEventData
