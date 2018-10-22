@@ -2595,6 +2595,12 @@ void CClientEvents::ProcessEvent(BinaryReader *pReader)
 					m_pPlayer->UseEx(true);
 				}
 				break;
+			case 0x06: // Augmentation
+				if (accepted)
+				{
+					m_pPlayer->UseEx(true);
+				}
+				break;
 			case 0x07:
 				CWeenieObject *target = g_pWorld->FindObject(context);
 					

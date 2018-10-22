@@ -23,6 +23,7 @@
 #include "easylogging++.h"
 #include "Util.h"
 #include "ChessManager.h"
+#include "AugmentationDevice.h"
 
 #include <chrono>
 #include <algorithm>
@@ -1163,6 +1164,10 @@ int CPlayerWeenie::UseEx(bool bConfirmed)
 		// no queued crafting op
 		return WERROR_NONE;
 	}
+
+	if (pTool->m_Qualities.m_WeenieType == AugmentationDevice_WeenieType)
+		pTool->AsAugmentationDevice()->UseEx(this, bConfirmed);
+
 
 	int toolType = pTool->InqIntQuality(ITEM_TYPE_INT, 0);
 

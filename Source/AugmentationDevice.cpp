@@ -23,7 +23,34 @@ int CAugmentationDeviceWeenie::Use(CPlayerWeenie *player)
 		return WERROR_NONE;
 	}
 
+	return UseEx(player, false);
+}
+
+int CAugmentationDeviceWeenie::UseEx(CPlayerWeenie *player, bool bConfirmed)
+{
 	long long augCost = InqInt64Quality(AUGMENTATION_COST_INT64, 0);
+
+	// Save these for later for the confirmation response
+	player->m_pCraftingTool = this;
+	player->m_pCraftingTarget = player;
+
+	if (!bConfirmed)
+	{
+		std::ostringstream sstrMessage;
+		sstrMessage.imbue(std::locale(""));
+		sstrMessage << "This action will augment your character with " << GetName() << " and will cost " << augCost << " available experience.";
+
+		BinaryWriter confirmAug;
+		confirmAug.Write<DWORD>(0x274);	// Message Type
+		confirmAug.Write<DWORD>(0x06);		// Confirm type (augmentation)
+		confirmAug.Write<int>(0);			// Sequence number??
+		confirmAug.WriteString(sstrMessage.str());
+
+		player->SendNetMessage(&confirmAug, PRIVATE_MSG, TRUE, FALSE);
+
+		return WERROR_NONE;
+	}
+
 	long long unassignedXP = player->InqInt64Quality(AVAILABLE_EXPERIENCE_INT64, 0);
 	int aug = InqIntQuality(AUGMENTATION_STAT_INT, 0);
 	int augJackOfTrades = player->InqIntQuality(AUGMENTATION_JACK_OF_ALL_TRADES_INT, 0);
@@ -681,7 +708,7 @@ int CAugmentationDeviceWeenie::Use(CPlayerWeenie *player)
 				player->NotifyInt64StatUpdated(AVAILABLE_EXPERIENCE_INT64);
 				player->NotifyIntStatUpdated(AUGMENTATION_CRITICAL_DEFENSE_INT);
 				player->EmitEffect(159, 1.0f);
-				player->SendText("Congratulations! You have succeeded in acquiring the Eye of the Remorseless augmentation.", LTT_DEFAULT);
+				player->SendText("Congratulations! You have succeeded in acquiring the Critical Protection augmentation.", LTT_DEFAULT);
 				std::string text = csprintf("%s has acquired the %s augmentation!", player->GetName().c_str(), GetName().c_str());
 				if (!text.empty())
 				{
@@ -1175,7 +1202,6 @@ int CAugmentationDeviceWeenie::Use(CPlayerWeenie *player)
 				player->NotifyIntStatUpdated(AUGMENTATION_JACK_OF_ALL_TRADES_INT);
 				player->EmitEffect(159, 1.0f);
 				player->SendText("Congratulations! You have succeeded in acquiring the Jack of All Trades augmentation.", LTT_DEFAULT);
-				player->SendText(csprintf("%s has acquired the %s augmentation!", player->GetName().c_str(), GetName().c_str()), LTT_WORLD_BROADCAST);
 				std::string text = csprintf("%s has acquired the %s augmentation!", player->GetName().c_str(), GetName().c_str());
 				if (!text.empty())
 				{
