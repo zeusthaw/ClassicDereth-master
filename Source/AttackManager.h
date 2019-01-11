@@ -5,7 +5,7 @@
 class CAttackEventData
 {
 public:
-	CAttackEventData();
+	CAttackEventData()noexcept;
 
 	virtual void Setup();
 	void Begin();
@@ -116,7 +116,7 @@ public:
 	Position _missile_target_position;
 	Vector _missile_velocity;
 	float _missile_dist_to_target = 0.0f;
-	bool m_bTurned;
+	bool m_bTurned = false;
 };
 
 class AttackManager
