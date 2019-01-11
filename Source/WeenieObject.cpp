@@ -6611,7 +6611,9 @@ void CWeenieObject::Remove()
 	m_Qualities.SetInt(PARENT_LOCATION_INT, 0);
 	unset_parent();
 	ReleaseFromBlock();
-	MarkForDestroy();
+	g_pWorld->EnsureRemoved(this);
+	Destroy();
+
 }
 
 void CWeenieObject::DebugValidate()
