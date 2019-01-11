@@ -1807,7 +1807,7 @@ float CPhysicsObj::get_walkable_z()
 
 void CPhysicsObj::set_velocity(const Vector &new_velocity, int send_event)
 {
-	if (new_velocity != m_velocityVector)
+	if (m_velocityVector != new_velocity)
 	{
 		m_velocityVector = new_velocity;
 
