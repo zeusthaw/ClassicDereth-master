@@ -4,14 +4,19 @@
 #include "MathLib.h"
 #include "Frame.h"
 
+inline Vector CrossProduct(const Vector& a, const Vector& b)
+{
+	return Vector(a.y*b.z - a.z*b.y, a.z*b.x - a.x*b.z, a.x*b.y - a.y*b.x);
+}
+
 float FindVectorZ(const Vector& p1, const Vector& p2, const Vector& p3, float x, float y)
 {
-	Vector v1 = p1 - p2;
-	Vector v2 = p1 - p3;
+	Vector v1 = p3 - p1;
+	Vector v2 = p2 - p1;
+	Vector normal = CrossProduct(v1, v2).normalize();
 
-	Vector n = v1.cross(v2);
-	float k = p1.dot_product(n);
-	float z = (k - (n.x * x) - (n.y * y)) / n.z;
+	float poo = -((normal.x * p1.x) + (normal.y * p1.y) + (normal.z * p1.z));
+	float z = (-((normal.x * x) + (normal.y * y) + poo)) / normal.z;
 
 	return z;
 }
@@ -167,8 +172,7 @@ ULONG Vec2D::pack_size()
 
 Vector cross_product(const Vector& v1, const Vector& v2)
 {
-	//return Vector(v1.y*v2.z - v1.z*v2.y, v1.z*v2.x - v1.x*v2.z, v1.x*v2.y - v1.y*v2.x);
-	return v1.cross(v2);
+	return Vector(v1.y*v2.z - v1.z*v2.y, v1.z*v2.x - v1.x*v2.z, v1.x*v2.y - v1.y*v2.x);
 }
 
 BOOL Vector::is_zero() const
@@ -198,11 +202,9 @@ BOOL Vector::normalize_check_small()
 
 	nfactor = 1 / nfactor;
 
-	*this *= nfactor;
-
-	//x *= nfactor;
-	//y *= nfactor;
-	//z *= nfactor;
+	x *= nfactor;
+	y *= nfactor;
+	z *= nfactor;
 
 	return FALSE;
 }
