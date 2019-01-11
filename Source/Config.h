@@ -92,8 +92,11 @@ public:
 
 	virtual unsigned int WcidForPurge() { return m_WcidForPurge; }
 
-
 	virtual bool AllowGeneralChat() { return m_bAllowGeneralChat; }
+
+	virtual double RareDropMultiplier() { return m_fRareDropMultiplier; }
+	virtual bool RealTimeRares() { return m_bRealTimeRares; }
+
 	
 
 protected:
