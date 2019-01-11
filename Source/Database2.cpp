@@ -432,7 +432,7 @@ bool CMYSQLSaveWeenieQuery::PerformQuery(MYSQL *c)
 	}
 
 	char query_string[512];
-	sprintf(query_string, "REPLACE INTO weenies (id, top_level_object_id, block_id, data) VALUES (%u, %u, %u, ?)", _weenie_id, _top_level_object_id, _block_id);
+	sprintf(query_string, "CALL blob_update_weenie(%u, %u, %u, ?)", _weenie_id, _top_level_object_id, _block_id);
 
 	if (mysql_stmt_prepare(statement, query_string, (unsigned long)strlen(query_string)))
 	{
@@ -508,7 +508,8 @@ bool CMYSQLSaveHouseQuery::PerformQuery(MYSQL *c)
 	}
 
 	char query_string[512];
-	sprintf(query_string, "REPLACE INTO houses (house_id, data) VALUES (%u, ?)", _house_id);
+	sprintf(query_string, "CALL blob_update_house(%u, ?)", _house_id);
+
 
 	if (mysql_stmt_prepare(statement, query_string, (unsigned long)strlen(query_string)))
 	{
