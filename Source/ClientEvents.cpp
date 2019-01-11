@@ -348,14 +348,15 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 			wielded->m_Qualities.RemoveDataID(SPELL_DID);
 			wielded->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
 		}
-
+		/*
 		if (g_pConfig->InventoryPurgeOnLogin())
 		{
-			if (wielded->m_Qualities.id == g_pConfig->WcidForPurge() || wielded->m_Qualities.id == 33257 || wielded->m_Qualities.id == 41201 || wielded->m_Qualities.id == 41200 || wielded->m_Qualities.id == 41199 || wielded->m_Qualities.id == 41198 || wielded->m_Qualities.id == 41197 || wielded->m_Qualities.id == 48919 || wielded->m_Qualities.id == 32984 || wielded->m_Qualities.id == 33053 || wielded->m_Qualities.id == 33116 || wielded->m_Qualities.id == 41889 || wielded->m_Qualities.id == 35916 || wielded->m_Qualities.id == 35173 || wielded->m_Qualities.id == 43056 || wielded->m_Qualities.id == 27092 || wielded->m_Qualities.id == 41885 || wielded->m_Qualities.id == 41886 || wielded->m_Qualities.id == 37478 || wielded->m_Qualities.id == 34277 || wielded->m_Qualities.id == 27305 || wielded->m_Qualities.id == 38456 || wielded->m_Qualities.id == 49563)
+			if (wielded->m_Qualities.id == g_pConfig->WcidForPurge() || wielded->m_Qualities.id == 38049 || wielded->m_Qualities.id == 38050 || wielded->m_Qualities.id == 2024 || wielded->m_Qualities.id == 33257 || wielded->m_Qualities.id == 41201 || wielded->m_Qualities.id == 41200 || wielded->m_Qualities.id == 41199 || wielded->m_Qualities.id == 41198 || wielded->m_Qualities.id == 41197 || wielded->m_Qualities.id == 48919 || wielded->m_Qualities.id == 32984 || wielded->m_Qualities.id == 33053 || wielded->m_Qualities.id == 33116 || wielded->m_Qualities.id == 41889 || wielded->m_Qualities.id == 35916 || wielded->m_Qualities.id == 35173 || wielded->m_Qualities.id == 43056 || wielded->m_Qualities.id == 27092 || wielded->m_Qualities.id == 41885 || wielded->m_Qualities.id == 41886 || wielded->m_Qualities.id == 37478 || wielded->m_Qualities.id == 34277 || wielded->m_Qualities.id == 27305 || wielded->m_Qualities.id == 38456 || wielded->m_Qualities.id == 49563)
 			{
 				wielded->_timeToRot = Timer::cur_time; wielded->_beganRot = true;
 			}
 		}
+		*/
 
 		// Remove all expired items, or set _timeToRot if not yet expired.
 		int lifespan = wielded->m_Qualities.GetInt(LIFESPAN_INT, 0);
@@ -659,6 +660,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 				}
 
 				// Remove all loot items with wcid > g_pConfig->WcidForPurge()
+				/*
 				if (g_pConfig->InventoryPurgeOnLogin())
 				{
 					if (item->m_Qualities.id == g_pConfig->WcidForPurge() || item->m_Qualities.id == 33257 || item->m_Qualities.id == 41201 || item->m_Qualities.id == 41200 || item->m_Qualities.id == 41199 || item->m_Qualities.id == 41198 || item->m_Qualities.id == 41197 || item->m_Qualities.id == 48919 || item->m_Qualities.id == 32984 || item->m_Qualities.id == 33053 || item->m_Qualities.id == 33116 || item->m_Qualities.id == 41889 || item->m_Qualities.id == 35916 || item->m_Qualities.id == 35173 || item->m_Qualities.id == 43056 || item->m_Qualities.id == 41885 || item->m_Qualities.id == 41886 || item->m_Qualities.id == 37478 || item->m_Qualities.id == 34277 || item->m_Qualities.id == 27305 || item->m_Qualities.id == 38456 || item->m_Qualities.id == 49563)
@@ -666,6 +668,7 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 						item->_timeToRot = Timer::cur_time; item->_beganRot = true;
 					}
 				}
+				*/
 
 
 				// Remove all expired items, or set _timeToRot if not yet expired.
@@ -710,15 +713,15 @@ void CClientEvents::LoginCharacter(DWORD char_weenie_id, const char *szAccount)
 							item->m_Qualities.RemoveDataID(SPELL_DID);
 							item->m_Qualities.SetFloat(SLAYER_DAMAGE_BONUS_FLOAT, 1.4);
 						}
-
+						/*
 						if (g_pConfig->InventoryPurgeOnLogin())
 						{
-							if (item->m_Qualities.id == g_pConfig->WcidForPurge() || item->m_Qualities.id == 33257 || item->m_Qualities.id == 41201 || item->m_Qualities.id == 41200 || item->m_Qualities.id == 41199 || item->m_Qualities.id == 41198 || item->m_Qualities.id == 41197 || item->m_Qualities.id == 48919 || item->m_Qualities.id == 32984 || item->m_Qualities.id == 33053 || item->m_Qualities.id == 33116 || item->m_Qualities.id == 41889 || item->m_Qualities.id == 35916 || item->m_Qualities.id == 35173 || item->m_Qualities.id == 43056 || item->m_Qualities.id == 27092 || item->m_Qualities.id == 41885 || item->m_Qualities.id == 41886 || item->m_Qualities.id == 37478 || item->m_Qualities.id == 34277 || item->m_Qualities.id == 27305 || item->m_Qualities.id == 38456 || item->m_Qualities.id == 49563)
+							if (item->m_Qualities.id == g_pConfig->WcidForPurge() || item->m_Qualities.id == 38049 || item->m_Qualities.id == 38050 || item->m_Qualities.id == 2024 || item->m_Qualities.id == 33257 || item->m_Qualities.id == 41201 || item->m_Qualities.id == 41200 || item->m_Qualities.id == 41199 || item->m_Qualities.id == 41198 || item->m_Qualities.id == 41197 || item->m_Qualities.id == 48919 || item->m_Qualities.id == 32984 || item->m_Qualities.id == 33053 || item->m_Qualities.id == 33116 || item->m_Qualities.id == 41889 || item->m_Qualities.id == 35916 || item->m_Qualities.id == 35173 || item->m_Qualities.id == 43056 || item->m_Qualities.id == 27092 || item->m_Qualities.id == 41885 || item->m_Qualities.id == 41886 || item->m_Qualities.id == 37478 || item->m_Qualities.id == 34277 || item->m_Qualities.id == 27305 || item->m_Qualities.id == 38456 || item->m_Qualities.id == 49563)
 							{
 								item->_timeToRot = Timer::cur_time; item->_beganRot = true;
 							}
 						}
-
+						*/
 
 						// Remove all expired items, or set _timeToRot if not yet expired.
 						int lifespan = item->m_Qualities.GetInt(LIFESPAN_INT, 0);

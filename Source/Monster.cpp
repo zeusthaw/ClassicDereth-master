@@ -743,6 +743,7 @@ bool CMonsterWeenie::FinishMoveItemToWield(CWeenieObject *sourceItem, DWORD targ
 	}
 	time_t t = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
 	// Remove all loot items with wcid > g_pConfig->WcidForPurge()
+	/*
 	if (g_pConfig->InventoryPurgeOnLogin())
 	{
 		if (sourceItem->m_Qualities.id == g_pConfig->WcidForPurge() || sourceItem->m_Qualities.id == 33257 ||
@@ -793,7 +794,7 @@ bool CMonsterWeenie::FinishMoveItemToWield(CWeenieObject *sourceItem, DWORD targ
 			sourceItem->_beganRot = true;
 		}
 	}
-
+	*/
 
 	// Remove all expired items, or set _timeToRot if not yet expired.
 	int lifespan = sourceItem->m_Qualities.GetInt(LIFESPAN_INT, 0);
