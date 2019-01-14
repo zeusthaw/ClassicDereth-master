@@ -2267,13 +2267,13 @@ void CTreasureFactory::MutateArmor(CWeenieObject *newItem, CWieldTier *wieldTier
 			if (hasRequirement1)
 			{
 				newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_2_INT, eWieldRequirements::level);
-				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_2_INT, 2);
+				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_2_INT, 1);
 				newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_2_INT, wieldTier->minLevel);
 			}
 			else
 			{
 				newItem->m_Qualities.SetInt(WIELD_REQUIREMENTS_INT, eWieldRequirements::level);
-				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_INT, 2);
+				newItem->m_Qualities.SetInt(WIELD_SKILLTYPE_INT, 1);
 				newItem->m_Qualities.SetInt(WIELD_DIFFICULTY_INT, wieldTier->minLevel);
 			}
 		}
